@@ -10,6 +10,7 @@ import TranscriptsList from '../components/TranscriptsList'; // Import Transcrip
 const Home = () => {
   const [transcript, setTranscript] = useState('');
   const [notes, setNotes] = useState<Array<{ id: number; content: string; transcript: string; timestamp: string }>>([]);
+  const [transcripts, setTranscripts] = useState<{ date: string; text: string }[]>([]);
 
   const fetchNotes = async () => {
     const response = await fetch(`${process.env.API_URL}/notes`);
@@ -19,24 +20,32 @@ const Home = () => {
     }
   };
 
+  const fetchTranscripts = () => {
+    const savedTranscripts = JSON.parse(localStorage.getItem('transcripts') || '[]');
+    const sortedTranscripts = savedTranscripts.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setTranscripts(sortedTranscripts);
+    console.log('Transcripts fetched:', sortedTranscripts); // Log the fetched transcripts
+  };
+
   const handleDelete = (id: number) => {
     setNotes(notes.filter(note => note.id !== id));
   };
 
   useEffect(() => {
     fetchNotes(); // Fetch notes on component mount
+    fetchTranscripts(); // Fetch transcripts on component mount
   }, []);
 
   return (
     <div className="min-h-screen bg-off-white text-black flex flex-col items-center justify-center p-8">
       <h1 className="text-4xl font-bold mb-8">Welcome to the Audio Note App</h1>
-      <div className="w-full max-w-2xl space-y-6"> {/* Increased spacing to space-y-6 */}
-        <AudioRecorder setTranscript={setTranscript} updateTranscripts={() => {}} /> {/* Pass updateTranscripts */}
-        <NoteSaver transcript={transcript} onSave={fetchNotes} /> {/* Pass onSave prop */}
-        <NoteList notes={notes} onDelete={handleDelete} /> {/* Pass only notes */}
-        <TranscriptsList /> {/* Add TranscriptsList component */}
+      <div className="w-full max-w-2xl space-y-6">
+        <AudioRecorder setTranscript={setTranscript} updateTranscripts={fetchTranscripts} /> {/* Pass updateTranscripts */}
+        <NoteSaver transcript={transcript} onSave={fetchNotes} />
+        <NoteList notes={notes} onDelete={handleDelete} />
+        <TranscriptsList transcripts={transcripts} /> {/* Pass transcripts to TranscriptsList */}
       </div>
-      <ToastContainer /> {/* Add ToastContainer for notifications */}
+      <ToastContainer />
     </div>
   );
 };
