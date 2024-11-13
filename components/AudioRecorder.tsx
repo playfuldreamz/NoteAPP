@@ -23,7 +23,7 @@ interface SpeechRecognitionEvent extends Event {
 }
 
 interface AudioRecorderProps {
-  setTranscript: (transcript: string) => void;
+  setTranscript: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript }) => {
