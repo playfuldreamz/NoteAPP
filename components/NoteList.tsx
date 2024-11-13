@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Modal from './Modal'; // Import the Modal component
 
 interface NoteListProps {
   notes: Array<{ id: number; content: string; transcript: string; timestamp: string }>;
@@ -8,6 +9,9 @@ interface NoteListProps {
 }
 
 const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<string>('');
+
   const handleDelete = async (id: number) => {
     const response = await fetch(`${process.env.API_URL}/notes/${id}`, {
       method: 'DELETE',
@@ -15,9 +19,20 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
 
     if (response.ok) {
       onDelete(id);
+      toast.success('Note deleted!'); // Notify user
     } else {
       toast.error('Failed to delete note.');
     }
+  };
+
+  const handleSeeMore = (content: string) => {
+    setSelectedNote(content);
+    setIsModalOpen(true);
+  };
+
+  const truncateText = (text: string) => {
+    const words = text.split(' ');
+    return words.length > 5 ? words.slice(0, 5).join(' ') + '...' : text;
   };
 
   return (
@@ -25,11 +40,20 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
       <h2 className="text-2xl font-bold mb-4">Your Notes</h2>
       <ul>
         {notes.map((note) => (
-          <li key={note.id} className="mb-4 p-4 border border-gray-300 rounded-md">
-            <div className="flex justify-between items-center">
+          <li key={note.id} className="mb-4 p-4 border border-gray-300 rounded-md max-h-24 overflow-hidden">
+            <div className="flex justify-between">
               <div>
-                <p className="text-lg font-semibold">{note.content}</p>
-                <p className="text-sm text-gray-500">{note.transcript}</p>
+                <p className="text-lg inline">
+                  {truncateText(note.content)}
+                </p>
+                {note.content.length > 100 && (
+                  <button
+                    onClick={() => handleSeeMore(note.content)}
+                    className="text-blue-500 hover:underline text-xs ml-2" // Made smaller
+                  >
+                    See more
+                  </button>
+                )}
               </div>
               <button
                 onClick={() => handleDelete(note.id)}
@@ -41,6 +65,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           </li>
         ))}
       </ul>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} content={selectedNote} />
     </div>
   );
 };
