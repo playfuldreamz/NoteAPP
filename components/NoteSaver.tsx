@@ -28,14 +28,20 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript }) => {
   };
 
   return (
-    <div>
-      <h2>Save Your Note</h2>
+    <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+      <h2 className="text-2xl font-bold mb-4">Save Your Note</h2>
       <textarea
         value={noteContent}
         onChange={(e) => setNoteContent(e.target.value)}
         placeholder="Write your note here..."
+        className="w-full h-32 p-2 border border-gray-300 rounded-md mb-4 resize-none"
       />
-      <button onClick={saveNote}>Save Note</button>
+      <button 
+        onClick={saveNote}
+        className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
+      >
+        Save Note
+      </button>
     </div>
   );
 };

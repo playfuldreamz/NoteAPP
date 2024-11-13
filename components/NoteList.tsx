@@ -32,13 +32,18 @@ const NoteList = () => {
   };
 
   return (
-    <div>
-      <h2>Saved Notes</h2>
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold mb-4">Saved Notes</h2>
       <ul>
         {notes.map(note => (
-          <li key={note.id}>
-            <p>{note.content}</p>
-            <button onClick={() => deleteNote(note.id)}>Delete</button>
+          <li key={note.id} className="mb-4 p-4 border border-gray-300 rounded-md">
+            <p className="mb-2">{note.content}</p>
+            <button 
+              onClick={() => deleteNote(note.id)}
+              className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors"
+            >
+              Delete
+            </button>
           </li>
         ))}
       </ul>

@@ -92,12 +92,15 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript }) => {
   };
 
   return (
-    <div>
-      <h2>Audio Recorder</h2>
-      <button onClick={isRecording ? stopRecording : startRecording}>
+    <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+      <h2 className="text-2xl font-bold mb-4">Audio Recorder</h2>
+      <button 
+        onClick={isRecording ? stopRecording : startRecording}
+        className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
+      >
         {isRecording ? 'Stop Recording' : 'Start Recording'}
       </button>
-      <p>Transcript: {transcript} {interimTranscript}</p>
+      <p className="mt-4">Transcript: {transcript} {interimTranscript}</p>
     </div>
   );
 };
