@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface NoteSaverProps {
   transcript: string;
+  onSave: () => void; // Add onSave prop
 }
 
-const NoteSaver: React.FC<NoteSaverProps> = ({ transcript }) => {
+const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
   const [noteContent, setNoteContent] = useState('');
 
   const saveNote = async () => {
-    const response = await fetch('/notes', {
+    const response = await fetch(`${process.env.API_URL}/notes`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -20,10 +23,11 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript }) => {
     });
 
     if (response.ok) {
-      alert('Note saved successfully!');
+      toast.success('Note saved successfully!');
       setNoteContent('');
+      onSave(); // Call onSave to refresh notes list
     } else {
-      alert('Failed to save note.');
+      toast.error('Failed to save note.');
     }
   };
 
