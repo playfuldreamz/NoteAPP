@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-toastify'; // Import toast
+import 'react-toastify/dist/ReactToastify.css'; // Import styles
 
 // Extend the Window interface to include SpeechRecognition
 interface Window {
@@ -24,9 +26,10 @@ interface SpeechRecognitionEvent extends Event {
 
 interface AudioRecorderProps {
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
+  updateTranscripts: () => void; // Updated prop for fetching transcripts
 }
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript }) => {
+const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTranscripts }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setLocalTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -91,6 +94,20 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript }) => {
     }
   };
 
+  const handleSaveTranscript = () => {
+    const savedTranscripts = JSON.parse(localStorage.getItem('transcripts') || '[]');
+    const transcriptExists = savedTranscripts.some((t: { text: string }) => t.text === transcript);
+
+    if (!transcriptExists) {
+      savedTranscripts.push({ date: new Date().toISOString(), text: transcript });
+      localStorage.setItem('transcripts', JSON.stringify(savedTranscripts));
+      updateTranscripts(); // Fetch latest transcripts in parent component
+      toast.success('Transcript saved!'); // Use toast for notification
+    } else {
+      toast.info('This transcript has already been saved.'); // Notify if duplicate
+    }
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mb-8">
       <h2 className="text-2xl font-bold mb-4">Audio Recorder</h2>
@@ -101,6 +118,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript }) => {
         {isRecording ? 'Stop Recording' : 'Start Recording'}
       </button>
       <p className="mt-4">Transcript: {transcript} {interimTranscript}</p>
+      <button 
+        onClick={handleSaveTranscript}
+        className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors mt-4"
+      >
+        Save Transcript
+      </button>
     </div>
   );
 };
