@@ -9,17 +9,26 @@ interface Transcript {
 
 interface TranscriptsListProps {
   transcripts: Transcript[]; // Accept transcripts as a prop
+  updateTranscripts: () => void; // Function to update transcripts
 }
 
-const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts }) => {
+const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialTranscripts, updateTranscripts }) => {
+  const [transcripts, setTranscripts] = useState<Transcript[]>(initialTranscripts);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
 
+  useEffect(() => {
+    //console.log('TranscriptsList re-rendered with new transcripts:', initialTranscripts); // Log when the component re-renders
+    setTranscripts(initialTranscripts);
+  }, [initialTranscripts]);
+
   const handleDeleteTranscript = (index: number) => {
-    const savedTranscripts = JSON.parse(localStorage.getItem('transcripts') || '[]');
-    savedTranscripts.splice(index, 1); // Remove the transcript at the specified index
-    localStorage.setItem('transcripts', JSON.stringify(savedTranscripts));
+    const updatedTranscripts = [...transcripts];
+    updatedTranscripts.splice(index, 1); // Remove the transcript at the specified index
+    setTranscripts(updatedTranscripts); // Update local state
+    localStorage.setItem('transcripts', JSON.stringify(updatedTranscripts)); // Update local storage
     toast.success('Transcript deleted!'); // Notify user
+    updateTranscripts(); // Call to update transcripts in parent component
   };
 
   const handleSeeMore = (text: string) => {

@@ -11,6 +11,11 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
   const [noteContent, setNoteContent] = useState('');
 
   const saveNote = async () => {
+    if (!noteContent.trim()) {
+      toast.error('Cannot save an empty note.'); // Notify user
+      return;
+    }
+
     const response = await fetch(`${process.env.API_URL}/notes`, {
       method: 'POST',
       headers: {

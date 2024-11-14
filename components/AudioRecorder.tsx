@@ -95,6 +95,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   };
 
   const handleSaveTranscript = () => {
+    if (!transcript.trim()) {
+      toast.error('Cannot save an empty transcript.'); // Notify user
+      return;
+    }
+
     const savedTranscripts = JSON.parse(localStorage.getItem('transcripts') || '[]');
     const transcriptExists = savedTranscripts.some((t: { text: string }) => t.text === transcript);
 
@@ -106,6 +111,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     } else {
       toast.info('This transcript has already been saved.'); // Notify if duplicate
     }
+  };
+
+  const handleResetTranscripts = () => {
+    setLocalTranscript(''); // Clear local transcript state only
+    setTranscript(''); // Clear transcript in parent component
+    toast.success('Current transcript reset!'); // Notify user
   };
 
   return (
@@ -123,9 +134,17 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       <p className="mt-4">Transcript: {transcript} {interimTranscript}</p>
       <button 
         onClick={handleSaveTranscript}
-        className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors mt-4"
+        className={`bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors mt-4 ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
+        disabled={isRecording}
       >
         Save Transcript
+      </button>
+      <button 
+        onClick={handleResetTranscripts}
+        className={`bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors mt-4 ml-2 ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
+        disabled={isRecording}
+      >
+        Reset Current Transcript
       </button>
     </div>
   );

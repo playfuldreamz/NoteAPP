@@ -24,7 +24,7 @@ const Home = () => {
     const savedTranscripts = JSON.parse(localStorage.getItem('transcripts') || '[]');
     const sortedTranscripts = savedTranscripts.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
     setTranscripts(sortedTranscripts);
-    console.log('Transcripts fetched:', sortedTranscripts); // Log the fetched transcripts
+    //console.log('Transcripts fetched:', sortedTranscripts); // Log the fetched transcripts
   };
 
   const handleDelete = (id: number) => {
@@ -43,7 +43,7 @@ const Home = () => {
         <AudioRecorder setTranscript={setTranscript} updateTranscripts={fetchTranscripts} /> {/* Pass updateTranscripts */}
         <NoteSaver transcript={transcript} onSave={fetchNotes} />
         <NoteList notes={notes} onDelete={handleDelete} />
-        <TranscriptsList transcripts={transcripts} /> {/* Pass transcripts to TranscriptsList */}
+        <TranscriptsList transcripts={transcripts} updateTranscripts={fetchTranscripts} /> {/* Pass updateTranscripts */}
       </div>
       <ToastContainer />
     </div>
