@@ -38,7 +38,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
   const truncateText = (text: string) => {
     const words = text.split(' ');
-    return words.length > 10 ? words.slice(0, 10).join(' ') + '...' : text; // Updated to truncate at 10th word
+    return words.length > 8 ? words.slice(0, 8).join(' ') + '...' : text; // Updated to truncate at 6th word
   };
 
   return (
@@ -56,7 +56,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                   <div>
                     <p className="font-semibold">{new Date(transcript.date).toLocaleString()}</p>
                     <p className="inline">{truncatedText}</p>
-                    {transcript.text.split(' ').length > 10 && (
+                    {transcript.text.split(' ').length > 6 && (
                       <button
                         onClick={() => handleSeeMore(transcript.text)}
                         className="text-blue-500 hover:underline text-xs ml-2"
