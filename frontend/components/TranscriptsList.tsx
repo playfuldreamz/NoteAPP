@@ -16,10 +16,13 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [transcripts, setTranscripts] = useState<Transcript[]>(initialTranscripts);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
+  const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
+  const [showLoadMore, setShowLoadMore] = useState(true);
 
   useEffect(() => {
-    //console.log('TranscriptsList re-rendered with new transcripts:', initialTranscripts); // Log when the component re-renders
     setTranscripts(initialTranscripts);
+    setVisibleTranscripts(initialTranscripts.slice(0, 5));
+    setShowLoadMore(initialTranscripts.length > 5);
   }, [initialTranscripts]);
 
   const handleDeleteTranscript = (index: number) => {
@@ -38,17 +41,24 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
   const truncateText = (text: string) => {
     const words = text.split(' ');
-    return words.length > 8 ? words.slice(0, 8).join(' ') + '...' : text; // Updated to truncate at 6th word
+    return words.length > 6 ? words.slice(0, 6).join(' ') + '...' : text; // Updated to truncate at 6th word
+  };
+
+  const handleLoadMore = () => {
+    const currentLength = visibleTranscripts.length;
+    const newVisibleTranscripts = transcripts.slice(0, currentLength + 5);
+    setVisibleTranscripts(newVisibleTranscripts);
+    setShowLoadMore(newVisibleTranscripts.length < transcripts.length);
   };
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mb-8">
       <h2 className="text-2xl font-bold mb-4">Saved Transcripts</h2>
-      {transcripts.length === 0 ? (
+      {visibleTranscripts.length === 0 ? (
         <p>No transcripts available.</p>
       ) : (
         <ul>
-          {transcripts.map((transcript, index) => {
+          {visibleTranscripts.map((transcript, index) => {
             const truncatedText = truncateText(transcript.text);
             return (
               <li key={index} className="mb-4 p-4 border border-gray-300 rounded-md">
@@ -76,6 +86,14 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
             );
           })}
         </ul>
+      )}
+      {showLoadMore && (
+        <button
+          onClick={handleLoadMore}
+          className="text-blue-500 hover:underline text-sm mt-4"
+        >
+          Load more
+        </button>
       )}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} content={selectedTranscript} />
     </div>
