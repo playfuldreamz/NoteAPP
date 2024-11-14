@@ -36,4 +36,6 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Rest of the global CSS styles */
+.bg-off-white {
+  background-color: #f5f5dc; /* Off-white, creamish color */
+}
