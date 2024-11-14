@@ -6,7 +6,7 @@ import TranscriptsList from "../components/TranscriptsList";
 import NoteSaver from "../components/NoteSaver";
 import NoteList from "../components/NoteList";
 import { useState, useEffect } from "react";
-
+import { Notebook, Mic, FileText, NotebookPen } from 'lucide-react';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -81,24 +81,36 @@ export default function ClientLayout({
             <div className="flex flex-col md:flex-row gap-6">
               <section className="w-full md:w-1/2 space-y-6">
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">Voice Recorder</h2>
+                  <div className="flex items-center mb-4">
+                    <Mic className="w-5 h-5 text-indigo-600" />
+                    <h2 className="text-lg font-medium text-gray-900 ml-2">Voice Recorder</h2>
+                  </div>
                   <AudioRecorder setTranscript={setTranscript} updateTranscripts={updateTranscripts} transcript={transcript} />
                 </div>
 
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">Transcripts</h2>
+                  <div className="flex items-center mb-4">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                    <h2 className="text-lg font-medium text-gray-900 ml-2">Transcripts</h2>
+                  </div>                  
                   <TranscriptsList transcripts={transcripts} updateTranscripts={updateTranscripts} />
                 </div>
               </section>
 
               <section className="w-full md:w-1/2 space-y-6">
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">Create Note</h2>
+                  <div className="flex items-center mb-4">
+                    <NotebookPen className="w-5 h-5 text-indigo-600" />
+                    <h2 className="text-lg font-medium text-gray-900 ml-2">Create Note</h2>
+                  </div>                  
                   <NoteSaver transcript={transcript} onSave={handleSaveNote} />
                 </div>
 
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">Saved Notes</h2>
+                  <div className="flex items-center mb-4">
+                    <Notebook className="w-5 h-5 text-indigo-600" />
+                    <h2 className="text-lg font-medium text-gray-900 ml-2">Saved Notes</h2>
+                  </div>
                   <NoteList notes={notes} onDelete={handleDeleteNote} />
                 </div>
               </section>

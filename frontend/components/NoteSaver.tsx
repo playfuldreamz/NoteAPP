@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { LucideIcon, Save, NotebookPen } from 'lucide-react'; // Import Lucide icons
+import { LucideIcon, Save } from 'lucide-react'; // Import Lucide icons
 
 interface NoteSaverProps {
   transcript: string;
@@ -35,10 +35,6 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-      <div className="flex items-center mb-4">
-        <NotebookPen className="w-5 h-5 text-indigo-600" />
-        <h2 className="text-lg font-medium text-gray-900 ml-2">Create Note</h2>
-      </div>
       <textarea
         value={noteContent}
         onChange={(e) => setNoteContent(e.target.value)}

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal'; // Import the Modal component
-import { LucideIcon, Trash2, Eye, Notebook } from 'lucide-react'; // Import Lucide icons
+import { LucideIcon, Trash2, Eye } from 'lucide-react'; // Import Lucide icons
 
 interface NoteListProps {
   notes: Array<{ id: number; content: string; transcript: string; timestamp: string }>;
@@ -54,10 +54,6 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="flex items-center mb-4">
-        <Notebook className="w-5 h-5 text-indigo-600" />
-        <h2 className="text-lg font-medium text-gray-900 ml-2">Saved Notes</h2>
-      </div>
       <ul>
         {visibleNotes.map((note) => (
           <li key={note.id} className="mb-4 p-4 border border-gray-300 rounded-md max-h-24 overflow-hidden">

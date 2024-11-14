@@ -120,7 +120,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-      <h2 className="text-2xl font-bold mb-4">Audio Recorder</h2>
       <div className="flex items-center">
         <button 
           onClick={isRecording ? stopRecording : startRecording}

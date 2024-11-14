@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify'; // Import toast for notifications
 import Modal from './Modal'; // Import the Modal component
-import { LucideIcon, Trash2, Eye, FileText } from 'lucide-react'; // Import Lucide icons
+import { LucideIcon, Trash2, Eye } from 'lucide-react'; // Import Lucide icons
 
 interface Transcript {
   date: string;
@@ -52,10 +52,6 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-      <div className="flex items-center mb-4">
-        <FileText className="w-5 h-5 text-indigo-600" />
-        <h2 className="text-lg font-medium text-gray-900 ml-2">Saved Transcripts</h2>
-      </div>
       {visibleTranscripts.length === 0 ? (
         <p>No transcripts available.</p>
       ) : (
