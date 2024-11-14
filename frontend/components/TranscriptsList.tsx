@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify'; // Import toast for notifications
 import Modal from './Modal'; // Import the Modal component
-import { LucideIcon, Trash2, Eye } from 'lucide-react'; // Import Lucide icons
+import { ChevronUp, Trash2, Eye } from 'lucide-react'; // Import Lucide icons
 
 interface Transcript {
   date: string;
@@ -50,6 +50,13 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setShowLoadMore(newVisibleTranscripts.length < initialTranscripts.length);
   };
 
+  const handleShowLess = () => {
+    const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setVisibleTranscripts(sortedTranscripts.slice(0, 5));
+    setShowLoadMore(sortedTranscripts.length > 5);
+  };
+
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mb-8">
       {visibleTranscripts.length === 0 ? (
@@ -85,14 +92,18 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           })}
         </ul>
       )}
-      {showLoadMore && (
-        <button
-          onClick={handleLoadMore}
-          className="text-blue-500 hover:underline text-sm mt-4"
-        >
-          Load more
-        </button>
-      )}
+      <div className="flex justify-end mt-4">
+        {showLoadMore && (
+          <button onClick={handleLoadMore} className="text-blue-500 hover:underline text-sm mr-2">
+            Load more
+          </button>
+        )}
+        {visibleTranscripts.length > 5 && (
+          <button onClick={handleShowLess} className="text-blue-500 hover:underline text-sm">
+            <ChevronUp size={16} />
+          </button>
+        )}
+      </div>
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} content={selectedTranscript} />
     </div>
   );

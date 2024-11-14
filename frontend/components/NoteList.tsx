@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal'; // Import the Modal component
-import { LucideIcon, Trash2, Eye } from 'lucide-react'; // Import Lucide icons
+import { ChevronUp, Trash2, Eye } from 'lucide-react'; // Import Lucide icons
 
 interface NoteListProps {
   notes: Array<{ id: number; content: string; transcript: string; timestamp: string }>;
@@ -52,6 +52,12 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     setShowLoadMore(newVisibleNotes.length < sortedNotes.length);
   };
 
+  const handleShowLess = () => {
+    const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    setVisibleNotes(sortedNotes.slice(0, 5));
+    setShowLoadMore(sortedNotes.length > 5);
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <ul>
@@ -59,10 +65,10 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           <li key={note.id} className="mb-4 p-4 border border-gray-300 rounded-md max-h-24 overflow-hidden">
             <div className="flex justify-between">
               <div>
-                <p className="text-base inline"> {/* Reduced font size to text-base */}
+                <p className="text-base inline">
                   {truncateText(note.content)}
                 </p>
-                {note.content.split(' ').length > 5 && ( // Check for truncation
+                {note.content.split(' ').length > 5 && (
                   <button
                     onClick={() => handleSeeMore(note.content)}
                     className="text-blue-500 hover:underline text-xs ml-2"
@@ -81,14 +87,18 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           </li>
         ))}
       </ul>
-      {showLoadMore && (
-        <button
-          onClick={handleLoadMore}
-          className="text-blue-500 hover:underline text-sm mt-4"
-        >
-          Load more
-        </button>
-      )}
+      <div className="flex justify-end mt-4"> {/* Added flex container */}
+        {showLoadMore && (
+          <button onClick={handleLoadMore} className="text-blue-500 hover:underline text-sm mr-2"> {/* Added margin-right */}
+            Load more
+          </button>
+        )}
+        {visibleNotes.length > 5 && (
+          <button onClick={handleShowLess} className="text-blue-500 hover:underline text-sm">
+            <ChevronUp size={16} />
+          </button>
+        )}
+      </div>
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} content={selectedNote} />
     </div>
   );
