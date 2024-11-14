@@ -15,8 +15,9 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   const [showLoadMore, setShowLoadMore] = useState(true);
 
   useEffect(() => {
-    setVisibleNotes(notes.slice(0, 5));
-    setShowLoadMore(notes.length > 5);
+    const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    setVisibleNotes(sortedNotes.slice(0, 5));
+    setShowLoadMore(sortedNotes.length > 5);
   }, [notes]);
 
   const handleDelete = async (id: number) => {
@@ -44,12 +45,11 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
 
   const handleLoadMore = () => {
     const currentLength = visibleNotes.length;
-    const newVisibleNotes = notes.slice(0, currentLength + 5);
+    const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const newVisibleNotes = sortedNotes.slice(0, currentLength + 5);
     setVisibleNotes(newVisibleNotes);
-    setShowLoadMore(newVisibleNotes.length < notes.length);
+    setShowLoadMore(newVisibleNotes.length < sortedNotes.length);
   };
-
-  const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">

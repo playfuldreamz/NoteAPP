@@ -20,9 +20,9 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [showLoadMore, setShowLoadMore] = useState(true);
 
   useEffect(() => {
-    setTranscripts(initialTranscripts);
-    setVisibleTranscripts(initialTranscripts.slice(0, 5));
-    setShowLoadMore(initialTranscripts.length > 5);
+    const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setVisibleTranscripts(sortedTranscripts.slice(0, 5));
+    setShowLoadMore(sortedTranscripts.length > 5);
   }, [initialTranscripts]);
 
   const handleDeleteTranscript = (index: number) => {
@@ -46,9 +46,10 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
   const handleLoadMore = () => {
     const currentLength = visibleTranscripts.length;
-    const newVisibleTranscripts = transcripts.slice(0, currentLength + 5);
+    const sortedTranscripts = [...transcripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const newVisibleTranscripts = sortedTranscripts.slice(0, currentLength + 5);
     setVisibleTranscripts(newVisibleTranscripts);
-    setShowLoadMore(newVisibleTranscripts.length < transcripts.length);
+    setShowLoadMore(newVisibleTranscripts.length < sortedTranscripts.length);
   };
 
   return (

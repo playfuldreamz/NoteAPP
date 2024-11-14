@@ -16,24 +16,20 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
       return;
     }
 
-    const response = await fetch(`${process.env.API_URL}/notes`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        content: noteContent,
-        transcript: transcript,
-      }),
-    });
+    const newNote = {
+      id: Date.now(),
+      content: noteContent,
+      transcript: transcript,
+      timestamp: new Date().toISOString(),
+    };
 
-    if (response.ok) {
-      toast.success('Note saved successfully!');
-      setNoteContent('');
-      onSave(); // Call onSave to refresh notes list
-    } else {
-      toast.error('Failed to save note.');
-    }
+    const updatedNotes = [...JSON.parse(localStorage.getItem('notes') || '[]'), newNote];
+    localStorage.setItem('notes', JSON.stringify(updatedNotes));
+    console.log('Saved note:', newNote, 'Updated notes:', updatedNotes);
+
+    toast.success('Note saved successfully!');
+    setNoteContent('');
+    onSave(); // Call onSave to refresh notes list
   };
 
   return (
