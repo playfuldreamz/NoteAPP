@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify'; // Import toast
 import 'react-toastify/dist/ReactToastify.css'; // Import styles
+import { LucideIcon, Mic, MicOff, Save, RotateCcw } from 'lucide-react'; // Import Lucide icons
 
 // Extend the Window interface to include SpeechRecognition
 interface Window {
@@ -27,11 +28,11 @@ interface SpeechRecognitionEvent extends Event {
 interface AudioRecorderProps {
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
   updateTranscripts: () => void; // Updated prop for fetching transcripts
+  transcript: string; // Add transcript prop
 }
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTranscripts }) => {
+const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTranscripts, transcript }) => {
   const [isRecording, setIsRecording] = useState(false);
-  const [transcript, setLocalTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -62,7 +63,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
 
       // Update state for interim and final transcripts
       if (finalTranscript) {
-        setLocalTranscript(prevTranscript => prevTranscript + finalTranscript);
         setTranscript(prevTranscript => prevTranscript + finalTranscript);
       }
 
@@ -114,7 +114,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   };
 
   const handleResetTranscripts = () => {
-    setLocalTranscript(''); // Clear local transcript state only
     setTranscript(''); // Clear transcript in parent component
     toast.success('Current transcript reset!'); // Notify user
   };
@@ -127,7 +126,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
           onClick={isRecording ? stopRecording : startRecording}
           className={`px-4 py-2 rounded-md transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
         >
-          {isRecording ? 'Stop Recording' : 'Start Recording'}
+          {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
         </button>
         {isRecording && <div className="ml-2 w-6 h-6 bg-red-600 rounded-full animate-pulse" />} {/* Increased size */}
       </div>
@@ -137,14 +136,14 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         className={`bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors mt-4 ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
         disabled={isRecording}
       >
-        Save Transcript
+        <Save size={24} />
       </button>
       <button 
         onClick={handleResetTranscripts}
         className={`bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors mt-4 ml-2 ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
         disabled={isRecording}
       >
-        Reset Current Transcript
+        <RotateCcw size={24} />
       </button>
     </div>
   );

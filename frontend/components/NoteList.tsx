@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal'; // Import the Modal component
+import { LucideIcon, Trash2, Eye, Notebook } from 'lucide-react'; // Import Lucide icons
 
 interface NoteListProps {
   notes: Array<{ id: number; content: string; transcript: string; timestamp: string }>;
@@ -53,7 +54,10 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-4">Your Notes</h2>
+      <div className="flex items-center mb-4">
+        <Notebook className="w-5 h-5 text-indigo-600" />
+        <h2 className="text-lg font-medium text-gray-900 ml-2">Saved Notes</h2>
+      </div>
       <ul>
         {visibleNotes.map((note) => (
           <li key={note.id} className="mb-4 p-4 border border-gray-300 rounded-md max-h-24 overflow-hidden">
@@ -67,15 +71,15 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                     onClick={() => handleSeeMore(note.content)}
                     className="text-blue-500 hover:underline text-xs ml-2"
                   >
-                    See more
+                    <Eye size={16} />
                   </button>
                 )}
               </div>
               <button
                 onClick={() => handleDelete(note.id)}
-                className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition-colors"
+                className="text-red-500 hover:text-red-700"
               >
-                Delete
+                <Trash2 size={16} />
               </button>
             </div>
           </li>

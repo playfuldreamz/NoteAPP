@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify'; // Import toast for notifications
 import Modal from './Modal'; // Import the Modal component
+import { LucideIcon, Trash2, Eye, FileText } from 'lucide-react'; // Import Lucide icons
 
 interface Transcript {
   date: string;
@@ -13,7 +14,6 @@ interface TranscriptsListProps {
 }
 
 const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialTranscripts, updateTranscripts }) => {
-  const [transcripts, setTranscripts] = useState<Transcript[]>(initialTranscripts);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
   const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
@@ -26,9 +26,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   }, [initialTranscripts]);
 
   const handleDeleteTranscript = (index: number) => {
-    const updatedTranscripts = [...transcripts];
+    const updatedTranscripts = [...initialTranscripts];
     updatedTranscripts.splice(index, 1); // Remove the transcript at the specified index
-    setTranscripts(updatedTranscripts); // Update local state
     localStorage.setItem('transcripts', JSON.stringify(updatedTranscripts)); // Update local storage
     toast.success('Transcript deleted!'); // Notify user
     updateTranscripts(); // Call to update transcripts in parent component
@@ -46,15 +45,17 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
   const handleLoadMore = () => {
     const currentLength = visibleTranscripts.length;
-    const sortedTranscripts = [...transcripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const newVisibleTranscripts = sortedTranscripts.slice(0, currentLength + 5);
+    const newVisibleTranscripts = initialTranscripts.slice(0, currentLength + 5);
     setVisibleTranscripts(newVisibleTranscripts);
-    setShowLoadMore(newVisibleTranscripts.length < sortedTranscripts.length);
+    setShowLoadMore(newVisibleTranscripts.length < initialTranscripts.length);
   };
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-      <h2 className="text-2xl font-bold mb-4">Saved Transcripts</h2>
+      <div className="flex items-center mb-4">
+        <FileText className="w-5 h-5 text-indigo-600" />
+        <h2 className="text-lg font-medium text-gray-900 ml-2">Saved Transcripts</h2>
+      </div>
       {visibleTranscripts.length === 0 ? (
         <p>No transcripts available.</p>
       ) : (
@@ -72,15 +73,15 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                         onClick={() => handleSeeMore(transcript.text)}
                         className="text-blue-500 hover:underline text-xs ml-2"
                       >
-                        See more
+                        <Eye size={16} />
                       </button>
                     )}
                   </div>
                   <button
                     onClick={() => handleDeleteTranscript(index)}
-                    className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition-colors"
+                    className="text-red-500 hover:text-red-700"
                   >
-                    Delete
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </li>
