@@ -22,15 +22,31 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   }, [notes]);
 
   const handleDelete = async (id: number) => {
-    const response = await fetch(`${process.env.API_URL}/notes/${id}`, {
-      method: 'DELETE',
-    });
+    try {
+      const token = localStorage.getItem('token'); // Get the auth token
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
 
-    if (response.ok) {
-      onDelete(id);
-      toast.success('Note deleted!'); // Notify user
-    } else {
-      toast.error('Failed to delete note.');
+      const response = await fetch(`http://localhost:5000/notes/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (response.ok) {
+        onDelete(id);
+        toast.success('Note deleted!');
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.message || 'Failed to delete note');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete note');
     }
   };
 

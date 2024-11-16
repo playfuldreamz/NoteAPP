@@ -1,11 +1,12 @@
 "use client";
+import { useEffect, useState } from "react";
+import { useRouter, usePathname } from 'next/navigation';
 import localFont from 'next/font/local';
 import "./globals.css";
 import AudioRecorder from "../components/AudioRecorder";
 import TranscriptsList from "../components/TranscriptsList";
 import NoteSaver from "../components/NoteSaver";
 import NoteList from "../components/NoteList";
-import { useState, useEffect } from "react";
 import { Notebook, Mic, FileText, NotebookPen } from 'lucide-react';
 
 const geistSans = localFont({
@@ -20,15 +21,30 @@ const geistMono = localFont({
   weight: '100 900',
 });
 
-
 export default function ClientLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
   const [transcripts, setTranscripts] = useState<{ date: string; text: string }[]>([]);
   const [notes, setNotes] = useState<{ id: number; content: string; transcript: string; timestamp: string }[]>([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const publicRoutes = ['/login', '/register'];
+    
+    if (!token && !publicRoutes.includes(pathname)) {
+      router.push('/login');
+    } else if (token && publicRoutes.includes(pathname)) {
+      router.push('/');
+    } else {
+      setIsAuthenticated(true);
+    }
+  }, [pathname, router]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -62,16 +78,37 @@ export default function ClientLayout({
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    router.push('/login');
+  };
+
+  // If on login or register page, just render the children
+  if (['/login', '/register'].includes(pathname)) {
+    return (
+      <html lang="en" className="h-full">
+        <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50`}>
+          {children}
+        </body>
+      </html>
+    );
+  }
+
+  // For authenticated routes, render the full layout
   return (
     <html lang="en" className="h-full">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50`}>
-
           <nav className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 shadow-sm z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center h-16">
                 <h1 className="text-xl font-semibold text-gray-900">Voice Notes</h1>
                 <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-500">Powered by AI</span>
+                  <button
+                    onClick={handleLogout}
+                    className="text-sm text-red-600 hover:text-red-800"
+                  >
+                    Logout
+                  </button>
                 </div>
               </div>
             </div>
