@@ -8,6 +8,7 @@ import TranscriptsList from "../components/TranscriptsList";
 import NoteSaver from "../components/NoteSaver";
 import NoteList from "../components/NoteList";
 import { Notebook, Mic, FileText, NotebookPen } from 'lucide-react';
+import { toast } from "react-toastify";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -30,7 +31,7 @@ export default function ClientLayout({
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
-  const [transcripts, setTranscripts] = useState<{ date: string; text: string }[]>([]);
+  const [transcripts, setTranscripts] = useState<{ id: number; text: string; date: string }[]>([]);
   const [notes, setNotes] = useState<{ id: number; content: string; transcript: string; timestamp: string }[]>([]);
 
   useEffect(() => {
@@ -46,36 +47,146 @@ export default function ClientLayout({
     }
   }, [pathname, router]);
 
+  // Fetch notes from backend when authenticated
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      setTranscripts(JSON.parse(localStorage.getItem('transcripts') || '[]'));
-      setNotes(JSON.parse(localStorage.getItem('notes') || '[]'));
-    }
-  }, []);
+    const fetchNotes = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
 
-  const updateTranscripts = () => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const newTranscripts = JSON.parse(localStorage.getItem('transcripts') || '[]');
-      console.log('Updating transcripts:', newTranscripts);
-      setTranscripts(newTranscripts);
+      try {
+        const response = await fetch('http://localhost:5000/notes', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setNotes(data);
+        } else {
+          console.error('Failed to fetch notes');
+        }
+      } catch (error) {
+        console.error('Error fetching notes:', error);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchNotes();
+    }
+  }, [isAuthenticated]);
+
+  // Fetch transcripts from backend when authenticated
+  useEffect(() => {
+    const fetchTranscripts = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const response = await fetch('http://localhost:5000/transcripts', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setTranscripts(data);
+        } else {
+          console.error('Failed to fetch transcripts');
+        }
+      } catch (error) {
+        console.error('Error fetching transcripts:', error);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchTranscripts();
+    }
+  }, [isAuthenticated]);
+
+  const updateTranscripts = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch('http://localhost:5000/transcripts', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTranscripts(data);
+      }
+    } catch (error) {
+      console.error('Error fetching transcripts:', error);
+    }
+  };
+
+  const handleSaveTranscript = async (text: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Please login to save transcript');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/transcripts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text })
+      });
+
+      if (response.ok) {
+        updateTranscripts(); // Refresh the transcripts list
+        toast.success('Transcript saved!');
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to save transcript');
+      }
+    } catch (error) {
+      console.error('Save transcript error:', error);
+      toast.error('Failed to save transcript');
     }
   };
 
   const handleSaveNote = () => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const newNotes = JSON.parse(localStorage.getItem('notes') || '[]');
-      console.log('Updating notes:', newNotes);
-      setNotes(newNotes);
-    }
+    // Refresh notes from the backend after saving
+    const fetchNotes = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const response = await fetch('http://localhost:5000/notes', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setNotes(data);
+        }
+      } catch (error) {
+        console.error('Error fetching notes:', error);
+      }
+    };
+
+    fetchNotes();
   };
 
   const handleDeleteNote = (id: number) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const updatedNotes = notes.filter(note => note.id !== id);
-      console.log('Deleting note:', id, 'Updated notes:', updatedNotes);
-      setNotes(updatedNotes);
-      localStorage.setItem('notes', JSON.stringify(updatedNotes));
-    }
+    // Remove from local state immediately for better UX
+    setNotes(prevNotes => prevNotes.filter(note => note.id !== id));
   };
 
   const handleLogout = () => {

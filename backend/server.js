@@ -59,6 +59,15 @@ db.serialize(() => {
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
   )`);
+
+  // Create transcripts table with user_id foreign key
+  db.run(`CREATE TABLE transcripts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT,
+    user_id INTEGER,
+    date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )`);
 });
 
 // Auth routes
@@ -159,6 +168,57 @@ app.delete('/notes/:id', authenticateToken, (req, res) => {
         return;
       }
       res.json({ message: 'Note deleted' });
+    });
+});
+
+// Transcript routes
+app.get('/transcripts', authenticateToken, (req, res) => {
+  db.all('SELECT * FROM transcripts WHERE user_id = ? ORDER BY date DESC', 
+    [req.user.id], 
+    (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json(rows);
+    });
+});
+
+app.post('/transcripts', authenticateToken, (req, res) => {
+  const { text } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: 'Text is required' });
+  }
+
+  db.run('INSERT INTO transcripts (text, user_id) VALUES (?, ?)',
+    [text, req.user.id],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.status(201).json({ 
+        id: this.lastID, 
+        text,
+        date: new Date().toISOString(),
+        user_id: req.user.id 
+      });
+    });
+});
+
+app.delete('/transcripts/:id', authenticateToken, (req, res) => {
+  db.run('DELETE FROM transcripts WHERE id = ? AND user_id = ?',
+    [req.params.id, req.user.id],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      if (this.changes === 0) {
+        res.status(404).json({ error: 'Transcript not found or unauthorized' });
+        return;
+      }
+      res.json({ message: 'Transcript deleted' });
     });
 });
 

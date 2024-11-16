@@ -94,28 +94,44 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     }
   };
 
-  const handleSaveTranscript = () => {
+  const handleSaveTranscript = async () => {
     if (!transcript.trim()) {
-      toast.error('Cannot save an empty transcript.'); // Notify user
+      toast.error('Cannot save an empty transcript.');
       return;
     }
 
-    const savedTranscripts = JSON.parse(localStorage.getItem('transcripts') || '[]');
-    const transcriptExists = savedTranscripts.some((t: { text: string }) => t.text === transcript);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Please login to save transcript');
+      return;
+    }
 
-    if (!transcriptExists) {
-      savedTranscripts.push({ date: new Date().toISOString(), text: transcript });
-      localStorage.setItem('transcripts', JSON.stringify(savedTranscripts));
-      updateTranscripts(); // Fetch latest transcripts in parent component
-      toast.success('Transcript saved!'); // Use toast for notification
-    } else {
-      toast.info('This transcript has already been saved.'); // Notify if duplicate
+    try {
+      const response = await fetch('http://localhost:5000/transcripts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text: transcript })
+      });
+
+      if (response.ok) {
+        toast.success('Transcript saved!');
+        updateTranscripts(); // Fetch latest transcripts in parent component
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to save transcript');
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error('Failed to save transcript. Please try again');
     }
   };
 
   const handleResetTranscripts = () => {
-    setTranscript(''); // Clear transcript in parent component
-    toast.success('Current transcript reset!'); // Notify user
+    setTranscript('');
+    toast.success('Current transcript reset!');
   };
 
   return (

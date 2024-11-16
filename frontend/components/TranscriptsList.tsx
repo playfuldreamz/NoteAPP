@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { toast } from 'react-toastify'; // Import toast for notifications
-import Modal from './Modal'; // Import the Modal component
-import { ChevronUp, Trash2, Eye } from 'lucide-react'; // Import Lucide icons
+import { toast } from 'react-toastify';
+import Modal from './Modal';
+import { ChevronUp, Trash2, Eye } from 'lucide-react';
 
 interface Transcript {
-  date: string;
+  id: number;
   text: string;
+  date: string;
 }
 
 interface TranscriptsListProps {
-  transcripts: Transcript[]; // Accept transcripts as a prop
-  updateTranscripts: () => void; // Function to update transcripts
+  transcripts: Transcript[];
+  updateTranscripts: () => void;
 }
 
 const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialTranscripts, updateTranscripts }) => {
@@ -25,12 +26,33 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setShowLoadMore(sortedTranscripts.length > 5);
   }, [initialTranscripts]);
 
-  const handleDeleteTranscript = (index: number) => {
-    const updatedTranscripts = [...initialTranscripts];
-    updatedTranscripts.splice(index, 1); // Remove the transcript at the specified index
-    localStorage.setItem('transcripts', JSON.stringify(updatedTranscripts)); // Update local storage
-    toast.success('Transcript deleted!'); // Notify user
-    updateTranscripts(); // Call to update transcripts in parent component
+  const handleDeleteTranscript = async (id: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const response = await fetch(`http://localhost:5000/transcripts/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (response.ok) {
+        toast.success('Transcript deleted!');
+        updateTranscripts(); // Call to update transcripts in parent component
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to delete transcript');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete transcript');
+    }
   };
 
   const handleSeeMore = (text: string) => {
@@ -40,12 +62,13 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
   const truncateText = (text: string) => {
     const words = text.split(' ');
-    return words.length > 6 ? words.slice(0, 6).join(' ') + '...' : text; // Updated to truncate at 6th word
+    return words.length > 6 ? words.slice(0, 6).join(' ') + '...' : text;
   };
 
   const handleLoadMore = () => {
     const currentLength = visibleTranscripts.length;
-    const newVisibleTranscripts = initialTranscripts.slice(0, currentLength + 5);
+    const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const newVisibleTranscripts = sortedTranscripts.slice(0, currentLength + 5);
     setVisibleTranscripts(newVisibleTranscripts);
     setShowLoadMore(newVisibleTranscripts.length < initialTranscripts.length);
   };
@@ -56,17 +79,16 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setShowLoadMore(sortedTranscripts.length > 5);
   };
 
-
   return (
     <div className="bg-white p-6 rounded-lg shadow-md mb-8">
       {visibleTranscripts.length === 0 ? (
         <p>No transcripts available.</p>
       ) : (
         <ul>
-          {visibleTranscripts.map((transcript, index) => {
+          {visibleTranscripts.map((transcript) => {
             const truncatedText = truncateText(transcript.text);
             return (
-              <li key={index} className="mb-4 p-4 border border-gray-300 rounded-md">
+              <li key={transcript.id} className="mb-4 p-4 border border-gray-300 rounded-md">
                 <div className="flex justify-between">
                   <div>
                     <p className="font-semibold">{new Date(transcript.date).toLocaleString()}</p>
@@ -81,7 +103,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                     )}
                   </div>
                   <button
-                    onClick={() => handleDeleteTranscript(index)}
+                    onClick={() => handleDeleteTranscript(transcript.id)}
                     className="text-red-500 hover:text-red-700"
                   >
                     <Trash2 size={16} />

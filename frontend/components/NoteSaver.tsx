@@ -1,36 +1,57 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { LucideIcon, Save } from 'lucide-react'; // Import Lucide icons
+import { Save } from 'lucide-react';
 
 interface NoteSaverProps {
   transcript: string;
-  onSave: () => void; // Add onSave prop
+  onSave: () => void;
 }
 
 const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
   const [noteContent, setNoteContent] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const saveNote = async () => {
     if (!noteContent.trim()) {
-      toast.error('Cannot save an empty note.'); // Notify user
+      toast.error('Cannot save an empty note.');
       return;
     }
 
-    const newNote = {
-      id: Date.now(),
-      content: noteContent,
-      transcript: transcript,
-      timestamp: new Date().toISOString(),
-    };
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Please login to save notes');
+      return;
+    }
 
-    const updatedNotes = [...JSON.parse(localStorage.getItem('notes') || '[]'), newNote];
-    localStorage.setItem('notes', JSON.stringify(updatedNotes));
-    console.log('Saved note:', newNote, 'Updated notes:', updatedNotes);
+    setIsSaving(true);
+    try {
+      const response = await fetch('http://localhost:5000/notes', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          content: noteContent,
+          transcript: transcript
+        })
+      });
 
-    toast.success('Note saved successfully!');
-    setNoteContent('');
-    onSave(); // Call onSave to refresh notes list
+      if (response.ok) {
+        toast.success('Note saved successfully!');
+        setNoteContent(''); // Clear the input
+        onSave(); // Refresh the notes list
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to save note');
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error('Failed to save note. Please try again');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -39,13 +60,20 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
         value={noteContent}
         onChange={(e) => setNoteContent(e.target.value)}
         placeholder="Write your note here..."
-        className="w-full h-32 p-2 border border-gray-300 rounded-md mb-4 resize-none"
+        className="w-full h-32 p-2 border border-gray-300 rounded-md mb-4 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        disabled={isSaving}
       />
       <button 
         onClick={saveNote}
-        className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
+        disabled={isSaving}
+        className={`flex items-center gap-2 ${
+          isSaving 
+            ? 'bg-gray-400 cursor-not-allowed' 
+            : 'bg-green-500 hover:bg-green-600'
+        } text-white px-4 py-2 rounded-md transition-colors`}
       >
-        <Save size={24} />
+        <Save size={20} />
+        {isSaving ? 'Saving...' : 'Save Note'}
       </button>
     </div>
   );
