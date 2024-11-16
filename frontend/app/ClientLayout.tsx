@@ -33,17 +33,22 @@ export default function ClientLayout({
   const [transcript, setTranscript] = useState<string>('');
   const [transcripts, setTranscripts] = useState<{ id: number; text: string; date: string }[]>([]);
   const [notes, setNotes] = useState<{ id: number; content: string; transcript: string; timestamp: string }[]>([]);
+  const [username, setUsername] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
+    const storedUsername = localStorage.getItem('username');
     const publicRoutes = ['/login', '/register'];
     
     if (!token && !publicRoutes.includes(pathname)) {
       router.push('/login');
     } else if (token && publicRoutes.includes(pathname)) {
       router.push('/');
-    } else {
+    } else if (token) {
       setIsAuthenticated(true);
+      if (storedUsername) {
+        setUsername(storedUsername);
+      }
     }
   }, [pathname, router]);
 
@@ -191,6 +196,7 @@ export default function ClientLayout({
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('username');
     router.push('/login');
   };
 
@@ -214,6 +220,7 @@ export default function ClientLayout({
               <div className="flex justify-between items-center h-16">
                 <h1 className="text-xl font-semibold text-gray-900">Voice Notes</h1>
                 <div className="flex items-center space-x-4">
+                  {username && <span className="text-sm text-gray-600">Hello, {username}</span>}
                   <button
                     onClick={handleLogout}
                     className="text-sm text-red-600 hover:text-red-800"

@@ -96,7 +96,7 @@ app.post('/register', async (req, res) => {
 
         // Create token
         const token = jwt.sign({ id: this.lastID, username }, JWT_SECRET);
-        res.status(201).json({ token });
+        res.status(201).json({ token, username }); // Include username in response
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -127,7 +127,7 @@ app.post('/login', async (req, res) => {
 
     // Create token
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET);
-    res.json({ token });
+    res.json({ token, username: user.username }); // Include username in response
   });
 });
 

@@ -50,8 +50,9 @@ const RegisterForm = () => {
         throw new Error(data.error || 'Registration failed');
       }
 
-      // Store the token
+      // Store the token and username
       localStorage.setItem('token', data.token);
+      localStorage.setItem('username', data.username);
       
       // Redirect to home page
       router.push('/');
