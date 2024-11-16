@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from 'next/navigation';
 import localFont from 'next/font/local';
 import "./globals.css";
@@ -35,84 +35,32 @@ export default function ClientLayout({
   const [notes, setNotes] = useState<{ id: number; content: string; transcript: string; timestamp: string }[]>([]);
   const [username, setUsername] = useState('');
 
-  useEffect(() => {
+  const fetchNotes = useCallback(async () => {
     const token = localStorage.getItem('token');
-    const storedUsername = localStorage.getItem('username');
-    const publicRoutes = ['/login', '/register'];
-    
-    if (!token && !publicRoutes.includes(pathname)) {
-      router.push('/login');
-    } else if (token && publicRoutes.includes(pathname)) {
-      router.push('/');
-    } else if (token) {
-      setIsAuthenticated(true);
-      if (storedUsername) {
-        setUsername(storedUsername);
-      }
-    }
-  }, [pathname, router]);
+    if (!token) return;
 
-  // Fetch notes from backend when authenticated
-  useEffect(() => {
-    const fetchNotes = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      try {
-        const response = await fetch('http://localhost:5000/notes', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setNotes(data);
-        } else {
-          console.error('Failed to fetch notes');
+    try {
+      const response = await fetch('http://localhost:5000/notes', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      } catch (error) {
-        console.error('Error fetching notes:', error);
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotes(data);
+      } else {
+        console.error('Failed to fetch notes');
+        toast.error('Failed to fetch notes');
       }
-    };
-
-    if (isAuthenticated) {
-      fetchNotes();
+    } catch (error) {
+      console.error('Error fetching notes:', error);
+      toast.error('Network error while fetching notes');
     }
-  }, [isAuthenticated]);
+  }, []);
 
-  // Fetch transcripts from backend when authenticated
-  useEffect(() => {
-    const fetchTranscripts = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      try {
-        const response = await fetch('http://localhost:5000/transcripts', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setTranscripts(data);
-        } else {
-          console.error('Failed to fetch transcripts');
-        }
-      } catch (error) {
-        console.error('Error fetching transcripts:', error);
-      }
-    };
-
-    if (isAuthenticated) {
-      fetchTranscripts();
-    }
-  }, [isAuthenticated]);
-
-  const updateTranscripts = async () => {
+  const fetchTranscripts = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -127,77 +75,58 @@ export default function ClientLayout({
       if (response.ok) {
         const data = await response.json();
         setTranscripts(data);
+      } else {
+        console.error('Failed to fetch transcripts');
+        toast.error('Failed to fetch transcripts');
       }
     } catch (error) {
       console.error('Error fetching transcripts:', error);
+      toast.error('Network error while fetching transcripts');
     }
-  };
+  }, []);
 
-  const handleSaveTranscript = async (text: string) => {
+  useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      toast.error('Please login to save transcript');
-      return;
-    }
-
-    try {
-      const response = await fetch('http://localhost:5000/transcripts', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text })
-      });
-
-      if (response.ok) {
-        updateTranscripts(); // Refresh the transcripts list
-        toast.success('Transcript saved!');
-      } else {
-        const data = await response.json();
-        toast.error(data.error || 'Failed to save transcript');
+    const storedUsername = localStorage.getItem('username');
+    const publicRoutes = ['/login', '/register'];
+    
+    if (!token && !publicRoutes.includes(pathname)) {
+      router.push('/login');
+    } else if (token && publicRoutes.includes(pathname)) {
+      router.push('/');
+    } else if (token) {
+      setIsAuthenticated(true);
+      if (storedUsername) {
+        setUsername(storedUsername);
       }
-    } catch (error) {
-      console.error('Save transcript error:', error);
-      toast.error('Failed to save transcript');
+      fetchNotes();
+      fetchTranscripts();
+    } else {
+      setIsAuthenticated(false);
+      setNotes([]);
+      setTranscripts([]);
     }
-  };
-
-  const handleSaveNote = () => {
-    // Refresh notes from the backend after saving
-    const fetchNotes = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      try {
-        const response = await fetch('http://localhost:5000/notes', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setNotes(data);
-        }
-      } catch (error) {
-        console.error('Error fetching notes:', error);
-      }
-    };
-
-    fetchNotes();
-  };
-
-  const handleDeleteNote = (id: number) => {
-    // Remove from local state immediately for better UX
-    setNotes(prevNotes => prevNotes.filter(note => note.id !== id));
-  };
+  }, [pathname, router, fetchNotes, fetchTranscripts]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+    setIsAuthenticated(false);
+    setNotes([]);
+    setTranscripts([]);
     router.push('/login');
+  };
+
+  const handleDeleteNote = (id: number) => {
+    setNotes(prevNotes => prevNotes.filter(note => note.id !== id));
+  };
+
+  const handleSaveNote = () => {
+    fetchNotes();
+  };
+
+  const updateTranscripts = () => {
+    fetchTranscripts();
   };
 
   // If on login or register page, just render the children
