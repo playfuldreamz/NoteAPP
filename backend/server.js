@@ -33,17 +33,17 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Database setup
-const db = new sqlite3.Database(':memory:', (err) => {
+const db = new sqlite3.Database('database.sqlite', (err) => {
   if (err) {
     console.error(err.message);
   }
-  console.log('Connected to the in-memory SQLite database.');
+  console.log('Connected to the SQLite database.');
 });
 
-// Create tables
+// Create tables if they don't exist
 db.serialize(() => {
   // Create users table
-  db.run(`CREATE TABLE users (
+  db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
     password TEXT,
@@ -51,7 +51,7 @@ db.serialize(() => {
   )`);
 
   // Create notes table with user_id foreign key
-  db.run(`CREATE TABLE notes (
+  db.run(`CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     content TEXT,
     transcript TEXT,
@@ -61,7 +61,7 @@ db.serialize(() => {
   )`);
 
   // Create transcripts table with user_id foreign key
-  db.run(`CREATE TABLE transcripts (
+  db.run(`CREATE TABLE IF NOT EXISTS transcripts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     text TEXT,
     user_id INTEGER,
