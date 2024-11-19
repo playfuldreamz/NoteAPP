@@ -1,18 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Modal from './Modal'; // Import the Modal component
-import { ChevronUp, Trash2, Eye } from 'lucide-react'; // Import Lucide icons
+import Modal from './Modal';
+import { ChevronUp, Trash2, Eye } from 'lucide-react';
 
 interface NoteListProps {
-  notes: Array<{ id: number; content: string; transcript: string; timestamp: string }>;
+  notes: Array<{
+    id: number;
+    content: string;
+    transcript: string;
+    timestamp: string;
+    title: string;
+  }>;
   onDelete: (id: number) => void;
 }
 
 const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<string>('');
-  const [visibleNotes, setVisibleNotes] = useState<Array<{ id: number; content: string; transcript: string; timestamp: string }>>([]);
+  const [visibleNotes, setVisibleNotes] = useState<Array<{
+    id: number;
+    content: string;
+    transcript: string;
+    timestamp: string;
+    title: string;
+  }>>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
 
   useEffect(() => {
@@ -23,7 +35,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
 
   const handleDelete = async (id: number) => {
     try {
-      const token = localStorage.getItem('token'); // Get the auth token
+      const token = localStorage.getItem('token');
       if (!token) {
         toast.error('Authentication required');
         return;
@@ -57,7 +69,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
 
   const truncateText = (text: string) => {
     const words = text.split(' ');
-    return words.length > 5 ? words.slice(0, 5).join(' ') + '...' : text; // Truncate at 5th word
+    return words.length > 5 ? words.slice(0, 5).join(' ') + '...' : text;
   };
 
   const handleLoadMore = () => {
@@ -78,9 +90,20 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     <div className="bg-white p-6 rounded-lg shadow-md">
       <ul>
         {visibleNotes.map((note) => (
-          <li key={note.id} className="mb-4 p-4 border border-gray-300 rounded-md max-h-24 overflow-hidden">
-            <div className="flex justify-between">
-              <div>
+          <li key={note.id} className="mb-4 p-4 border border-gray-300 rounded-md">
+            <div className="flex flex-col">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {note.title || 'Untitled Note'}
+                </h3>
+                <button
+                  onClick={() => handleDelete(note.id)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              <div className="text-gray-600">
                 <p className="text-base inline">
                   {truncateText(note.content)}
                 </p>
@@ -93,19 +116,16 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                   </button>
                 )}
               </div>
-              <button
-                onClick={() => handleDelete(note.id)}
-                className="text-red-500 hover:text-red-700"
-              >
-                <Trash2 size={16} />
-              </button>
+              <div className="text-xs text-gray-400 mt-2">
+                {new Date(note.timestamp).toLocaleString()}
+              </div>
             </div>
           </li>
         ))}
       </ul>
-      <div className="flex justify-end mt-4"> {/* Added flex container */}
+      <div className="flex justify-end mt-4">
         {showLoadMore && (
-          <button onClick={handleLoadMore} className="text-blue-500 hover:underline text-sm mr-2"> {/* Added margin-right */}
+          <button onClick={handleLoadMore} className="text-blue-500 hover:underline text-sm mr-2">
             Load more
           </button>
         )}

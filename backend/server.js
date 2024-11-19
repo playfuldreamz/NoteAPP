@@ -1,18 +1,27 @@
+// Load environment variables
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// Import routes
+const aiRoutes = require('./routes/ai');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // JWT secret key - in production, use an environment variable
-const JWT_SECRET = 'your-secret-key'; // TODO: Move to environment variable
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Mount routes
+app.use('/api/ai', aiRoutes);
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -50,13 +59,36 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Create notes table with user_id foreign key
+  // Create notes table with user_id foreign key and title
   db.run(`CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     content TEXT,
+    title TEXT,
     transcript TEXT,
     user_id INTEGER,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )`);
+
+  // Create app_settings table for global AI configuration
+  db.run(`CREATE TABLE IF NOT EXISTS app_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL,
+    api_key TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Create user_settings table for user-specific API keys
+  db.run(`CREATE TABLE IF NOT EXISTS user_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    provider TEXT NOT NULL,
+    api_key TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
   )`);
 
@@ -143,15 +175,15 @@ app.get('/notes', authenticateToken, (req, res) => {
 });
 
 app.post('/notes', authenticateToken, (req, res) => {
-  const { content, transcript } = req.body;
-  db.run('INSERT INTO notes (content, transcript, user_id) VALUES (?, ?, ?)', 
-    [content, transcript, req.user.id], 
+  const { content, title, transcript } = req.body;
+  db.run('INSERT INTO notes (content, title, transcript, user_id) VALUES (?, ?, ?, ?)', 
+    [content, title, transcript, req.user.id], 
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
-      res.status(201).json({ id: this.lastID, content, transcript });
+      res.status(201).json({ id: this.lastID, content, title, transcript });
     });
 });
 
