@@ -29,6 +29,7 @@ export default function ClientLayout({
 }>) {
   const router = useRouter();
   const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
@@ -95,7 +96,7 @@ export default function ClientLayout({
   useEffect(() => {
     const token = localStorage.getItem('token');
     const storedUsername = localStorage.getItem('username');
-    const publicRoutes = ['/login', '/register'];
+    const publicRoutes = ['/login', '/register']
 
     if (!token && !publicRoutes.includes(pathname)) {
       router.push('/login');
@@ -121,6 +122,7 @@ export default function ClientLayout({
       setNotes([]);
       setTranscripts([]);
     }
+    setIsLoading(false);
   }, [pathname, router, fetchNotes, fetchTranscripts]);
 
   const handleLogout = () => {
@@ -144,6 +146,11 @@ export default function ClientLayout({
   const updateTranscripts = () => {
     fetchTranscripts();
   };
+
+  // If still loading, show nothing
+  if (isLoading) {
+    return null;
+  }
 
   // If on login or register page, just render the children
   if (['/login', '/register'].includes(pathname)) {
@@ -203,44 +210,36 @@ export default function ClientLayout({
           </div>
         </nav>
 
-        <main className="pt-20 pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row gap-6">
-            <section className="w-full md:w-1/2 space-y-6">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center mb-4">
-                  <Mic className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-medium text-gray-900 ml-2">Voice Recorder</h2>
-                </div>
-                <AudioRecorder setTranscript={setTranscript} updateTranscripts={updateTranscripts} transcript={transcript} />
-              </div>
-
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center mb-4">
-                  <FileText className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-medium text-gray-900 ml-2">Transcripts</h2>
-                </div>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+          {children}
+          {isAuthenticated && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8">
+              <div>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                  <Mic className="w-6 h-6" />
+                  Voice Recording
+                </h2>
+                <AudioRecorder updateTranscripts={updateTranscripts} setTranscript={setTranscript} transcript={transcript} />
+                <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-2">
+                  <FileText className="w-6 h-6" />
+                  Transcripts
+                </h2>
                 <TranscriptsList transcripts={transcripts} updateTranscripts={updateTranscripts} />
               </div>
-            </section>
-
-            <section className="w-full md:w-1/2 space-y-6">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center mb-4">
-                  <NotebookPen className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-medium text-gray-900 ml-2">Create Note</h2>
-                </div>
+              <div>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                  <NotebookPen className="w-6 h-6" />
+                  Create Note
+                </h2>
                 <NoteSaver transcript={transcript} onSave={handleSaveNote} />
-              </div>
-
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center mb-4">
-                  <Notebook className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-medium text-gray-900 ml-2">Saved Notes</h2>
-                </div>
+                <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-2">
+                  <Notebook className="w-6 h-6" />
+                  Notes
+                </h2>
                 <NoteList notes={notes} onDelete={handleDeleteNote} />
               </div>
-            </section>
-          </div>
+            </div>
+          )}
         </main>
       </body>
     </html>
