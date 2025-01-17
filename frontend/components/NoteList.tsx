@@ -87,13 +87,13 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
       <ul>
         {visibleNotes.map((note) => (
-          <li key={note.id} className="mb-4 p-4 border border-gray-300 rounded-md">
+          <li key={note.id} className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-md">
             <div className="flex flex-col">
               <div className="flex justify-between items-start mb-2">
-                <h3 className="text-lg font-semibold text-gray-800">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
                   {note.title || 'Untitled Note'}
                 </h3>
                 <button

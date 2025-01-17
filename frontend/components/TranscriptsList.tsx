@@ -80,19 +80,19 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
       {visibleTranscripts.length === 0 ? (
-        <p>No transcripts available.</p>
+        <p className="dark:text-gray-200">No transcripts available.</p>
       ) : (
         <ul>
           {visibleTranscripts.map((transcript) => {
             const truncatedText = truncateText(transcript.text);
             return (
-              <li key={transcript.id} className="mb-4 p-4 border border-gray-300 rounded-md">
+              <li key={transcript.id} className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-md">
                 <div className="flex justify-between">
                   <div>
-                    <p className="font-semibold">{new Date(transcript.date).toLocaleString()}</p>
-                    <p className="inline">{truncatedText}</p>
+                    <p className="font-semibold dark:text-gray-200">{new Date(transcript.date).toLocaleString()}</p>
+                    <p className="inline dark:text-gray-300">{truncatedText}</p>
                     {transcript.text.split(' ').length > 6 && (
                       <button
                         onClick={() => handleSeeMore(transcript.text)}

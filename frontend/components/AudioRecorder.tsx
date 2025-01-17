@@ -135,7 +135,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
       <div className="flex items-center">
         <button 
           onClick={isRecording ? stopRecording : startRecording}
@@ -145,7 +145,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         </button>
         {isRecording && <div className="ml-2 w-6 h-6 bg-red-600 rounded-full animate-pulse" />} {/* Increased size */}
       </div>
-      <p className="mt-4">Transcript: {transcript} {interimTranscript}</p>
+      <p className="mt-4 dark:text-gray-200">Transcript: {transcript} {interimTranscript}</p>
       <button 
         onClick={handleSaveTranscript}
         className={`bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors mt-4 ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
