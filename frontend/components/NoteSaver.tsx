@@ -73,12 +73,12 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
       <textarea
         value={noteContent}
         onChange={(e) => setNoteContent(e.target.value)}
         placeholder="Write your note here..."
-        className="w-full h-32 p-2 border border-gray-300 rounded-md mb-4 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="w-full h-32 p-2 border border-gray-300 dark:border-gray-600 rounded-md mb-4 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
         disabled={isSaving || isGeneratingTitle}
       />
       <button 

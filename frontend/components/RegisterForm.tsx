@@ -8,6 +8,7 @@ const RegisterForm = () => {
   const router = useRouter();
   const [formData, setFormData] = useState({
     username: '',
+    email: '',
     password: '',
     confirmPassword: ''
   });
@@ -24,13 +25,13 @@ const RegisterForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      setLoading(false);
       return;
     }
-
-    setLoading(true);
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/register`, {
@@ -38,10 +39,7 @@ const RegisterForm = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          username: formData.username,
-          password: formData.password
-        }),
+        body: JSON.stringify(formData),
       });
 
       const data = await response.json();
@@ -50,12 +48,8 @@ const RegisterForm = () => {
         throw new Error(data.error || 'Registration failed');
       }
 
-      // Store the token and username
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('username', data.username);
-      
-      // Redirect to home page
-      router.push('/');
+      // Redirect to login page after successful registration
+      router.push('/login');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -64,72 +58,94 @@ const RegisterForm = () => {
   };
 
   return (
-    <div className="w-full max-w-md">
-      <form onSubmit={handleSubmit} className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">
-            Username
-          </label>
-          <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            id="username"
-            type="text"
-            name="username"
-            placeholder="Username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
-            Password
-          </label>
-          <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
-            id="password"
-            type="password"
-            name="password"
-            placeholder="******************"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="confirmPassword">
-            Confirm Password
-          </label>
-          <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
-            id="confirmPassword"
-            type="password"
-            name="confirmPassword"
-            placeholder="******************"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        {error && (
-          <div className="mb-4 text-red-500 text-sm">
-            {error}
-          </div>
-        )}
-        <div className="flex items-center justify-between">
-          <button
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-            type="submit"
-            disabled={loading}
-          >
-            {loading ? 'Registering...' : 'Register'}
-          </button>
-          <Link
-            href="/login"
-            className="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800"
-          >
-            Already have an account?
-          </Link>
+    <div className="fixed inset-0 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
+      <form 
+        onSubmit={handleSubmit} 
+        className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 space-y-6"
+      >
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Username
+              </label>
+              <input
+                className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200"
+                type="text"
+                name="username"
+                placeholder="Enter your username"
+                value={formData.username}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Email
+              </label>
+              <input
+                className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200"
+                type="email"
+                name="email"
+                placeholder="Enter your email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Password
+              </label>
+              <input
+                className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200"
+                type="password"
+                name="password"
+                placeholder="Enter your password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Confirm Password
+              </label>
+              <input
+                className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200"
+                type="password"
+                name="confirmPassword"
+                placeholder="Confirm your password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="text-sm text-red-500 dark:text-red-400">
+                {error}
+              </div>
+            )}
+
+            <button
+              className="w-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? 'Creating account...' : 'Create Account'}
+            </button>
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Already have an account?{' '}
+            <Link
+              href="/login"
+              className="font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
+            >
+              Login
+            </Link>
+          </p>
         </div>
       </form>
     </div>

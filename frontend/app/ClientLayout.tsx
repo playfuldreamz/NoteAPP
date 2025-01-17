@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import DarkModeToggle from "../components/DarkModeToggle";
 import { useRouter, usePathname } from 'next/navigation';
 import localFont from 'next/font/local';
 import "./globals.css";
@@ -156,8 +157,11 @@ export default function ClientLayout({
   if (['/login', '/register'].includes(pathname)) {
     return (
       <html lang="en" className="h-full">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50`}>
-          {children}
+        <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50 dark:bg-gray-900`}>
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            {children}
+          </div>
+          <DarkModeToggle />
         </body>
       </html>
     );
@@ -166,28 +170,28 @@ export default function ClientLayout({
   // For authenticated routes, render the full layout
   return (
     <html lang="en" className="h-full">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50`}>
-        <nav className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 shadow-sm z-50">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50 dark:bg-gray-900`}>
+        <nav className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
-              <h1 className="text-xl font-semibold text-gray-900">Voice Notes</h1>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Notes</h1>
               <div className="flex items-center space-x-4">
                 {isAuthenticated && (
                   <>
-                    <span className="text-gray-500">Welcome, {username}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Welcome, {username}</span>
                     <div className="relative group">
-                      <button className="flex items-center space-x-1 text-gray-700 hover:text-gray-900">
+                      <button className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
                         <span>Menu</span>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
-                      <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                      <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black dark:ring-gray-600 ring-opacity-5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                         <div className="py-1" role="menu">
                           {isAdmin && (
                             <a
                               href="/admin/settings"
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
                               role="menuitem"
                             >
                               Settings
@@ -195,7 +199,7 @@ export default function ClientLayout({
                           )}
                           <button
                             onClick={handleLogout}
-                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
                             role="menuitem"
                           >
                             Logout
@@ -210,7 +214,8 @@ export default function ClientLayout({
           </div>
         </nav>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 text-gray-900 dark:text-gray-100">
+          <DarkModeToggle />
           {children}
           {isAuthenticated && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8">
