@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Modal from './Modal';
-import { ChevronUp, Trash2, Eye } from 'lucide-react';
+import { ChevronUp, Trash2, Eye, Search } from 'lucide-react';
 
 interface Transcript {
   id: number;
@@ -19,12 +19,32 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
   const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
 
   useEffect(() => {
     const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setFilteredTranscripts(sortedTranscripts);
     setVisibleTranscripts(sortedTranscripts.slice(0, 5));
     setShowLoadMore(sortedTranscripts.length > 5);
   }, [initialTranscripts]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = initialTranscripts.filter(transcript =>
+        transcript.text.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      const sortedFiltered = filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setFilteredTranscripts(sortedFiltered);
+      setVisibleTranscripts(sortedFiltered.slice(0, 5));
+      setShowLoadMore(sortedFiltered.length > 5);
+    } else {
+      const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setFilteredTranscripts(sortedTranscripts);
+      setVisibleTranscripts(sortedTranscripts.slice(0, 5));
+      setShowLoadMore(sortedTranscripts.length > 5);
+    }
+  }, [searchQuery, initialTranscripts]);
 
   const handleDeleteTranscript = async (id: number) => {
     try {
@@ -67,20 +87,36 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
   const handleLoadMore = () => {
     const currentLength = visibleTranscripts.length;
-    const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const newVisibleTranscripts = sortedTranscripts.slice(0, currentLength + 5);
+    const newVisibleTranscripts = filteredTranscripts.slice(0, currentLength + 5);
     setVisibleTranscripts(newVisibleTranscripts);
-    setShowLoadMore(newVisibleTranscripts.length < initialTranscripts.length);
+    setShowLoadMore(newVisibleTranscripts.length < filteredTranscripts.length);
   };
 
   const handleShowLess = () => {
-    const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setVisibleTranscripts(sortedTranscripts.slice(0, 5));
-    setShowLoadMore(sortedTranscripts.length > 5);
+    setVisibleTranscripts(filteredTranscripts.slice(0, 5));
+    setShowLoadMore(filteredTranscripts.length > 5);
   };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+      <div className="relative mb-6">
+        <input
+          type="text"
+          placeholder="Search transcripts..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            ×
+          </button>
+        )}
+      </div>
       {visibleTranscripts.length === 0 ? (
         <p className="dark:text-gray-200">No transcripts available.</p>
       ) : (

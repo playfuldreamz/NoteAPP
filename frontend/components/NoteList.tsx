@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal';
-import { ChevronUp, Trash2, Eye } from 'lucide-react';
+import { ChevronUp, Trash2, Eye, Search } from 'lucide-react';
 
 interface NoteListProps {
   notes: Array<{
@@ -26,12 +26,39 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     title: string;
   }>>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredNotes, setFilteredNotes] = useState<Array<{
+    id: number;
+    content: string;
+    transcript: string;
+    timestamp: string;
+    title: string;
+  }>>([]);
 
   useEffect(() => {
     const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    setFilteredNotes(sortedNotes);
     setVisibleNotes(sortedNotes.slice(0, 5));
     setShowLoadMore(sortedNotes.length > 5);
   }, [notes]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = notes.filter(note =>
+        note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        note.content.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      const sortedFiltered = filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setFilteredNotes(sortedFiltered);
+      setVisibleNotes(sortedFiltered.slice(0, 5));
+      setShowLoadMore(sortedFiltered.length > 5);
+    } else {
+      const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setFilteredNotes(sortedNotes);
+      setVisibleNotes(sortedNotes.slice(0, 5));
+      setShowLoadMore(sortedNotes.length > 5);
+    }
+  }, [searchQuery, notes]);
 
   const handleDelete = async (id: number) => {
     try {
@@ -74,20 +101,36 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
 
   const handleLoadMore = () => {
     const currentLength = visibleNotes.length;
-    const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    const newVisibleNotes = sortedNotes.slice(0, currentLength + 5);
+    const newVisibleNotes = filteredNotes.slice(0, currentLength + 5);
     setVisibleNotes(newVisibleNotes);
-    setShowLoadMore(newVisibleNotes.length < sortedNotes.length);
+    setShowLoadMore(newVisibleNotes.length < filteredNotes.length);
   };
 
   const handleShowLess = () => {
-    const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    setVisibleNotes(sortedNotes.slice(0, 5));
-    setShowLoadMore(sortedNotes.length > 5);
+    setVisibleNotes(filteredNotes.slice(0, 5));
+    setShowLoadMore(filteredNotes.length > 5);
   };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+      <div className="relative mb-6">
+        <input
+          type="text"
+          placeholder="Search notes..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            ×
+          </button>
+        )}
+      </div>
       <ul>
         {visibleNotes.map((note) => (
           <li key={note.id} className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-md">
