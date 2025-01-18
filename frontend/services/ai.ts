@@ -79,7 +79,7 @@ export async function generateTranscriptTitle(content: string): Promise<string> 
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE}/api/ai/transcript-title`, {
+  const response = await fetch(`${API_BASE}/api/ai/summarize`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
