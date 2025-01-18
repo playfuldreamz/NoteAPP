@@ -9,6 +9,7 @@ This repository contains a full-stack web application for taking and organizing 
 * View and organize saved notes
 * User authentication
 * Dark mode support
+* Download transcripts in multiple formats (TXT, JSON, PDF)
 
 ## Technologies Used
 
@@ -85,6 +86,11 @@ This repository contains a full-stack web application for taking and organizing 
 2. Create new notes
 3. Notes will automatically get AI-generated titles
 4. View and organize your saved notes
+5. Download transcripts in your preferred format:
+   - Click the download icon next to any transcript
+   - Select format (TXT, JSON, or PDF)
+   - Choose whether to include metadata
+   - Download will start automatically
 
 ## Future Improvements
 

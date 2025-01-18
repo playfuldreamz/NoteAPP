@@ -140,8 +140,11 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           </button>
         )}
       </div>
-      <ul>
-        {visibleNotes.map((note) => (
+      {visibleNotes.length === 0 ? (
+        <p className="dark:text-gray-200">No notes available.</p>
+      ) : (
+        <ul>
+          {visibleNotes.map((note) => (
           <li key={note.id} className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-md">
             <div className="flex flex-col">
               <div className="flex justify-between items-start mb-2">
@@ -214,6 +217,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           </li>
         ))}
       </ul>
+      )}
       <div className="flex justify-end mt-4">
         {showLoadMore && (
           <button onClick={handleLoadMore} className="text-blue-500 hover:underline text-sm mr-2">
