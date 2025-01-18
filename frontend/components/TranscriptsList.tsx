@@ -139,7 +139,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                       <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
                         {transcript.title || 'Untitled Transcript'}
                       </h3>
-                      {!transcript.title && (
+{(!transcript.title || transcript.title === 'Untitled Transcript') && (
                         <button
                           onClick={() => handleGenerateTitle(transcript.id, transcript.text, (id, title) => {
                             setVisibleTranscripts(prev => prev.map(t => 
