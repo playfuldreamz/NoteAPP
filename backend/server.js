@@ -29,6 +29,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 app.use(cors());
 app.use(express.json());
 
+// Add request logging middleware
+app.use((req, res, next) => {
+  next();
+});
+
 // Mount routes
 app.use('/api/ai', aiRoutes);
 
@@ -215,60 +220,58 @@ app.delete('/notes/:id', authenticateToken, (req, res) => {
 
 // Transcript routes
 app.get('/transcripts', authenticateToken, (req, res) => {
-  db.all('SELECT * FROM transcripts WHERE user_id = ? ORDER BY date DESC', 
-    [req.user.id], 
-    (err, rows) => {
+    const query = 'SELECT id, text, title, date FROM transcripts WHERE user_id = ? ORDER BY date DESC';
+    
+    db.all(query, [req.user.id], (err, rows) => {
       if (err) {
-        res.status(500).json({ error: err.message });
-        return;
+        return res.status(500).json({ error: err.message });
       }
-      res.json(rows);
-    });
+    res.json(rows);
+  });
 });
 
 app.post('/transcripts', authenticateToken, async (req, res) => {
-  const { text } = req.body;
-  if (!text) {
-    return res.status(400).json({ error: 'Text is required' });
-  }
-
-  let title = 'Untitled Transcript';
-  
   try {
-    // Try to get AI-generated title
-    const titleResponse = await fetch('http://localhost:5000/api/ai/transcript-title', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': req.headers['authorization']
-      },
-      body: JSON.stringify({ text })
-    });
-
-    if (titleResponse.ok) {
-      const titleData = await titleResponse.json();
-      title = titleData.title || title;
+    if (!req.body) {
+      return res.status(400).json({ error: 'No request body' });
     }
-  } catch (error) {
-    console.error('Title generation failed, using default title:', error.message);
-  }
+    
+    const text = req.body.text;
+    const title = req.body.title;
+    
+    if (!text) {
+      return res.status(400).json({ error: 'Text is required' });
+    }
 
-  // Save transcript with either generated or default title
-  db.run('INSERT INTO transcripts (text, title, user_id) VALUES (?, ?, ?)',
-    [text, title, req.user.id],
-    function(err) {
+    if (typeof title !== 'string') {
+      return res.status(400).json({ error: 'Title must be a string' });
+    }
+
+    // Only use 'Untitled Transcript' if title is null or undefined
+    const finalTitle = (title === null || title === undefined) ? 'Untitled Transcript' : title;
+    
+    // Save transcript with provided title
+    const query = 'INSERT INTO transcripts (text, title, user_id) VALUES (?, ?, ?)';
+    const params = [text, finalTitle, req.user.id];
+
+    db.run(query, params, function(err) {
       if (err) {
-        console.error('Database error:', err.message);
         return res.status(500).json({ error: 'Failed to save transcript' });
       }
-      res.status(201).json({ 
+
+      const response = { 
         id: this.lastID, 
         text,
-        title,
+        title: finalTitle,
         date: new Date().toISOString(),
         user_id: req.user.id 
-      });
+      };
+      res.status(201).json(response);
     });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.delete('/transcripts/:id', authenticateToken, (req, res) => {
