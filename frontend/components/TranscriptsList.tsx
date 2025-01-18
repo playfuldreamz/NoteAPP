@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search } from 'lucide-react';
+import { generateTranscriptTitle } from '../services/ai';
 
 interface Transcript {
   id: number;
   text: string;
+  title: string;
   date: string;
 }
 
@@ -21,6 +23,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
+  const [loadingTitles, setLoadingTitles] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
     const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -97,6 +100,33 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setShowLoadMore(filteredTranscripts.length > 5);
   };
 
+  const handleGenerateTitle = async (id: number, text: string) => {
+    try {
+      setLoadingTitles(prev => ({ ...prev, [id]: true }));
+      
+      const title = await generateTranscriptTitle(text);
+      
+      // Update the transcript with new title
+      const updatedTranscripts = visibleTranscripts.map(t => 
+        t.id === id ? { ...t, title } : t
+      );
+      setVisibleTranscripts(updatedTranscripts);
+      
+      // Update filtered transcripts to maintain consistency
+      const updatedFiltered = filteredTranscripts.map(t =>
+        t.id === id ? { ...t, title } : t
+      );
+      setFilteredTranscripts(updatedFiltered);
+      
+      toast.success('Title generated successfully');
+    } catch (error) {
+      console.error('Error generating title:', error);
+      toast.error('Failed to generate title');
+    } finally {
+      setLoadingTitles(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
       <div className="relative mb-6">
@@ -124,26 +154,55 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           {visibleTranscripts.map((transcript) => {
             const truncatedText = truncateText(transcript.text);
             return (
-              <li key={transcript.id} className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-md">
-                <div className="flex justify-between">
-                  <div>
-                    <p className="font-semibold dark:text-gray-200">{new Date(transcript.date).toLocaleString()}</p>
-                    <p className="inline dark:text-gray-300">{truncatedText}</p>
-                    {transcript.text.split(' ').length > 6 && (
+              <li 
+                key={transcript.id} 
+                className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-md hover:shadow-lg transition-shadow duration-200"
+              >
+                <div className="flex flex-col">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                        {transcript.title || 'Untitled Transcript'}
+                      </h3>
+                      {!transcript.title && (
+                        <button
+                          onClick={() => handleGenerateTitle(transcript.id, transcript.text)}
+                          className="text-xs text-blue-500 hover:text-blue-700"
+                          disabled={loadingTitles[transcript.id]}
+                        >
+                          {loadingTitles[transcript.id] ? 'Generating...' : 'Generate Title'}
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleDeleteTranscript(transcript.id)}
+                      className="text-red-500 hover:text-red-700 transition-colors duration-200"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="text-gray-600 dark:text-gray-300">
+                    <p className="text-base inline">
+                      {truncateText(transcript.text)}
+                    </p>
+                    {transcript.text.split(' ').length > 5 && (
                       <button
                         onClick={() => handleSeeMore(transcript.text)}
-                        className="text-blue-500 hover:underline text-xs ml-2"
+                        className="text-blue-500 hover:text-blue-700 transition-colors duration-200 text-xs ml-2"
                       >
                         <Eye size={16} />
                       </button>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleDeleteTranscript(transcript.id)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="text-xs text-gray-400 mt-2">
+                    {new Date(transcript.date).toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
                 </div>
               </li>
             );

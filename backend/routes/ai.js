@@ -130,4 +130,62 @@ router.post('/summarize', async (req, res) => {
   }
 });
 
+// Generate transcript title
+router.post('/transcript-title', async (req, res) => {
+  const { text } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: 'Transcript text is required' });
+  }
+
+  try {
+    db.get('SELECT provider FROM app_settings WHERE is_active = 1', [], async (err, row) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      const provider = row?.provider || process.env.DEFAULT_AI_PROVIDER;
+
+      // Check if the selected provider is configured
+      if (provider === 'openai' && !openai) {
+        return res.status(400).json({ error: 'OpenAI is not configured' });
+      }
+      if (provider === 'gemini' && !genAI) {
+        return res.status(400).json({ error: 'Gemini is not configured' });
+      }
+
+      try {
+        let title;
+        if (provider === 'openai') {
+          const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+              {
+                role: "system",
+                content: "Generate a brief, descriptive title for this transcript text."
+              },
+              {
+                role: "user",
+                content: text
+              }
+            ],
+            max_tokens: 50
+          });
+          title = completion.choices[0].message.content;
+        } else {
+          const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+          const prompt = `Generate a brief, descriptive title for this transcript text: ${text}`;
+          const result = await model.generateContent(prompt);
+          title = result.response.text();
+        }
+
+        res.json({ title: title.trim() });
+      } catch (aiError) {
+        res.status(500).json({ error: aiError.message });
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

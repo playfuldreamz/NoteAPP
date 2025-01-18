@@ -107,20 +107,37 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     }
 
     try {
-      const response = await fetch('http://localhost:5000/transcripts', {
+      // First get AI-generated title
+      const titleResponse = await fetch('http://localhost:5000/api/ai/summarize', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ text: transcript })
+        body: JSON.stringify({ content: transcript })
       });
 
-      if (response.ok) {
+      if (!titleResponse.ok) {
+        throw new Error('Failed to generate title');
+      }
+
+      const { title } = await titleResponse.json();
+
+      // Save transcript with title
+      const saveResponse = await fetch('http://localhost:5000/transcripts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text: transcript, title })
+      });
+
+      if (saveResponse.ok) {
         toast.success('Transcript saved!');
         updateTranscripts(); // Fetch latest transcripts in parent component
       } else {
-        const data = await response.json();
+        const data = await saveResponse.json();
         toast.error(data.error || 'Failed to save transcript');
       }
     } catch (error) {

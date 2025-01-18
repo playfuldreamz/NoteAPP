@@ -6,6 +6,15 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OpenAI } = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// Initialize AI clients
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+}) : null;
+
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 // Import routes
 const aiRoutes = require('./routes/ai');
@@ -92,10 +101,11 @@ db.serialize(() => {
     FOREIGN KEY(user_id) REFERENCES users(id)
   )`);
 
-  // Create transcripts table with user_id foreign key
+// Create transcripts table with user_id foreign key and title
   db.run(`CREATE TABLE IF NOT EXISTS transcripts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     text TEXT,
+    title TEXT,
     user_id INTEGER,
     date DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
@@ -216,22 +226,45 @@ app.get('/transcripts', authenticateToken, (req, res) => {
     });
 });
 
-app.post('/transcripts', authenticateToken, (req, res) => {
+app.post('/transcripts', authenticateToken, async (req, res) => {
   const { text } = req.body;
   if (!text) {
     return res.status(400).json({ error: 'Text is required' });
   }
 
-  db.run('INSERT INTO transcripts (text, user_id) VALUES (?, ?)',
-    [text, req.user.id],
+  let title = 'Untitled Transcript';
+  
+  try {
+    // Try to get AI-generated title
+    const titleResponse = await fetch('http://localhost:5000/api/ai/transcript-title', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': req.headers['authorization']
+      },
+      body: JSON.stringify({ text })
+    });
+
+    if (titleResponse.ok) {
+      const titleData = await titleResponse.json();
+      title = titleData.title || title;
+    }
+  } catch (error) {
+    console.error('Title generation failed, using default title:', error.message);
+  }
+
+  // Save transcript with either generated or default title
+  db.run('INSERT INTO transcripts (text, title, user_id) VALUES (?, ?, ?)',
+    [text, title, req.user.id],
     function(err) {
       if (err) {
-        res.status(500).json({ error: err.message });
-        return;
+        console.error('Database error:', err.message);
+        return res.status(500).json({ error: 'Failed to save transcript' });
       }
       res.status(201).json({ 
         id: this.lastID, 
         text,
+        title,
         date: new Date().toISOString(),
         user_id: req.user.id 
       });
