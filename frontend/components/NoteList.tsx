@@ -165,10 +165,10 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                   <Trash2 size={16} />
                 </button>
               </div>
-              <div className="text-gray-600">
-                <p className="text-base inline">
-                  {truncateText(note.content)}
-                </p>
+<div className="text-gray-600 dark:text-gray-300">
+  <p className="text-base inline">
+    {truncateText(note.content)}
+  </p>
                 {note.content.split(' ').length > 5 && (
                   <button
                     onClick={() => handleSeeMore(note.content)}
