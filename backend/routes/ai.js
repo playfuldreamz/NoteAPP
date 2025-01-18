@@ -52,6 +52,36 @@ router.post('/summarize', async (req, res) => {
   }
 });
 
-module.exports = router;
+// Update transcript title
+router.put('/transcripts/:id/title', async (req, res) => {
+  const { id } = req.params;
+  const { title } = req.body;
+
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    db.run(
+      'UPDATE transcripts SET title = ? WHERE id = ?',
+      [title, id],
+      function(err) {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Failed to update transcript title' });
+        }
+        res.json({ success: true });
+      }
+    );
+  } catch (error) {
+    console.error('Error updating transcript title:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 module.exports = router;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'react-toastify';
-import { generateTranscriptTitle } from '../services/ai';
+import { generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
 
 interface UseTitleGeneration {
   loadingTitles: { [key: number]: boolean };
@@ -15,9 +15,10 @@ const useTitleGeneration = (): UseTitleGeneration => {
       setLoadingTitles(prev => ({ ...prev, [id]: true }));
       
       const title = await generateTranscriptTitle(text);
+      await updateTranscriptTitle(id, title);
       updateTitle(id, title);
       
-      toast.success('Title generated successfully');
+      toast.success('Title generated and saved successfully');
     } catch (error) {
       console.error('Error generating title:', error);
       toast.error('Failed to generate title');

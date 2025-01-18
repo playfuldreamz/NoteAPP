@@ -16,10 +16,10 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
+const app = express();
+
 // Import routes
 const aiRoutes = require('./routes/ai');
-
-const app = express();
 const PORT = process.env.PORT || 5000;
 
 // JWT secret key - in production, use an environment variable
