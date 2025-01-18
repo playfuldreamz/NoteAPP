@@ -166,7 +166,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                 </button>
               </div>
 <div className="text-gray-600 dark:text-gray-300">
-  <p className="text-base inline">
+  <p className="text-sm inline">
     {truncateText(note.content)}
   </p>
                 {note.content.split(' ').length > 5 && (

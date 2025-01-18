@@ -164,7 +164,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                     </button>
                   </div>
                   <div className="text-gray-600 dark:text-gray-300">
-                    <p className="text-base inline">
+  <p className="text-sm inline">
                       {truncateText(transcript.text)}
                     </p>
                     {transcript.text.split(' ').length > 5 && (
@@ -172,7 +172,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                         onClick={() => handleSeeMore(transcript.text)}
                         className="text-blue-500 hover:text-blue-700 transition-colors duration-200 text-xs ml-2"
                       >
-                        <Eye size={16} />
+                    <Eye size={16} />
                       </button>
                     )}
                   </div>
