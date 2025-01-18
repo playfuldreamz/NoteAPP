@@ -156,7 +156,7 @@ export default function ClientLayout({
   // If on login or register page, just render the children
   if (['/login', '/register'].includes(pathname)) {
   return (
-    <div className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50 dark:bg-gray-900`}>
+<div className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50 dark:bg-gray-900`}>
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
           {children}
         </div>
@@ -167,7 +167,7 @@ export default function ClientLayout({
 
   // For authenticated routes, render the full layout
   return (
-    <div className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50 dark:bg-gray-900`}>
+    <div className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50 dark:bg-gray-900`}>
         <nav className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
@@ -211,7 +211,7 @@ export default function ClientLayout({
           </div>
         </nav>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 text-gray-900 dark:text-gray-100">
+<main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 text-gray-900 dark:text-gray-100 min-h-[calc(100vh-5rem)]">
           <DarkModeToggle />
           {children}
           {isAuthenticated && (
