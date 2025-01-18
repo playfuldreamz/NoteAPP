@@ -34,7 +34,7 @@ export default function ClientLayout({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
-  const [transcripts, setTranscripts] = useState<{ id: number; text: string; date: string }[]>([]);
+  const [transcripts, setTranscripts] = useState<{ id: number; text: string; title: string; date: string }[]>([]);
   const [notes, setNotes] = useState<{
     id: number;
     content: string;
@@ -155,29 +155,26 @@ export default function ClientLayout({
 
   // If on login or register page, just render the children
   if (['/login', '/register'].includes(pathname)) {
-    return (
-      <html lang="en" className="h-full">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50 dark:bg-gray-900`}>
-          <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-            {children}
-          </div>
-          <DarkModeToggle />
-        </body>
-      </html>
+  return (
+    <div className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50 dark:bg-gray-900`}>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          {children}
+        </div>
+        <DarkModeToggle />
+    </div>
     );
   }
 
   // For authenticated routes, render the full layout
   return (
-    <html lang="en" className="h-full">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50 dark:bg-gray-900`}>
+    <div className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-gray-50 dark:bg-gray-900`}>
         <nav className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Notes</h1>
               <div className="flex items-center space-x-4">
                 {isAuthenticated && (
-                  <>
+                  <div>
                     <span className="text-gray-500 dark:text-gray-400">Welcome, {username}</span>
                     <div className="relative group">
                       <button className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
@@ -207,7 +204,7 @@ export default function ClientLayout({
                         </div>
                       </div>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -246,7 +243,6 @@ export default function ClientLayout({
             </div>
           )}
         </main>
-      </body>
-    </html>
+    </div>
   );
 }
