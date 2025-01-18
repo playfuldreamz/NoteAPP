@@ -132,9 +132,9 @@ router.post('/summarize', async (req, res) => {
 
 // Generate transcript title
 router.post('/transcript-title', async (req, res) => {
-  const { text } = req.body;
-  if (!text) {
-    return res.status(400).json({ error: 'Transcript text is required' });
+  const { content } = req.body;
+  if (!content) {
+    return res.status(400).json({ error: 'Transcript content is required' });
   }
 
   try {
@@ -165,7 +165,7 @@ router.post('/transcript-title', async (req, res) => {
               },
               {
                 role: "user",
-                content: text
+          content
               }
             ],
             max_tokens: 50
@@ -173,7 +173,7 @@ router.post('/transcript-title', async (req, res) => {
           title = completion.choices[0].message.content;
         } else {
           const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-          const prompt = `Generate a brief, descriptive title for this transcript text: ${text}`;
+          const prompt = `Generate a brief, descriptive title for this transcript content: ${content}`;
           const result = await model.generateContent(prompt);
           title = result.response.text();
         }
