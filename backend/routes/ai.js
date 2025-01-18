@@ -37,18 +37,41 @@ router.post('/summarize', async (req, res) => {
     return res.json({ title: fallbackTitle });
   }
 
+  // Validate content
+  if (typeof content !== 'string' || content.length > 10000) {
+    return res.status(400).json({ error: 'Invalid content format or length' });
+  }
+
+  // Sanitize content by removing potentially problematic characters
+  const sanitizedContent = content
+    .replace(/[<>{}[\]]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 5000);
+
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const prompt = `Generate a brief, descriptive title for this content: ${content}`;
+    const prompt = `Generate a brief, descriptive title for this content: ${sanitizedContent}`;
     const result = await model.generateContent(prompt);
-    const title = result.response.text();
     
+    // Handle safety filters
+    if (result.response.promptFeedback?.blockReason) {
+      console.warn('Content blocked by safety filters:', result.response.promptFeedback.blockReason);
+      throw new Error('Content blocked by safety filters');
+    }
+    
+    const title = result.response.text();
     res.json({ title: title.trim() });
   } catch (error) {
     console.error('Gemini error:', error);
-    // Fallback if Gemini fails
-    const fallbackTitle = content.split(/\s+/).slice(0, 5).join(' ') + '...';
-    res.json({ title: fallbackTitle });
+    // Enhanced fallback mechanism
+    const fallbackTitle = sanitizedContent
+      .split(/\s+/)
+      .slice(0, 5)
+      .join(' ')
+      .replace(/[^\w\s]/g, '')
+      .trim();
+    res.json({ title: fallbackTitle || 'Untitled' });
   }
 });
 
