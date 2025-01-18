@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal';
-import { ChevronUp, Trash2, Eye, Search } from 'lucide-react';
+import { ChevronUp, Trash2, Eye, Search, Sparkles } from 'lucide-react';
+import useTitleGeneration from '../hooks/useTitleGeneration';
 
 interface NoteListProps {
   notes: Array<{
@@ -34,6 +35,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     timestamp: string;
     title: string;
   }>>([]);
+  const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
 
   useEffect(() => {
     const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -136,9 +138,26 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           <li key={note.id} className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-md">
             <div className="flex flex-col">
               <div className="flex justify-between items-start mb-2">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                  {note.title || 'Untitled Note'}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    {note.title || 'Untitled Note'}
+                  </h3>
+                  {!note.title && (
+                    <button
+                      onClick={() => handleGenerateTitle(note.id, note.content, (id, title) => {
+                        const updatedNotes = notes.map(n =>
+                          n.id === id ? { ...n, title } : n
+                        );
+                        setFilteredNotes(updatedNotes);
+                        setVisibleNotes(updatedNotes.slice(0, visibleNotes.length));
+                      })}
+                      disabled={loadingTitles[note.id]}
+                      className="text-xs text-blue-500 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
+                    >
+                      {loadingTitles[note.id] ? 'Generating...' : 'Generate Title'}
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={() => handleDelete(note.id)}
                   className="text-red-500 hover:text-red-700"

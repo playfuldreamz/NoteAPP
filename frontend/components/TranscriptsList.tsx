@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search } from 'lucide-react';
-import { generateTranscriptTitle } from '../services/ai';
+import useTitleGeneration from '../hooks/useTitleGeneration';
 
 interface Transcript {
   id: number;
@@ -23,7 +23,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
-  const [loadingTitles, setLoadingTitles] = useState<{ [key: number]: boolean }>({});
+  const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
 
   useEffect(() => {
     const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -35,7 +35,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   useEffect(() => {
     if (searchQuery) {
       const filtered = initialTranscripts.filter(transcript =>
-        transcript.text.toLowerCase().includes(searchQuery.toLowerCase())
+        transcript.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        transcript.title?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       const sortedFiltered = filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setFilteredTranscripts(sortedFiltered);
@@ -100,32 +101,6 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setShowLoadMore(filteredTranscripts.length > 5);
   };
 
-  const handleGenerateTitle = async (id: number, text: string) => {
-    try {
-      setLoadingTitles(prev => ({ ...prev, [id]: true }));
-      
-      const title = await generateTranscriptTitle(text);
-      
-      // Update the transcript with new title
-      const updatedTranscripts = visibleTranscripts.map(t => 
-        t.id === id ? { ...t, title } : t
-      );
-      setVisibleTranscripts(updatedTranscripts);
-      
-      // Update filtered transcripts to maintain consistency
-      const updatedFiltered = filteredTranscripts.map(t =>
-        t.id === id ? { ...t, title } : t
-      );
-      setFilteredTranscripts(updatedFiltered);
-      
-      toast.success('Title generated successfully');
-    } catch (error) {
-      console.error('Error generating title:', error);
-      toast.error('Failed to generate title');
-    } finally {
-      setLoadingTitles(prev => ({ ...prev, [id]: false }));
-    }
-  };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
@@ -166,7 +141,14 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                       </h3>
                       {!transcript.title && (
                         <button
-                          onClick={() => handleGenerateTitle(transcript.id, transcript.text)}
+                          onClick={() => handleGenerateTitle(transcript.id, transcript.text, (id, title) => {
+                            setVisibleTranscripts(prev => prev.map(t => 
+                              t.id === id ? { ...t, title } : t
+                            ));
+                            setFilteredTranscripts(prev => prev.map(t =>
+                              t.id === id ? { ...t, title } : t
+                            ));
+                          })}
                           className="text-xs text-blue-500 hover:text-blue-700"
                           disabled={loadingTitles[transcript.id]}
                         >
