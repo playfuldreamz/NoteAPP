@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal';
-import { ChevronUp, Trash2, Eye, Search, Sparkles } from 'lucide-react';
+import { ChevronUp, Trash2, Eye, Search, Sparkles, Download } from 'lucide-react';
 import useTitleGeneration from '../hooks/useTitleGeneration';
+import { useDownloadNote, DownloadOptions } from '../hooks/useDownloadNote';
 
 interface NoteListProps {
   notes: Array<{
@@ -36,6 +37,12 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     title: string;
   }>>([]);
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
+  const { downloadNote, isDownloading } = useDownloadNote();
+  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>({
+    format: 'txt',
+    includeTranscript: true,
+    includeMetadata: true
+  });
 
   useEffect(() => {
     const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -158,12 +165,22 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                     </button>
                   )}
                 </div>
-                <button
-                  onClick={() => handleDelete(note.id)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDelete(note.id)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                  <button
+                    onClick={() => downloadNote(note, downloadOptions)}
+                    disabled={isDownloading}
+                    className="text-blue-500 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
+                    title="Download note"
+                  >
+                    <Download size={16} />
+                  </button>
+                </div>
               </div>
 <div className="text-gray-600 dark:text-gray-300">
   <p className="text-sm inline">
@@ -178,8 +195,20 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                   </button>
                 )}
               </div>
-              <div className="text-xs text-gray-400 mt-2">
-                {new Date(note.timestamp).toLocaleString()}
+              <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
+                <span>{new Date(note.timestamp).toLocaleString()}</span>
+                <select
+                  value={downloadOptions.format}
+                  onChange={(e) => setDownloadOptions((prev: DownloadOptions) => ({
+                    ...prev,
+                    format: e.target.value as 'txt' | 'json' | 'pdf'
+                  }))}
+                  className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5"
+                >
+                  <option value="txt">TXT</option>
+                  <option value="json">JSON</option>
+                  <option value="pdf">PDF</option>
+                </select>
               </div>
             </div>
           </li>
