@@ -142,7 +142,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
                     {note.title || 'Untitled Note'}
                   </h3>
-                  {!note.title && (
+                  {(!note.title || note.title === 'Untitled Note') && (
                     <button
                       onClick={() => handleGenerateTitle(note.id, note.content, (id, title) => {
                         const updatedNotes = notes.map(n =>
