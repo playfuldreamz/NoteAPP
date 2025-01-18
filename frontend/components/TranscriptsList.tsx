@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Modal from './Modal';
-import { ChevronUp, Trash2, Eye, Search } from 'lucide-react';
+import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
+import { useDownloadNote, type DownloadOptions } from '../hooks/useDownloadNote';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 
 interface Transcript {
@@ -22,6 +23,11 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const { downloadNote, isDownloading } = useDownloadNote();
+  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>({
+    format: 'txt',
+    includeMetadata: true
+  });
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
 
@@ -156,12 +162,28 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                         </button>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleDeleteTranscript(transcript.id)}
-                      className="text-red-500 hover:text-red-700 transition-colors duration-200"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleDeleteTranscript(transcript.id)}
+                        className="text-red-500 hover:text-red-700 transition-colors duration-200"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => downloadNote({
+                          id: transcript.id,
+                          content: transcript.text,
+                          transcript: '', // Not applicable for transcripts
+                          timestamp: transcript.date,
+                          title: `Transcript-${transcript.id}`
+                        }, downloadOptions)}
+                        disabled={isDownloading}
+                        className="text-blue-500 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        title="Download transcript"
+                      >
+                        <Download size={16} />
+                      </button>
+                    </div>
                   </div>
                   <div className="text-gray-600 dark:text-gray-300">
   <p className="text-sm inline">
@@ -176,14 +198,28 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                       </button>
                     )}
                   </div>
-                  <div className="text-xs text-gray-400 mt-2">
-                    {new Date(transcript.date).toLocaleString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                  <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
+                    <span>
+                      {new Date(transcript.date).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                    <select
+                      value={downloadOptions.format}
+                      onChange={(e) => setDownloadOptions(prev => ({
+                        ...prev,
+                        format: e.target.value as 'txt' | 'json' | 'pdf'
+                      }))}
+                      className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5"
+                    >
+                      <option value="txt">TXT</option>
+                      <option value="json">JSON</option>
+                      <option value="pdf">PDF</option>
+                    </select>
                   </div>
                 </div>
               </li>
