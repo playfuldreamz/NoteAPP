@@ -174,9 +174,9 @@ export default function ClientLayout({
               <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Notes</h1>
               <div className="flex items-center space-x-4">
                 {isAuthenticated && (
-                  <div>
+                  <>
                     <span className="text-gray-500 dark:text-gray-400">Welcome, {username}</span>
-                    <div className="relative group">
+                    <div className="relative group inline-block">
                       <button className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
                         <span>Menu</span>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,7 +204,7 @@ export default function ClientLayout({
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
