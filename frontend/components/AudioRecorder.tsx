@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw } from 'lucide-react';
+import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader } from 'lucide-react';
 import { generateTranscriptTitle, enhanceTranscript } from '../services/ai';
 
 interface Window {
@@ -38,6 +38,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [enhanceEnabled, setEnhanceEnabled] = useState(true);
   const [confidenceThreshold, setConfidenceThreshold] = useState(45);
   const [showEnhanced, setShowEnhanced] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhancementProgress, setEnhancementProgress] = useState(0);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const originalTranscriptRef = useRef<HTMLDivElement>(null);
   const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
@@ -117,22 +119,30 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       return;
     }
 
+    setIsEnhancing(true);
+    setEnhancementProgress(0);
+    setShowEnhanced(true);
+
     try {
-      const { enhanced, confidence } = await enhanceTranscript(transcript);
+      const { enhanced, confidence } = await enhanceTranscript(
+        transcript,
+        (progress) => setEnhancementProgress(progress)
+      );
+      
       if (confidence >= confidenceThreshold) {
         setEnhancedTranscript(enhanced);
-        setShowEnhanced(true);
         toast.success(`Transcript enhanced with confidence: ${confidence}%`);
       } else {
         toast.warn(`Low confidence enhancement (${confidence}%). Keeping original transcript.`);
         setEnhancedTranscript(transcript);
-        setShowEnhanced(true);
       }
     } catch (error) {
       console.error('Enhancement error:', error);
       toast.error('Failed to enhance transcript');
       setEnhancedTranscript(transcript);
-      setShowEnhanced(true);
+    } finally {
+      setIsEnhancing(false);
+      setEnhancementProgress(100);
     }
   };
 
@@ -264,12 +274,31 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
           
           {showEnhanced && (
             <div className={`transition-all duration-500 ${showEnhanced ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Enhanced Transcript</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium dark:text-gray-200">Enhanced Transcript</h3>
+                {isEnhancing && (
+                  <div className="flex items-center space-x-2">
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      Enhancing... {enhancementProgress}%
+                    </span>
+                  </div>
+                )}
+              </div>
               <div
                 ref={enhancedTranscriptRef}
                 className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg h-[300px] overflow-y-auto scroll-smooth"
               >
-                <p className="text-sm dark:text-gray-200">{enhancedTranscript}</p>
+                {isEnhancing ? (
+                  <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                    <div
+                      className="bg-blue-600 h-2.5 rounded-full"
+                      style={{ width: `${enhancementProgress}%` }}
+                    ></div>
+                  </div>
+                ) : (
+                  <p className="text-sm dark:text-gray-200">{enhancedTranscript}</p>
+                )}
               </div>
             </div>
           )}
@@ -280,12 +309,16 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         <button 
           onClick={handleEnhanceTranscript}
           className={`bg-purple-500 text-white px-4 py-2 rounded-md transition-colors ${
-            (isRecording || !transcript.trim()) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+            (isRecording || !transcript.trim() || isEnhancing) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
           }`}
-          disabled={isRecording || !transcript.trim()}
+          disabled={isRecording || !transcript.trim() || isEnhancing}
         >
-          <RefreshCw size={20} className="mr-2" />
-          Enhance
+          {isEnhancing ? (
+            <Loader className="w-5 h-5 animate-spin" />
+          ) : (
+            <RefreshCw size={20} className="mr-2" />
+          )}
+          {isEnhancing ? 'Enhancing...' : 'Enhance'}
         </button>
         <button 
           onClick={handleSaveTranscript}
