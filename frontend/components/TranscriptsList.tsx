@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
-import TranscriptActions from './TranscriptActions';
+import TranscriptActions, { TranscriptFilters } from './TranscriptActions';
 import { useDownloadNote, type DownloadOptions } from '../hooks/useDownloadNote';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 
@@ -32,11 +32,54 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
 
+  const applyFilters = (transcripts: Transcript[], filters: TranscriptFilters) => {
+    let filtered = [...transcripts];
+
+    // Keyword filter
+    if (filters.keyword) {
+      const searchTerm = filters.keyword.toLowerCase();
+      filtered = filtered.filter(t => 
+        t.text.toLowerCase().includes(searchTerm) ||
+        t.title.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Date range filter
+    if (filters.dateRange?.start && filters.dateRange?.end) {
+      const startDate = new Date(filters.dateRange.start);
+      const endDate = new Date(filters.dateRange.end);
+      filtered = filtered.filter(t => {
+        const transcriptDate = new Date(t.date);
+        return transcriptDate >= startDate && transcriptDate <= endDate;
+      });
+    }
+
+    // Length filter
+    if (filters.length) {
+  const wordCount = (t: Transcript) => t.text.split(' ').length;
+      filtered = filtered.filter(t => {
+        const words = wordCount(t);
+        switch (filters.length) {
+          case 'short': return words < 100;
+          case 'medium': return words >= 100 && words <= 500;
+          case 'long': return words > 500;
+          default: return true;
+        }
+      });
+    }
+
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
+
+  const handleFilter = (filters: TranscriptFilters) => {
+    const filtered = applyFilters(initialTranscripts, filters);
+    setFilteredTranscripts(filtered);
+    setVisibleTranscripts(filtered.slice(0, 5));
+    setShowLoadMore(filtered.length > 5);
+  };
+
   useEffect(() => {
-    const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setFilteredTranscripts(sortedTranscripts);
-    setVisibleTranscripts(sortedTranscripts.slice(0, 5));
-    setShowLoadMore(sortedTranscripts.length > 5);
+    handleFilter({}); // Initial load with no filters
   }, [initialTranscripts]);
 
   useEffect(() => {
@@ -132,9 +175,29 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
       
       <TranscriptActions 
         count={initialTranscripts.length}
-        onFilter={() => console.log('Filter clicked')}
-        onSort={() => console.log('Sort clicked')}
-        onExport={() => console.log('Export clicked')}
+        onFilter={handleFilter}
+        onSort={() => {
+          const sorted = [...filteredTranscripts].reverse();
+          setFilteredTranscripts(sorted);
+          setVisibleTranscripts(sorted.slice(0, 5));
+        }}
+        onExport={() => {
+          const exportData = filteredTranscripts.map(t => ({
+            id: t.id,
+            title: t.title,
+            text: t.text,
+            date: t.date
+          }));
+          const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `transcripts-${new Date().toISOString()}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }}
       />
       
       {visibleTranscripts.length === 0 ? (

@@ -144,9 +144,57 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
       
       <TranscriptActions 
         count={notes.length}
-        onFilter={() => console.log('Filter clicked')}
-        onSort={() => console.log('Sort clicked')}
-        onExport={() => console.log('Export clicked')}
+        onFilter={(filters) => {
+          const filtered = notes.filter(note => {
+            // Keyword filter
+            if (filters.keyword) {
+              const searchTerm = filters.keyword.toLowerCase();
+              if (!note.title.toLowerCase().includes(searchTerm) &&
+                  !note.content.toLowerCase().includes(searchTerm)) {
+                return false;
+              }
+            }
+            // Date range filter
+            if (filters.dateRange?.start && filters.dateRange?.end) {
+              const noteDate = new Date(note.timestamp);
+              const startDate = new Date(filters.dateRange.start);
+              const endDate = new Date(filters.dateRange.end);
+              if (noteDate < startDate || noteDate > endDate) {
+                return false;
+              }
+            }
+            return true;
+          });
+          const sortedFiltered = filtered.sort((a, b) => 
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+          setFilteredNotes(sortedFiltered);
+          setVisibleNotes(sortedFiltered.slice(0, 5));
+          setShowLoadMore(sortedFiltered.length > 5);
+        }}
+        onSort={() => {
+          const sorted = [...filteredNotes].reverse();
+          setFilteredNotes(sorted);
+          setVisibleNotes(sorted.slice(0, 5));
+        }}
+        onExport={() => {
+          const exportData = filteredNotes.map(n => ({
+            id: n.id,
+            title: n.title,
+            content: n.content,
+            transcript: n.transcript,
+            timestamp: n.timestamp
+          }));
+          const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `notes-${new Date().toISOString()}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }}
       />
       {visibleNotes.length === 0 ? (
         <p className="dark:text-gray-200">No notes available.</p>
