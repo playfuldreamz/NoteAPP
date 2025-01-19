@@ -16,6 +16,7 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
 
   const saveNote = async () => {
     if (!noteContent.trim()) {
+      console.log('Attempting to show empty note toast');
       toast.error('Cannot save an empty note.');
       return;
     }
@@ -60,11 +61,13 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
         throw new Error(data.error || 'Failed to save note');
       }
 
+      console.log('Attempting to show success toast');
       toast.success('Note saved successfully!');
       setNoteContent(''); // Clear the input
       onSave(); // Refresh the notes list
     } catch (error) {
       console.error('Save error:', error);
+      console.log('Attempting to show error toast');
       toast.error('Failed to save note. Please try again');
     } finally {
       setIsSaving(false);

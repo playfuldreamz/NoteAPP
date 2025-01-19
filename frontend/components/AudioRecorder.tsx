@@ -42,6 +42,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [enhancementProgress, setEnhancementProgress] = useState(0);
   const [isEnhancedCollapsed, setIsEnhancedCollapsed] = useState(false);
   const [isOriginalCollapsed, setIsOriginalCollapsed] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const originalTranscriptRef = useRef<HTMLDivElement>(null);
   const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
@@ -159,9 +160,25 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       
       if (confidence >= confidenceThreshold) {
         setEnhancedTranscript(enhanced);
-        toast.success(`Transcript enhanced with confidence: ${confidence}%`);
+        toast.success(`🎉 Transcript enhanced with ${confidence}% confidence!`, {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        });
       } else {
-        toast.warn(`Low confidence enhancement (${confidence}%). Keeping original transcript.`);
+        toast.warn(`🤔 Low confidence enhancement (${confidence}%). Keeping original transcript.`, {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        });
         setEnhancedTranscript(transcript);
       }
     } catch (error) {
@@ -175,10 +192,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   };
 
   const handleSaveTranscript = async () => {
+    setIsSaving(true);
     const finalTranscript = enhanceEnabled && enhancedTranscript ? enhancedTranscript : transcript;
     
     if (!finalTranscript.trim()) {
       toast.error('Cannot save an empty transcript.');
+      setIsSaving(false);
       return;
     }
 
@@ -215,15 +234,42 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       });
 
       if (saveResponse.ok) {
-        toast.success('Transcript saved!');
+        toast.success(`💾 Transcript saved successfully!`, {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        });
         updateTranscripts();
       } else {
         const saveData = await saveResponse.json();
-        toast.error(saveData.error || 'Failed to save transcript');
+        toast.error(`❌ Failed to save transcript: ${saveData.error || 'Please try again'}`, {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        });
       }
     } catch (error) {
       console.error('Save error:', error);
-      toast.error('Failed to save transcript. Please try again');
+      const errorMessage = error instanceof Error ? error.message : 'Please try again';
+      toast.error(`❌ Failed to save transcript: ${errorMessage}`, {
+        position: "bottom-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -362,15 +408,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
           )}
           {isEnhancing ? 'Enhancing...' : 'Enhance'}
         </button>
-        <button 
+        <button
           onClick={handleSaveTranscript}
           className={`bg-green-500 text-white px-4 py-2 rounded-md transition-colors ${
-            isRecording ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
+            isRecording || isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
           }`}
-          disabled={isRecording}
+          disabled={isRecording || isSaving}
         >
-          <Save size={20} className="mr-2" />
-          Save
+          {isSaving ? (
+            <Loader className="w-5 h-5 animate-spin" />
+          ) : (
+            <Save size={20} className="mr-2" />
+          )}
+          {isSaving ? 'Saving...' : 'Save'}
         </button>
         <button 
           onClick={handleResetTranscripts}
