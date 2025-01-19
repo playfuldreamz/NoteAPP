@@ -4,40 +4,52 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   content: string;
+  children?: React.ReactNode;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, content }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, content, children }) => {
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden'; // Disable scrolling
+      document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = 'unset'; // Re-enable scrolling
+      document.body.style.overflow = 'unset';
     }
     return () => {
-      document.body.style.overflow = 'unset'; // Clean up on unmount
+      document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl relative flex flex-col">
-        {/* Fixed header with close button */}
-        <div className="sticky top-0 bg-white p-4 border-b border-gray-200 rounded-t-lg flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">Content</h3>
-          <button 
-            onClick={onClose} 
-            className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
-          >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        {/* Scrollable content */}
-        <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 100px)' }}>
-          <p className="text-gray-600 whitespace-pre-wrap">{content}</p>
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+      <div className="fixed inset-0 flex flex-col p-4 pt-20"> {/* Added pt-20 for navbar spacing */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg h-[calc(100vh-6rem)] w-full flex flex-col overflow-hidden"> {/* Constrained height */}
+          {/* Header */}
+          <div className="sticky top-0 bg-white dark:bg-gray-900 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Content</h3>
+            <button 
+              onClick={onClose} 
+              className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* Main content area */}
+          <div className="flex-1 grid grid-cols-[70%_30%] divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden">
+            {/* Left column - Content */}
+            <div className="p-6 overflow-y-auto">
+              <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{content}</p>
+            </div>
+            
+            {/* Right column - Modules */}
+            <div className="p-6 overflow-y-auto">
+              {children}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -314,7 +314,20 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           </button>
         )}
       </div>
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} content={selectedTranscript} />
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        content={selectedTranscript}
+      >
+        <div className="p-4">
+          <h4 className="text-lg font-semibold mb-4 dark:text-gray-200">Modules</h4>
+          <div className="space-y-2">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
+              Coming soon: Additional modules will appear here
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
