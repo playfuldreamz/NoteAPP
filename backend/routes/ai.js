@@ -36,16 +36,54 @@ router.post('/enhance-transcription', async (req, res) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-pro",
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_DANGEROUS",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_HARASSMENT", 
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_NONE"
+        }
+      ]
+    });
     
     // First pass: Basic formatting and punctuation
     const formatPrompt = `Add proper punctuation and formatting to this transcript:\n${transcript}`;
     const formatResult = await model.generateContent(formatPrompt);
+    
+    // Check for blocked content
+    if (formatResult.response.promptFeedback?.blockReason) {
+      console.warn('Formatting blocked:', formatResult.response.promptFeedback.blockReason);
+      throw new Error('Formatting blocked by safety filters');
+    }
+    
     let formattedText = formatResult.response.text();
     
     // Second pass: Context-aware correction
     const correctPrompt = `Correct any transcription errors in this text while preserving meaning:\n${formattedText}`;
     const correctResult = await model.generateContent(correctPrompt);
+    
+    // Check for blocked content
+    if (correctResult.response.promptFeedback?.blockReason) {
+      console.warn('Correction blocked:', correctResult.response.promptFeedback.blockReason);
+      throw new Error('Correction blocked by safety filters');
+    }
+    
     const correctedText = correctResult.response.text();
     
     // Calculate confidence score
