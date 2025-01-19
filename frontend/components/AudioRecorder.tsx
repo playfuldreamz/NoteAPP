@@ -36,7 +36,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [enhancedTranscript, setEnhancedTranscript] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [enhanceEnabled, setEnhanceEnabled] = useState(true);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(70);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(19);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
