@@ -37,6 +37,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [showSettings, setShowSettings] = useState(false);
   const [enhanceEnabled, setEnhanceEnabled] = useState(true);
   const [confidenceThreshold, setConfidenceThreshold] = useState(45);
+  const [showEnhanced, setShowEnhanced] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const originalTranscriptRef = useRef<HTMLDivElement>(null);
   const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
@@ -120,15 +121,18 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       const { enhanced, confidence } = await enhanceTranscript(transcript);
       if (confidence >= confidenceThreshold) {
         setEnhancedTranscript(enhanced);
+        setShowEnhanced(true);
         toast.success(`Transcript enhanced with confidence: ${confidence}%`);
       } else {
         toast.warn(`Low confidence enhancement (${confidence}%). Keeping original transcript.`);
         setEnhancedTranscript(transcript);
+        setShowEnhanced(true);
       }
     } catch (error) {
       console.error('Enhancement error:', error);
       toast.error('Failed to enhance transcript');
       setEnhancedTranscript(transcript);
+      setShowEnhanced(true);
     }
   };
 
@@ -188,6 +192,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const handleResetTranscripts = () => {
     setTranscript('');
     setEnhancedTranscript('');
+    setShowEnhanced(false);
     toast.success('Transcript reset!');
   };
 
@@ -245,24 +250,29 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div>
-          <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Original Transcript</h3>
-          <div
-            ref={originalTranscriptRef}
-            className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg h-[300px] overflow-y-auto scroll-smooth"
-          >
-            <p className="text-sm dark:text-gray-200">{transcript} {interimTranscript}</p>
+      <div className="mb-4">
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Original Transcript</h3>
+            <div
+              ref={originalTranscriptRef}
+              className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg h-[300px] overflow-y-auto scroll-smooth"
+            >
+              <p className="text-sm dark:text-gray-200">{transcript} {interimTranscript}</p>
+            </div>
           </div>
-        </div>
-        <div>
-          <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Enhanced Transcript</h3>
-          <div
-            ref={enhancedTranscriptRef}
-            className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg h-[300px] overflow-y-auto scroll-smooth"
-          >
-            <p className="text-sm dark:text-gray-200">{enhancedTranscript}</p>
-          </div>
+          
+          {showEnhanced && (
+            <div className={`transition-all duration-500 ${showEnhanced ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Enhanced Transcript</h3>
+              <div
+                ref={enhancedTranscriptRef}
+                className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg h-[300px] overflow-y-auto scroll-smooth"
+              >
+                <p className="text-sm dark:text-gray-200">{enhancedTranscript}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
