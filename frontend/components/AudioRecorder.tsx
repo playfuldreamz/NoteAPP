@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader } from 'lucide-react';
+import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader, ChevronDown, ChevronUp } from 'lucide-react';
 import { generateTranscriptTitle, enhanceTranscript } from '../services/ai';
 
 interface Window {
@@ -40,6 +40,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [showEnhanced, setShowEnhanced] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhancementProgress, setEnhancementProgress] = useState(0);
+  const [isEnhancedCollapsed, setIsEnhancedCollapsed] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const originalTranscriptRef = useRef<HTMLDivElement>(null);
   const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
@@ -203,6 +204,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     setTranscript('');
     setEnhancedTranscript('');
     setShowEnhanced(false);
+    setIsEnhancedCollapsed(false);
     toast.success('Transcript reset!');
   };
 
@@ -261,7 +263,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       )}
 
       <div className="mb-4">
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-6">
           <div>
             <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Original Transcript</h3>
             <div
@@ -275,7 +277,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
           {showEnhanced && (
             <div className={`transition-all duration-500 ${showEnhanced ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium dark:text-gray-200">Enhanced Transcript</h3>
+                <div className="flex items-center cursor-pointer" onClick={() => setIsEnhancedCollapsed(!isEnhancedCollapsed)}>
+                  <h3 className="text-sm font-medium dark:text-gray-200 mr-2">Enhanced Transcript</h3>
+                  {isEnhancedCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                </div>
                 {isEnhancing && (
                   <div className="flex items-center space-x-2">
                     <Loader className="w-4 h-4 animate-spin" />
@@ -285,10 +290,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
                   </div>
                 )}
               </div>
-              <div
-                ref={enhancedTranscriptRef}
-                className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg h-[300px] overflow-y-auto scroll-smooth"
-              >
+              <div className={`transition-all duration-500 ${isEnhancedCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[300px]'}`}>
+                <div
+                  ref={enhancedTranscriptRef}
+                  className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-y-auto scroll-smooth min-h-[100px]"
+                >
                 {isEnhancing ? (
                   <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
                     <div
@@ -300,6 +306,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
                   <p className="text-sm dark:text-gray-200">{enhancedTranscript}</p>
                 )}
               </div>
+            </div>
             </div>
           )}
         </div>
