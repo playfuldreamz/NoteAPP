@@ -175,7 +175,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                           content: transcript.text,
                           transcript: '', // Not applicable for transcripts
                           timestamp: transcript.date,
-                          title: `Transcript-${transcript.id}`
+                          title: transcript.title || `Transcript-${transcript.id}`
                         }, downloadOptions)}
                         disabled={isDownloading}
                         className="text-blue-500 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
