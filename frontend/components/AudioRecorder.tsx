@@ -36,7 +36,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [enhancedTranscript, setEnhancedTranscript] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [enhanceEnabled, setEnhanceEnabled] = useState(true);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(19);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(45);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
@@ -247,7 +247,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       <div className="flex gap-2">
         <button 
           onClick={handleEnhanceTranscript}
-          className="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors"
+          className={`bg-purple-500 text-white px-4 py-2 rounded-md transition-colors ${
+            (isRecording || !transcript.trim()) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+          }`}
           disabled={isRecording || !transcript.trim()}
         >
           <RefreshCw size={20} className="mr-2" />
@@ -255,7 +257,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         </button>
         <button 
           onClick={handleSaveTranscript}
-          className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
+          className={`bg-green-500 text-white px-4 py-2 rounded-md transition-colors ${
+            isRecording ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
+          }`}
           disabled={isRecording}
         >
           <Save size={20} className="mr-2" />
@@ -263,7 +267,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         </button>
         <button 
           onClick={handleResetTranscripts}
-          className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors"
+          className={`bg-yellow-500 text-white px-4 py-2 rounded-md transition-colors ${
+            isRecording ? 'opacity-50 cursor-not-allowed' : 'hover:bg-yellow-600'
+          }`}
           disabled={isRecording}
         >
           <RotateCcw size={20} className="mr-2" />
