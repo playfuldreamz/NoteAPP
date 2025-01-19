@@ -20,9 +20,10 @@ interface TranscriptActionsProps {
   onFilter: (filters: TranscriptFilters) => void;
   onSort: () => void;
   onExport: () => void;
+  onRefresh: () => void;
 }
 
-export default function TranscriptActions({ count, onFilter, onSort, onExport }: TranscriptActionsProps) {
+export default function TranscriptActions({ count, onFilter, onSort, onExport, onRefresh }: TranscriptActionsProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     dateRange: { start: '', end: '' },
@@ -71,7 +72,7 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport }:
             <DownloadCloud size={18} />
           </button>
           <button
-            onClick={() => window.location.reload()}
+            onClick={onRefresh}
             className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"
             title="Refresh"
           >

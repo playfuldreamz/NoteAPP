@@ -200,6 +200,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }}
+        onRefresh={updateTranscripts}
       />
       
       {visibleTranscripts.length === 0 ? (

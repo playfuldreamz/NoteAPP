@@ -197,6 +197,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }}
+        onRefresh={() => onDelete(-1)} // Using onDelete with invalid ID to trigger refresh
       />
       {visibleNotes.length === 0 ? (
         <p className="dark:text-gray-200">No notes available.</p>

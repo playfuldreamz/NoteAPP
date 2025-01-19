@@ -138,15 +138,20 @@ export default function ClientLayout({
   };
 
   const handleDeleteNote = (id: number) => {
-    setNotes(prevNotes => prevNotes.filter(note => note.id !== id));
+    if (id === -1) {
+      fetchNotes();
+    } else {
+      setNotes(prevNotes => prevNotes.filter(note => note.id !== id));
+    }
   };
 
   const handleSaveNote = () => {
     fetchNotes();
   };
 
-  const updateTranscripts = () => {
+  const handleRefresh = () => {
     fetchTranscripts();
+    fetchNotes();
   };
 
   // If still loading, show nothing
@@ -248,12 +253,12 @@ export default function ClientLayout({
                   <Mic className="w-6 h-6" />
                   Voice Recording
                 </h2>
-                <AudioRecorder updateTranscripts={updateTranscripts} setTranscript={setTranscript} transcript={transcript} />
+                <AudioRecorder updateTranscripts={handleRefresh} setTranscript={setTranscript} transcript={transcript} />
                 <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-2">
                   <FileText className="w-6 h-6" />
                   Transcripts
                 </h2>
-                <TranscriptsList transcripts={transcripts} updateTranscripts={updateTranscripts} />
+                <TranscriptsList transcripts={transcripts} updateTranscripts={handleRefresh} />
               </div>
               <div>
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
