@@ -122,7 +122,11 @@ export interface EnhancedTranscript {
   original: string;
 }
 
-export async function enhanceTranscript(transcript: string, language = 'en-US'): Promise<EnhancedTranscript> {
+export async function enhanceTranscript(
+  transcript: string,
+  onProgress?: (progress: number) => void,
+  language = 'en-US'
+): Promise<EnhancedTranscript> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
@@ -138,6 +142,35 @@ export async function enhanceTranscript(transcript: string, language = 'en-US'):
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Failed to enhance transcript');
+  }
+
+  // Handle progress updates if callback provided
+  if (onProgress) {
+    const reader = response.body?.getReader();
+    if (reader) {
+      let receivedLength = 0;
+      const chunks = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        chunks.push(value);
+        receivedLength += value.length;
+        if (onProgress) {
+          const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10) || receivedLength;
+          const progress = Math.round((receivedLength / contentLength) * 100);
+          onProgress(progress);
+        }
+      }
+      const chunksAll = new Uint8Array(receivedLength);
+      let position = 0;
+      for (const chunk of chunks) {
+        chunksAll.set(chunk, position);
+        position += chunk.length;
+      }
+      const result = new TextDecoder('utf-8').decode(chunksAll);
+      return JSON.parse(result);
+    }
   }
 
   return response.json();
