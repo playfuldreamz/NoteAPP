@@ -163,6 +163,21 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                 return false;
               }
             }
+            // Length filter
+            if (filters.length) {
+              const wordCount = note.content.split(/\s+/).length;
+              switch (filters.length) {
+                case 'short':
+                  if (wordCount >= 100) return false;
+                  break;
+                case 'medium':
+                  if (wordCount < 100 || wordCount > 500) return false;
+                  break;
+                case 'long':
+                  if (wordCount <= 500) return false;
+                  break;
+              }
+            }
             return true;
           });
           const sortedFiltered = filtered.sort((a, b) => 
