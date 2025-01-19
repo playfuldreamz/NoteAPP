@@ -38,6 +38,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [enhanceEnabled, setEnhanceEnabled] = useState(true);
   const [confidenceThreshold, setConfidenceThreshold] = useState(45);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const originalTranscriptRef = useRef<HTMLDivElement>(null);
+  const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -78,6 +80,20 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
 
     recognitionRef.current = recognitionInstance;
   }, [setTranscript]);
+
+  // Auto-scroll original transcript
+  useEffect(() => {
+    if (originalTranscriptRef.current) {
+      originalTranscriptRef.current.scrollTop = originalTranscriptRef.current.scrollHeight;
+    }
+  }, [transcript, interimTranscript]);
+
+  // Auto-scroll enhanced transcript
+  useEffect(() => {
+    if (enhancedTranscriptRef.current) {
+      enhancedTranscriptRef.current.scrollTop = enhancedTranscriptRef.current.scrollHeight;
+    }
+  }, [enhancedTranscript]);
 
   const startRecording = () => {
     if (recognitionRef.current && !isRecording) {
@@ -232,13 +248,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
           <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Original Transcript</h3>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[200px]">
+          <div
+            ref={originalTranscriptRef}
+            className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg h-[300px] overflow-y-auto scroll-smooth"
+          >
             <p className="text-sm dark:text-gray-200">{transcript} {interimTranscript}</p>
           </div>
         </div>
         <div>
           <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Enhanced Transcript</h3>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[200px]">
+          <div
+            ref={enhancedTranscriptRef}
+            className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg h-[300px] overflow-y-auto scroll-smooth"
+          >
             <p className="text-sm dark:text-gray-200">{enhancedTranscript}</p>
           </div>
         </div>
