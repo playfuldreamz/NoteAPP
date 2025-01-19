@@ -189,7 +189,9 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `notes-${new Date().toISOString()}.json`;
+          const date = new Date();
+          const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}-${String(date.getSeconds()).padStart(2, '0')}`;
+          a.download = `notes_${formattedDate}.json`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
