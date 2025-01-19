@@ -23,6 +23,62 @@ try {
   console.error('Error initializing Gemini:', error);
 }
 
+// Transcription enhancement endpoint
+router.post('/enhance-transcription', async (req, res) => {
+  const { transcript, language = 'en-US' } = req.body;
+  
+  if (!transcript) {
+    return res.status(400).json({ error: 'Transcript is required' });
+  }
+
+  if (!genAI) {
+    return res.json({ enhanced: transcript, confidence: 0 });
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    
+    // First pass: Basic formatting and punctuation
+    const formatPrompt = `Add proper punctuation and formatting to this transcript:\n${transcript}`;
+    const formatResult = await model.generateContent(formatPrompt);
+    let formattedText = formatResult.response.text();
+    
+    // Second pass: Context-aware correction
+    const correctPrompt = `Correct any transcription errors in this text while preserving meaning:\n${formattedText}`;
+    const correctResult = await model.generateContent(correctPrompt);
+    const correctedText = correctResult.response.text();
+    
+    // Calculate confidence score
+    const similarity = calculateSimilarity(transcript, correctedText);
+    const confidence = Math.min(100, Math.max(0, Math.round(similarity * 100)));
+    
+    res.json({ 
+      enhanced: correctedText,
+      confidence,
+      original: transcript
+    });
+  } catch (error) {
+    console.error('Transcription enhancement error:', error);
+    res.status(500).json({ 
+      error: 'Failed to enhance transcription',
+      enhanced: transcript,
+      confidence: 0
+    });
+  }
+});
+
+// Helper function to calculate text similarity
+function calculateSimilarity(original, enhanced) {
+  const originalWords = new Set(original.toLowerCase().split(/\s+/));
+  const enhancedWords = new Set(enhanced.toLowerCase().split(/\s+/));
+  
+  const intersection = new Set(
+    [...originalWords].filter(word => enhancedWords.has(word))
+  );
+  
+  return intersection.size / originalWords.size;
+}
+
 // Generate title for content
 router.post('/summarize', async (req, res) => {
   const { content } = req.body;

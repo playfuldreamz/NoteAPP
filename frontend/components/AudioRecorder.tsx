@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { toast } from 'react-toastify'; // Import toast
-import 'react-toastify/dist/ReactToastify.css'; // Import styles
-import { LucideIcon, Mic, MicOff, Save, RotateCcw } from 'lucide-react'; // Import Lucide icons
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw } from 'lucide-react';
+import { generateTranscriptTitle, enhanceTranscript } from '../services/ai';
 
-// Extend the Window interface to include SpeechRecognition
 interface Window {
   SpeechRecognition: new () => SpeechRecognition;
   webkitSpeechRecognition: new () => SpeechRecognition;
 }
 
-// Type declarations for SpeechRecognition and SpeechRecognitionEvent
 interface SpeechRecognition extends EventTarget {
   start(): void;
   stop(): void;
@@ -27,13 +26,17 @@ interface SpeechRecognitionEvent extends Event {
 
 interface AudioRecorderProps {
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
-  updateTranscripts: () => void; // Updated prop for fetching transcripts
-  transcript: string; // Add transcript prop
+  updateTranscripts: () => void;
+  transcript: string;
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTranscripts, transcript }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
+  const [enhancedTranscript, setEnhancedTranscript] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [enhanceEnabled, setEnhanceEnabled] = useState(true);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(70);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
@@ -61,18 +64,15 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         }
       }
 
-      // Update state for interim and final transcripts
       if (finalTranscript) {
-        setTranscript(prevTranscript => prevTranscript + finalTranscript);
+        setTranscript(prev => prev + finalTranscript);
       }
-
-      // Show the interim transcript in real-time
       setInterimTranscript(interimTranscript);
     };
 
     recognitionInstance.onend = () => {
       if (isRecording) {
-        recognitionInstance.start(); // Restart if still recording
+        recognitionInstance.start();
       }
     };
 
@@ -90,12 +90,36 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     if (recognitionRef.current && isRecording) {
       recognitionRef.current.stop();
       setIsRecording(false);
-      setInterimTranscript(''); // Clear interim transcript on stop
+      setInterimTranscript('');
+    }
+  };
+
+  const handleEnhanceTranscript = async () => {
+    if (!transcript.trim()) {
+      toast.error('Cannot enhance empty transcript');
+      return;
+    }
+
+    try {
+      const { enhanced, confidence } = await enhanceTranscript(transcript);
+      if (confidence >= confidenceThreshold) {
+        setEnhancedTranscript(enhanced);
+        toast.success(`Transcript enhanced with confidence: ${confidence}%`);
+      } else {
+        toast.warn(`Low confidence enhancement (${confidence}%). Keeping original transcript.`);
+        setEnhancedTranscript(transcript);
+      }
+    } catch (error) {
+      console.error('Enhancement error:', error);
+      toast.error('Failed to enhance transcript');
+      setEnhancedTranscript(transcript);
     }
   };
 
   const handleSaveTranscript = async () => {
-    if (!transcript.trim()) {
+    const finalTranscript = enhanceEnabled && enhancedTranscript ? enhancedTranscript : transcript;
+    
+    if (!finalTranscript.trim()) {
       toast.error('Cannot save an empty transcript.');
       return;
     }
@@ -107,50 +131,36 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     }
 
     try {
-      // First get AI-generated title
       const titleResponse = await fetch('http://localhost:5000/api/ai/summarize', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ content: transcript })
+        body: JSON.stringify({ content: finalTranscript })
       });
 
-      if (!titleResponse.ok) {
-        throw new Error('Failed to generate title');
-      }
-
+      if (!titleResponse.ok) throw new Error('Failed to generate title');
       const titleData = await titleResponse.json();
-      console.log('Title response:', titleData);
       const generatedTitle = titleData.title || 'Untitled Transcript';
 
-      console.log('About to save transcript with title:', generatedTitle);
-      
-      // Construct request body explicitly
-      const requestBody = {
-        text: transcript,
-        title: generatedTitle
-      };
-      console.log('Request body being sent:', requestBody);
-
-      // Save transcript with title
       const saveResponse = await fetch('http://localhost:5000/transcripts', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({
+          text: finalTranscript,
+          title: generatedTitle
+        })
       });
-
-      const saveData = await saveResponse.json();
-      console.log('Save response data:', saveData);
 
       if (saveResponse.ok) {
         toast.success('Transcript saved!');
-        updateTranscripts(); // Fetch latest transcripts in parent component
+        updateTranscripts();
       } else {
+        const saveData = await saveResponse.json();
         toast.error(saveData.error || 'Failed to save transcript');
       }
     } catch (error) {
@@ -161,35 +171,105 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
 
   const handleResetTranscripts = () => {
     setTranscript('');
-    toast.success('Current transcript reset!');
+    setEnhancedTranscript('');
+    toast.success('Transcript reset!');
   };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
-      <div className="flex items-center">
-        <button 
-          onClick={isRecording ? stopRecording : startRecording}
-          className={`px-4 py-2 rounded-md transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <button 
+            onClick={isRecording ? stopRecording : startRecording}
+            className={`px-4 py-2 rounded-md transition-colors ${
+              isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'
+            } text-white`}
+          >
+            {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
+          </button>
+          {isRecording && <div className="ml-2 w-6 h-6 bg-red-600 rounded-full animate-pulse" />}
+        </div>
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
         >
-          {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
+          <Settings size={24} />
         </button>
-        {isRecording && <div className="ml-2 w-6 h-6 bg-red-600 rounded-full animate-pulse" />} {/* Increased size */}
       </div>
-      <p className="mt-4 dark:text-gray-200">Transcript: {transcript} {interimTranscript}</p>
-      <button 
-        onClick={handleSaveTranscript}
-        className={`bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors mt-4 ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
-        disabled={isRecording}
-      >
-        <Save size={24} />
-      </button>
-      <button 
-        onClick={handleResetTranscripts}
-        className={`bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors mt-4 ml-2 ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
-        disabled={isRecording}
-      >
-        <RotateCcw size={24} />
-      </button>
+
+      {showSettings && (
+        <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div className="flex items-center mb-2">
+            <input
+              type="checkbox"
+              id="enhance-toggle"
+              checked={enhanceEnabled}
+              onChange={(e) => setEnhanceEnabled(e.target.checked)}
+              className="mr-2"
+            />
+            <label htmlFor="enhance-toggle" className="text-sm dark:text-gray-200">
+              Enable AI Enhancement
+            </label>
+          </div>
+          <div className="flex items-center">
+            <label htmlFor="confidence" className="text-sm dark:text-gray-200 mr-2">
+              Confidence Threshold:
+            </label>
+            <input
+              type="range"
+              id="confidence"
+              min="0"
+              max="100"
+              value={confidenceThreshold}
+              onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
+              className="w-32"
+            />
+            <span className="ml-2 text-sm dark:text-gray-200">{confidenceThreshold}%</span>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Original Transcript</h3>
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[200px]">
+            <p className="text-sm dark:text-gray-200">{transcript} {interimTranscript}</p>
+          </div>
+        </div>
+        <div>
+          <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Enhanced Transcript</h3>
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[200px]">
+            <p className="text-sm dark:text-gray-200">{enhancedTranscript}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button 
+          onClick={handleEnhanceTranscript}
+          className="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors"
+          disabled={isRecording || !transcript.trim()}
+        >
+          <RefreshCw size={20} className="mr-2" />
+          Enhance
+        </button>
+        <button 
+          onClick={handleSaveTranscript}
+          className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
+          disabled={isRecording}
+        >
+          <Save size={20} className="mr-2" />
+          Save
+        </button>
+        <button 
+          onClick={handleResetTranscripts}
+          className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors"
+          disabled={isRecording}
+        >
+          <RotateCcw size={20} className="mr-2" />
+          Reset
+        </button>
+      </div>
     </div>
   );
 };

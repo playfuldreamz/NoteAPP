@@ -115,3 +115,30 @@ export async function updateTranscriptTitle(id: number, title: string): Promise<
     throw new Error(error.message || 'Failed to update transcript title');
   }
 }
+
+export interface EnhancedTranscript {
+  enhanced: string;
+  confidence: number;
+  original: string;
+}
+
+export async function enhanceTranscript(transcript: string, language = 'en-US'): Promise<EnhancedTranscript> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/enhance-transcription`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ transcript, language }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to enhance transcript');
+  }
+
+  return response.json();
+}
