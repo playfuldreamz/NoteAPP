@@ -41,6 +41,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhancementProgress, setEnhancementProgress] = useState(0);
   const [isEnhancedCollapsed, setIsEnhancedCollapsed] = useState(false);
+  const [isOriginalCollapsed, setIsOriginalCollapsed] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const originalTranscriptRef = useRef<HTMLDivElement>(null);
   const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
@@ -86,11 +87,37 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   }, [setTranscript]);
 
   // Auto-scroll original transcript
+  const [isManualScroll, setIsManualScroll] = useState(false);
+  
   useEffect(() => {
-    if (originalTranscriptRef.current) {
-      originalTranscriptRef.current.scrollTop = originalTranscriptRef.current.scrollHeight;
+    const transcriptElement = originalTranscriptRef.current;
+    if (!transcriptElement) return;
+
+    // Check if user has manually scrolled up
+    const isNearBottom =
+      transcriptElement.scrollHeight - transcriptElement.scrollTop <= transcriptElement.clientHeight + 50;
+
+    // Only auto-scroll if near bottom or not manually scrolled
+    if (!isManualScroll || isNearBottom) {
+      transcriptElement.scrollTop = transcriptElement.scrollHeight;
+      setIsManualScroll(false);
     }
   }, [transcript, interimTranscript]);
+
+  // Handle manual scroll
+  useEffect(() => {
+    const transcriptElement = originalTranscriptRef.current;
+    if (!transcriptElement) return;
+
+    const handleScroll = () => {
+      const isNearBottom =
+        transcriptElement.scrollHeight - transcriptElement.scrollTop <= transcriptElement.clientHeight + 50;
+      setIsManualScroll(!isNearBottom);
+    };
+
+    transcriptElement.addEventListener('scroll', handleScroll);
+    return () => transcriptElement.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Auto-scroll enhanced transcript
   useEffect(() => {
@@ -205,6 +232,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     setEnhancedTranscript('');
     setShowEnhanced(false);
     setIsEnhancedCollapsed(false);
+    setIsOriginalCollapsed(false);
     toast.success('Transcript reset!');
   };
 
@@ -265,12 +293,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       <div className="mb-4">
         <div className="grid grid-cols-1 gap-6">
           <div>
-            <h3 className="text-sm font-medium mb-2 dark:text-gray-200">Original Transcript</h3>
-            <div
-              ref={originalTranscriptRef}
-              className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg h-[300px] overflow-y-auto scroll-smooth"
-            >
-              <p className="text-sm dark:text-gray-200">{transcript} {interimTranscript}</p>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center cursor-pointer" onClick={() => setIsOriginalCollapsed(!isOriginalCollapsed)}>
+                <h3 className="text-sm font-medium dark:text-gray-200 mr-2">Original Transcript</h3>
+                {isOriginalCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              </div>
+            </div>
+            <div className={`transition-all duration-500 ${isOriginalCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[200px]'}`}>
+              <div
+                ref={originalTranscriptRef}
+                className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-y-auto scroll-smooth h-[200px]"
+              >
+                <p className="text-sm dark:text-gray-200">{transcript} {interimTranscript}</p>
+              </div>
             </div>
           </div>
           
@@ -293,7 +328,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
               <div className={`transition-all duration-500 ${isEnhancedCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[300px]'}`}>
                 <div
                   ref={enhancedTranscriptRef}
-                  className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-y-auto scroll-smooth min-h-[100px]"
+                  className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-y-auto scroll-smooth h-[200px]"
                 >
                 {isEnhancing ? (
                   <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
