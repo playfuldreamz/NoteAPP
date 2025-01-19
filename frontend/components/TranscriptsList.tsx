@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
+import TranscriptActions from './TranscriptActions';
 import { useDownloadNote, type DownloadOptions } from '../hooks/useDownloadNote';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 
@@ -128,6 +129,14 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           </button>
         )}
       </div>
+      
+      <TranscriptActions 
+        count={initialTranscripts.length}
+        onFilter={() => console.log('Filter clicked')}
+        onSort={() => console.log('Sort clicked')}
+        onExport={() => console.log('Export clicked')}
+      />
+      
       {visibleTranscripts.length === 0 ? (
         <p className="dark:text-gray-200">No transcripts available.</p>
       ) : (

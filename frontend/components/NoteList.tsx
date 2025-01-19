@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Sparkles, Download } from 'lucide-react';
+import TranscriptActions from './TranscriptActions';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 import { useDownloadNote, DownloadOptions } from '../hooks/useDownloadNote';
 
@@ -140,6 +141,13 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           </button>
         )}
       </div>
+      
+      <TranscriptActions 
+        count={notes.length}
+        onFilter={() => console.log('Filter clicked')}
+        onSort={() => console.log('Sort clicked')}
+        onExport={() => console.log('Export clicked')}
+      />
       {visibleNotes.length === 0 ? (
         <p className="dark:text-gray-200">No notes available.</p>
       ) : (
