@@ -87,11 +87,11 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
       <button 
         onClick={saveNote}
         disabled={isSaving || isGeneratingTitle}
-        className={`flex items-center gap-2 ${
+        className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
           isSaving || isGeneratingTitle
-            ? 'bg-gray-400 cursor-not-allowed' 
-            : 'bg-green-500 hover:bg-green-600'
-        } text-white px-4 py-2 rounded-md transition-colors`}
+            ? 'bg-emerald-200 dark:bg-emerald-900 text-emerald-50 dark:text-emerald-200 cursor-not-allowed'
+            : 'bg-emerald-600 dark:bg-emerald-500 text-white hover:bg-emerald-700 dark:hover:bg-emerald-600 hover:shadow-md active:scale-[0.98]'
+        } w-full sm:w-auto`}
       >
         <Save size={20} />
         {isGeneratingTitle ? 'Generating Title...' : isSaving ? 'Saving...' : 'Save Note'}

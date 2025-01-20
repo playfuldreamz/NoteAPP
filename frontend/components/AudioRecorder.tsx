@@ -393,44 +393,52 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         <button 
           onClick={handleEnhanceTranscript}
-          className={`bg-purple-500 text-white px-4 py-2 rounded-md transition-colors ${
-            (isRecording || !transcript.trim() || isEnhancing) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+          className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
+            (isRecording || !transcript.trim() || isEnhancing) 
+              ? 'bg-blue-200 dark:bg-blue-900 text-blue-50 dark:text-blue-200 cursor-not-allowed' 
+              : 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 hover:shadow-md active:scale-[0.98]'
           }`}
           disabled={isRecording || !transcript.trim() || isEnhancing}
         >
           {isEnhancing ? (
             <Loader className="w-5 h-5 animate-spin" />
           ) : (
-            <RefreshCw size={20} className="mr-2" />
+            <RefreshCw size={18} className="shrink-0" />
           )}
-          {isEnhancing ? 'Enhancing...' : 'Enhance'}
+          <span>{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
         </button>
+        
         <button
           onClick={handleSaveTranscript}
-          className={`bg-green-500 text-white px-4 py-2 rounded-md transition-colors ${
-            isRecording || isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
+          className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
+            isRecording || isSaving
+              ? 'bg-emerald-200 dark:bg-emerald-900 text-emerald-50 dark:text-emerald-200 cursor-not-allowed'
+              : 'bg-emerald-600 dark:bg-emerald-500 text-white hover:bg-emerald-700 dark:hover:bg-emerald-600 hover:shadow-md active:scale-[0.98]'
           }`}
           disabled={isRecording || isSaving}
         >
           {isSaving ? (
             <Loader className="w-5 h-5 animate-spin" />
           ) : (
-            <Save size={20} className="mr-2" />
+            <Save size={18} className="shrink-0" />
           )}
-          {isSaving ? 'Saving...' : 'Save'}
+          <span>{isSaving ? 'Saving...' : 'Save'}</span>
         </button>
+        
         <button 
           onClick={handleResetTranscripts}
-          className={`bg-yellow-500 text-white px-4 py-2 rounded-md transition-colors ${
-            isRecording ? 'opacity-50 cursor-not-allowed' : 'hover:bg-yellow-600'
+          className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
+            isRecording
+              ? 'bg-amber-200 dark:bg-amber-900 text-amber-50 dark:text-amber-200 cursor-not-allowed'
+              : 'bg-amber-600 dark:bg-amber-500 text-white hover:bg-amber-700 dark:hover:bg-amber-600 hover:shadow-md active:scale-[0.98]'
           }`}
           disabled={isRecording}
         >
-          <RotateCcw size={20} className="mr-2" />
-          Reset
+          <RotateCcw size={18} className="shrink-0" />
+          <span>Reset</span>
         </button>
       </div>
     </div>
