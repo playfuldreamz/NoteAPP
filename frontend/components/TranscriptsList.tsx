@@ -6,11 +6,17 @@ import TranscriptActions, { TranscriptFilters } from './TranscriptActions';
 import { useDownloadNote, type DownloadOptions } from '../hooks/useDownloadNote';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 
+interface Tag {
+  id: number;
+  name: string;
+}
+
 interface Transcript {
   id: number;
   text: string;
   title: string;
   date: string;
+  tags?: Tag[];
 }
 
 interface TranscriptsListProps {
@@ -31,6 +37,40 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     format: 'txt',
     includeMetadata: true
   });
+  const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({});
+
+  const toggleTagsExpansion = (transcriptId: number) => {
+    setExpandedTags(prev => ({
+      ...prev,
+      [transcriptId]: !prev[transcriptId]
+    }));
+  };
+
+  const renderTags = (transcript: Transcript) => {
+    const tags = transcript.tags || [];
+    const maxVisibleTags = 3;
+    const showAll = expandedTags[transcript.id] || false;
+    
+    return (
+      <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-wrap gap-2">
+          {(showAll ? tags : tags.slice(0, maxVisibleTags)).map(tag => (
+            <span key={tag.id} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+              {tag.name}
+            </span>
+          ))}
+        </div>
+        {tags.length > maxVisibleTags && (
+          <button
+            onClick={() => toggleTagsExpansion(transcript.id)}
+            className="text-xs text-blue-500 hover:underline self-start"
+          >
+            {showAll ? 'Show less' : `+${tags.length - maxVisibleTags} more`}
+          </button>
+        )}
+      </div>
+    );
+  };
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
 
@@ -58,7 +98,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
     // Length filter
     if (filters.length) {
-  const wordCount = (t: Transcript) => t.text.split(' ').length;
+      const wordCount = (t: Transcript) => t.text.split(' ').length;
       filtered = filtered.filter(t => {
         const words = wordCount(t);
         switch (filters.length) {
@@ -68,6 +108,23 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           default: return true;
         }
       });
+    }
+
+    // Tag filter - must match all selected tags
+    if (filters.tags.length > 0) {
+      console.log('Applying tag filter with selected tags:', filters.tags);
+      filtered = filtered.filter(t => {
+        const itemTags = (t.tags || []).map(tag => tag.name);
+        console.log(`Checking item ${t.id} with tags:`, itemTags);
+        const matchesAll = filters.tags.every(selectedTag => {
+          const match = itemTags.includes(selectedTag);
+          console.log(`Checking tag ${selectedTag}: ${match}`);
+          return match;
+        });
+        console.log(`Item ${t.id} matches all tags: ${matchesAll}`);
+        return matchesAll;
+      });
+      console.log('Filtered items after tag filter:', filtered);
     }
 
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -81,7 +138,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   };
 
   useEffect(() => {
-    handleFilter({}); // Initial load with no filters
+    handleFilter({ tags: [] }); // Initial load with no filters
   }, [initialTranscripts]);
 
   useEffect(() => {
@@ -120,7 +177,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
       if (response.ok) {
         toast.success('Transcript deleted!');
-        updateTranscripts(); // Call to update transcripts in parent component
+        updateTranscripts();
       } else {
         const data = await response.json();
         toast.error(data.error || 'Failed to delete transcript');
@@ -132,7 +189,6 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   };
 
   const handleSeeMore = (text: string, title: string, id: number) => {
-    console.log('Opening transcript with ID:', id, 'Title:', title);
     setSelectedTranscript(text);
     setIsModalOpen(true);
     setSelectedTranscriptTitle(title);
@@ -155,7 +211,6 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setVisibleTranscripts(filteredTranscripts.slice(0, 5));
     setShowLoadMore(filteredTranscripts.length > 5);
   };
-
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
@@ -191,7 +246,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
             id: t.id,
             title: t.title,
             text: t.text,
-            date: t.date
+            date: t.date,
+            tags: t.tags || []
           }));
           const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
@@ -225,7 +281,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                       <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
                         {transcript.title || 'Untitled Transcript'}
                       </h3>
-{(!transcript.title || transcript.title === 'Untitled Transcript') && (
+                      {(!transcript.title || transcript.title === 'Untitled Transcript') && (
                         <button
                           onClick={() => handleGenerateTitle(transcript.id, transcript.text, (id, title) => {
                             setVisibleTranscripts(prev => prev.map(t => 
@@ -253,7 +309,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                         onClick={() => downloadNote({
                           id: transcript.id,
                           content: transcript.text,
-                          transcript: '', // Not applicable for transcripts
+                          transcript: '',
                           timestamp: transcript.date,
                           title: transcript.title || `Transcript-${transcript.id}`
                         }, downloadOptions)}
@@ -266,17 +322,24 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                     </div>
                   </div>
                   <div className="text-gray-600 dark:text-gray-300">
-  <p className="text-sm inline">
-                      {truncateText(transcript.text)}
+                    <p className="text-sm inline">
+                      {truncatedText}
                     </p>
                     {transcript.text.split(' ').length > 5 && (
                       <button
                         onClick={() => handleSeeMore(transcript.text, transcript.title || 'Untitled Transcript', transcript.id)}
                         className="text-blue-500 hover:text-blue-700 transition-colors duration-200 text-xs ml-2"
                       >
-                    <Eye size={16} />
+                        <Eye size={16} />
                       </button>
                     )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {(transcript.tags || []).map(tag => (
+                      <span key={tag.id} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                        {tag.name}
+                      </span>
+                    ))}
                   </div>
                   <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
                     <span>

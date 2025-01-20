@@ -236,12 +236,36 @@ app.post('/login', async (req, res) => {
 
 // Protected routes - Add authenticateToken middleware
 app.get('/notes', authenticateToken, (req, res) => {
-  db.all('SELECT * FROM notes WHERE user_id = ?', [req.user.id], (err, rows) => {
+  const query = `
+    SELECT
+      n.id,
+      n.content,
+      n.title,
+      n.transcript,
+      n.timestamp,
+      n.user_id,
+      json_group_array(json_object('id', t.id, 'name', t.name)) AS tags
+    FROM notes n
+    LEFT JOIN item_tags it ON n.id = it.item_id AND it.item_type = 'note'
+    LEFT JOIN tags t ON it.tag_id = t.id
+    WHERE n.user_id = ?
+    GROUP BY n.id
+    ORDER BY n.timestamp DESC
+  `;
+  
+  db.all(query, [req.user.id], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
-    res.json(rows);
+    
+    // Parse the JSON tags array
+    const notes = rows.map(row => ({
+      ...row,
+      tags: JSON.parse(row.tags).filter(tag => tag.id !== null)
+    }));
+    
+    res.json(notes);
   });
 });
 

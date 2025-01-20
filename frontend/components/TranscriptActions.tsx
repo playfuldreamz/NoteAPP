@@ -1,11 +1,19 @@
 import { Filter, ArrowUpDown, DownloadCloud, ChevronDown, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import TagChip from './TagChip';
+import { getAllTags } from '../services/ai';
+
+interface Tag {
+  id: number;
+  name: string;
+}
 
 export interface TranscriptFilters {
   dateRange?: { start: string; end: string };
   keyword?: string;
   length?: 'short' | 'medium' | 'long';
-  tags?: string[];
+  tags: string[];
+  itemType?: 'note' | 'transcript';
 }
 
 interface Filters {
@@ -13,6 +21,7 @@ interface Filters {
   keyword: string;
   length?: 'short' | 'medium' | 'long';
   tags: string[];
+  showAllTags: boolean;
 }
 
 interface TranscriptActionsProps {
@@ -28,15 +37,30 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport, o
   const [filters, setFilters] = useState<Filters>({
     dateRange: { start: '', end: '' },
     keyword: '',
-    tags: []
+    tags: [],
+    showAllTags: false
   });
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+
+  useEffect(() => {
+    const loadTags = async () => {
+      try {
+        const tags = await getAllTags();
+        setAvailableTags(tags);
+      } catch (error) {
+        console.error('Error loading tags:', error);
+      }
+    };
+    loadTags();
+  }, []);
 
   const handleApplyFilters = () => {
     onFilter({
       dateRange: filters.dateRange.start || filters.dateRange.end ? filters.dateRange : undefined,
       keyword: filters.keyword.trim() || undefined,
       length: filters.length,
-      tags: filters.tags.length ? filters.tags : undefined
+      tags: filters.tags,
+      itemType: 'transcript' // Add itemType to filter criteria
     });
     setShowFilters(false);
   };
@@ -141,6 +165,58 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport, o
                 <option value="long">Long (more than 500 words)</option>
               </select>
             </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                Tags
+              </label>
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {availableTags.slice(0, 10).map(tag => (
+                    <TagChip
+                      key={tag.id}
+                      tag={tag}
+                      isSelected={filters.tags.includes(tag.name)}
+                      onToggle={() => {
+                        setFilters(prev => ({
+                          ...prev,
+                          tags: prev.tags.includes(tag.name)
+                            ? prev.tags.filter(t => t !== tag.name)
+                            : [...prev.tags, tag.name]
+                        }));
+                      }}
+                    />
+                  ))}
+                </div>
+                {availableTags.length > 10 && (
+                  <button
+                    onClick={() => setFilters(prev => ({ ...prev, showAllTags: !prev.showAllTags }))}
+                    className="text-xs text-blue-500 hover:underline self-start"
+                  >
+                    {filters.showAllTags ? 'Show less' : `+${availableTags.length - 10} more`}
+                  </button>
+                )}
+                {filters.showAllTags && (
+                  <div className="flex flex-wrap gap-2">
+                    {availableTags.slice(10).map(tag => (
+                      <TagChip
+                        key={tag.id}
+                        tag={tag}
+                        isSelected={filters.tags.includes(tag.name)}
+                        onToggle={() => {
+                          setFilters(prev => ({
+                            ...prev,
+                            tags: prev.tags.includes(tag.name)
+                              ? prev.tags.filter(t => t !== tag.name)
+                              : [...prev.tags, tag.name]
+                          }));
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2">
@@ -150,9 +226,10 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport, o
                   dateRange: { start: '', end: '' },
                   keyword: '',
                   length: undefined,
-                  tags: []
+                  tags: [],
+                  showAllTags: false
                 });
-                onFilter({});
+                onFilter({ tags: [] });
                 setShowFilters(false);
               }}
               className="text-sm text-gray-600 dark:text-gray-300 hover:underline"

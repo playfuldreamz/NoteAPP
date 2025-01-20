@@ -7,14 +7,23 @@ import TranscriptActions from './TranscriptActions';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 import { useDownloadNote, DownloadOptions } from '../hooks/useDownloadNote';
 
+interface Tag {
+  id: number;
+  name: string;
+}
+
+interface Note {
+  id: number;
+  content: string;
+  transcript: string;
+  timestamp: string;
+  title: string;
+  user_id: number;
+  tags: Tag[];
+}
+
 interface NoteListProps {
-  notes: Array<{
-    id: number;
-    content: string;
-    transcript: string;
-    timestamp: string;
-    title: string;
-  }>;
+  notes: Note[];
   onDelete: (id: number) => void;
 }
 
@@ -23,22 +32,10 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   const [selectedNote, setSelectedNote] = useState<string>('');
   const [selectedNoteTitle, setSelectedNoteTitle] = useState<string>('');
   const [selectedNoteId, setSelectedNoteId] = useState<number>(0);
-  const [visibleNotes, setVisibleNotes] = useState<Array<{
-    id: number;
-    content: string;
-    transcript: string;
-    timestamp: string;
-    title: string;
-  }>>([]);
+  const [visibleNotes, setVisibleNotes] = useState<Note[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredNotes, setFilteredNotes] = useState<Array<{
-    id: number;
-    content: string;
-    transcript: string;
-    timestamp: string;
-    title: string;
-  }>>([]);
+  const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
   const { downloadNote, isDownloading } = useDownloadNote();
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>({
@@ -46,6 +43,40 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     includeTranscript: true,
     includeMetadata: true
   });
+  const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({});
+
+  const toggleTagsExpansion = (noteId: number) => {
+    setExpandedTags(prev => ({
+      ...prev,
+      [noteId]: !prev[noteId]
+    }));
+  };
+
+  const renderTags = (note: Note) => {
+    const tags = note.tags || [];
+    const maxVisibleTags = 3;
+    const showAll = expandedTags[note.id] || false;
+    
+    return (
+      <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-wrap gap-2">
+          {(showAll ? tags : tags.slice(0, maxVisibleTags)).map(tag => (
+            <span key={tag.id} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+              {tag.name}
+            </span>
+          ))}
+        </div>
+        {tags.length > maxVisibleTags && (
+          <button
+            onClick={() => toggleTagsExpansion(note.id)}
+            className="text-xs text-blue-500 hover:underline self-start"
+          >
+            {showAll ? 'Show less' : `+${tags.length - maxVisibleTags} more`}
+          </button>
+        )}
+      </div>
+    );
+  };
 
   useEffect(() => {
     const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -182,6 +213,22 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                   break;
               }
             }
+            // Tag filter - must match all selected tags
+            console.log('Note object:', note);
+            if (filters.tags && filters.tags.length > 0) {
+              console.log('Applying tag filter with selected tags:', filters.tags);
+              const itemTags = (note.tags || []).map(tag => tag.name);
+              console.log(`Checking note ${note.id} with tags:`, itemTags);
+              const matchesAll = filters.tags.every(selectedTag => {
+                const match = itemTags.includes(selectedTag);
+                console.log(`Checking tag ${selectedTag}: ${match}`);
+                return match;
+              });
+              console.log(`Note ${note.id} matches all tags: ${matchesAll}`);
+              if (!matchesAll) {
+                return false;
+              }
+            }
             return true;
           });
           const sortedFiltered = filtered.sort((a, b) => 
@@ -202,7 +249,8 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
             title: n.title,
             content: n.content,
             transcript: n.transcript,
-            timestamp: n.timestamp
+            timestamp: n.timestamp,
+            tags: n.tags || []
           }));
           const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
@@ -216,7 +264,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }}
-        onRefresh={() => onDelete(-1)} // Using onDelete with invalid ID to trigger refresh
+        onRefresh={() => onDelete(-1)}
       />
       {visibleNotes.length === 0 ? (
         <p className="dark:text-gray-200">No notes available.</p>
@@ -263,10 +311,10 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                   </button>
                 </div>
               </div>
-<div className="text-gray-600 dark:text-gray-300">
-  <p className="text-sm inline">
-    {truncateText(note.content)}
-  </p>
+              <div className="text-gray-600 dark:text-gray-300">
+                <p className="text-sm inline">
+                  {truncateText(note.content)}
+                </p>
                 {note.content.split(' ').length > 5 && (
                   <button
                     onClick={() => handleSeeMore(note.content, note.title || 'Untitled Note', note.id)}
@@ -275,6 +323,13 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                     <Eye size={16} />
                   </button>
                 )}
+              </div>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {(note.tags || []).map(tag => (
+                  <span key={tag.id} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    {tag.name}
+                  </span>
+                ))}
               </div>
               <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
                 <span>{new Date(note.timestamp).toLocaleString()}</span>
@@ -294,7 +349,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
             </div>
           </li>
         ))}
-      </ul>
+        </ul>
       )}
       <div className="flex justify-end mt-4">
         {showLoadMore && (
