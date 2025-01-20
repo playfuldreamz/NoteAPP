@@ -101,10 +101,11 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     }
   };
 
-  const handleSeeMore = (content: string, title: string) => {
+  const handleSeeMore = (content: string, title: string, id: number) => {
     setSelectedNote(content);
     setIsModalOpen(true);
     setSelectedNoteTitle(title);
+    setSelectedNoteId(id);
   };
 
   const truncateText = (text: string) => {
@@ -268,7 +269,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   </p>
                 {note.content.split(' ').length > 5 && (
                   <button
-                    onClick={() => handleSeeMore(note.content, note.title || 'Untitled Note')}
+                    onClick={() => handleSeeMore(note.content, note.title || 'Untitled Note', note.id)}
                     className="text-blue-500 hover:underline text-xs ml-2"
                   >
                     <Eye size={16} />
@@ -313,6 +314,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
         content={selectedNote}
         title={selectedNoteTitle}
         itemId={selectedNoteId}
+        type="note"
       />
     </div>
   );

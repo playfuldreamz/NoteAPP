@@ -8,6 +8,7 @@ interface ModalProps {
   content: string;
   title?: string;
   itemId: number;
+  type?: 'note' | 'transcript';
   children?: React.ReactNode;
   initialTags?: Tag[];
   onTagsUpdate?: (tags: Tag[]) => void;
@@ -19,6 +20,7 @@ const Modal: React.FC<ModalProps> = ({
   content,
   title,
   itemId,
+  type,
   children,
   initialTags = [],
   onTagsUpdate
@@ -38,6 +40,9 @@ const Modal: React.FC<ModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Validate and normalize type
+  const normalizedType = type === 'note' ? 'note' : 'transcript';
+  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
       <div className="fixed inset-0 flex flex-col p-4 pt-20"> {/* Added pt-20 for navbar spacing */}
@@ -66,13 +71,9 @@ const Modal: React.FC<ModalProps> = ({
             
             {/* Right column - Modules */}
             <div className="p-6 overflow-y-auto">
-              {(() => {
-                console.log('Passing to TaggingModule - type: transcript, itemId:', itemId);
-                return null;
-              })()}
               <TaggingModule
-                type="transcript"
-                itemId={itemId || 0}
+                type={normalizedType}
+                itemId={itemId}
                 content={content}
                 initialTags={tags}
                 onTagsUpdate={(newTags) => {

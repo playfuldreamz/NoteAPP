@@ -13,7 +13,7 @@ import TagChip from '@components/TagChip';
 import TagCreator from '@components/TagCreator';
 
 interface TaggingModuleProps {
-  type: string;
+  type?: string;
   itemId: number;
   content: string;
   initialTags?: Tag[];
@@ -21,12 +21,19 @@ interface TaggingModuleProps {
 }
 
 // Helper function to validate and normalize type
-const normalizeType = (type: string): 'note' | 'transcript' => {
+const normalizeType = (type?: string): 'note' | 'transcript' => {
+  if (!type) {
+    console.warn('Type not provided, defaulting to "note"');
+    return 'note';
+  }
+  
   const normalized = type.toLowerCase();
   if (['note', 'transcript'].includes(normalized)) {
     return normalized as 'note' | 'transcript';
   }
-  throw new Error(`Invalid type: ${type}. Must be 'note' or 'transcript'`);
+  
+  console.error(`Invalid type: ${type}. Must be 'note' or 'transcript'`);
+  return 'note';
 };
 
 const TaggingModule: React.FC<TaggingModuleProps> = ({
