@@ -252,166 +252,220 @@ const validateItemType = (req, res, next) => {
   next();
 };
 
-router.post('/tags/:type/:id', validateItemType, async (req, res) => {
-  const { type, id } = req.params;
-  // Extract tag data from request body
-  const tagData = req.body;
-  const tagId = tagData.id || tagData.tagId;
-  const tagName = tagData.name || tagData.tagName;
-  const description = tagData.description;
+// Create new endpoint for tag creation
+router.post('/tags', async (req, res) => {
+  const { name, description } = req.body;
   
-  console.log('Received tag assignment request:', {
-    type,
-    id,
-    tagId,
-    tagName,
-    description,
-    headers: req.headers,
-    body: req.body
-  });
-
-  // Validate tag data
-  if (!tagId && !tagName) {
-    return res.status(400).json({
-      error: 'Either tag ID or tag name is required'
-    });
+  if (!name) {
+    return res.status(400).json({ error: 'Tag name is required' });
   }
 
   try {
-    let finalTagId = tagId;
-    let finalDescription = description;
-    
-    // If we have a tag name but no ID, find or create the tag
-    if (tagName && (!tagId || tagId === -1)) {
-      console.log(`Finding or creating tag: ${tagName}`);
-      
-      // First try to find existing tag
-      const existingTag = await new Promise((resolve, reject) => {
-        db.get(
-          'SELECT id FROM tags WHERE name = ?',
-          [tagName],
-          function(err, row) {
-            if (err) {
-              console.error('Tag lookup error:', err);
-              reject(err);
-            } else {
-              resolve(row);
-            }
-          }
-        );
-      });
-
-      if (existingTag) {
-        finalTagId = existingTag.id;
-      } else {
-        // Create new tag if it doesn't exist
-        finalTagId = await new Promise((resolve, reject) => {
-          db.run(
-            'INSERT INTO tags (name, description) VALUES (?, ?)',
-            [tagName, description || null],
-            function(err) {
-              if (err) {
-                console.error('Tag creation error:', {
-                  message: err.message,
-                  code: err.code,
-                  stack: err.stack,
-                  sql: this.sql,
-                  params: [tagName]
-                });
-                reject(err);
-              } else {
-                resolve(this.lastID);
-              }
-            }
-          );
-        });
-      }
-    }
-
-    console.log('Attempting to assign tag:', {
-      id,
-      type,
-      finalTagId
-    });
-
-    // Assign tag using the unified item_tags table
-    await new Promise((resolve, reject) => {
+    const tag = await new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO item_tags (item_id, item_type, tag_id)
-         VALUES (?, ?, ?)`,
-        [id, type, finalTagId],
+        'INSERT INTO tags (name, description) VALUES (?, ?)',
+        [name, description || null],
         function(err) {
           if (err) {
-            // Handle UNIQUE constraint violation specifically
-            if (err.code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE')) {
-              console.log('Tag already assigned to item');
-              return resolve(null); // Resolve with null to indicate duplicate
-            }
-            
-            console.error('Database error details:', {
-              message: err.message,
-              code: err.code,
-              stack: err.stack,
-              sql: this.sql,
-              params: [id, finalTagId]
-            });
+            console.error('Tag creation error:', err);
             reject(err);
           } else {
-            resolve(this.lastID);
+            resolve({
+              id: this.lastID,
+              name,
+              description
+            });
           }
         }
       );
     });
 
-    console.log(`Successfully assigned tag ${finalTagId} to item ${id}`);
-    res.status(201).json({ success: true });
+    res.status(201).json(tag);
   } catch (error) {
-    console.error('Error in tag assignment:', {
-      message: error.message,
-      stack: error.stack,
-      request: {
-        params: req.params,
-        body: req.body,
-        headers: req.headers
-      }
+    console.error('Error creating tag:', error);
+    res.status(500).json({ error: 'Failed to create tag' });
+  }
+});
+
+// Update tag assignment endpoint
+router.post('/tags/:type/:id', validateItemType, async (req, res) => {
+  const { type, id } = req.params;
+  const { tag_id } = req.body;
+  
+  if (!tag_id) {
+    return res.status(400).json({ error: 'Tag ID is required' });
+  }
+
+  // Validate item ID
+  if (isNaN(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid item ID' });
+  }
+
+  // Validate tag ID
+  if (isNaN(tag_id) || tag_id <= 0) {
+    return res.status(400).json({ error: 'Invalid tag ID' });
+  }
+
+  try {
+    // Begin transaction
+    await new Promise((resolve, reject) => {
+      db.run('BEGIN TRANSACTION', (err) => {
+        if (err) reject(err);
+        else resolve(null);
+      });
     });
-    res.status(500).json({ error: 'Failed to assign tag', details: error.message });
+
+    // Check if tag exists
+    const tagExists = await new Promise((resolve, reject) => {
+      db.get('SELECT id FROM tags WHERE id = ?', [tag_id], (err, row) => {
+        if (err) reject(err);
+        else resolve(!!row);
+      });
+    });
+
+    if (!tagExists) {
+      await new Promise((resolve) => {
+        db.run('ROLLBACK', () => resolve(null));
+      });
+      return res.status(404).json({ error: 'Tag not found' });
+    }
+
+    // Check if item exists
+    const itemExists = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT id FROM ${type}s WHERE id = ?`,
+        [id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(!!row);
+        }
+      );
+    });
+
+    if (!itemExists) {
+      await new Promise((resolve) => {
+        db.run('ROLLBACK', () => resolve(null));
+      });
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    // Assign tag
+    const result = await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO item_tags (item_id, item_type, tag_id)
+         VALUES (?, ?, ?)`,
+        [id, type, tag_id],
+        function(err) {
+          if (err) {
+            if (err.code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE')) {
+              resolve({ success: true, message: 'Tag already assigned' });
+            } else {
+              reject(err);
+            }
+          } else {
+            resolve({ success: true });
+          }
+        }
+      );
+    });
+
+    // Commit transaction
+    await new Promise((resolve, reject) => {
+      db.run('COMMIT', (err) => {
+        if (err) reject(err);
+        else resolve(null);
+      });
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    // Rollback on error
+    await new Promise((resolve) => {
+      db.run('ROLLBACK', () => resolve(null));
+    });
+
+    console.error('Error assigning tag:', error);
+    res.status(500).json({ 
+      error: 'Failed to assign tag',
+      details: error.message 
+    });
   }
 });
 
 // Remove tag from note or transcript
-router.delete('/tags/:type/:id/:tagId', validateItemType, async (req, res) => {
-  const { type, id, tagId } = req.params;
+router.delete('/tags/:type/:id/:tag_id', validateItemType, async (req, res) => {
+  const { type, id, tag_id } = req.params;
   
+  // Validate IDs
+  if (isNaN(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid item ID' });
+  }
+  if (isNaN(tag_id) || tag_id <= 0) {
+    return res.status(400).json({ error: 'Invalid tag ID' });
+  }
+
   try {
-    db.run(
-      `DELETE FROM item_tags
-       WHERE item_id = ? AND item_type = ? AND tag_id = ?`,
-      [id, type, tagId],
-      function(err) {
-        if (err) {
-          console.error('Database error:', {
-            message: err.message,
-            code: err.code,
-            stack: err.stack,
-            sql: this.sql,
-            params: [id, type, tagId]
-          });
-          return res.status(500).json({ error: 'Failed to remove tag' });
-        }
-        if (this.changes === 0) {
-          return res.status(404).json({ error: 'Tag association not found' });
-        }
-        res.json({ success: true });
-      }
-    );
-  } catch (error) {
-    console.error('Error removing tag:', {
-      message: error.message,
-      stack: error.stack,
-      request: req.params
+    // Begin transaction
+    await new Promise((resolve, reject) => {
+      db.run('BEGIN TRANSACTION', (err) => {
+        if (err) reject(err);
+        else resolve(null);
+      });
     });
-    res.status(500).json({ error: 'Internal server error' });
+
+    // Check if association exists
+    const associationExists = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT * FROM item_tags 
+         WHERE item_id = ? AND item_type = ? AND tag_id = ?`,
+        [id, type, tag_id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(!!row);
+        }
+      );
+    });
+
+    if (!associationExists) {
+      await new Promise((resolve) => {
+        db.run('ROLLBACK', () => resolve(null));
+      });
+      return res.status(404).json({ error: 'Tag association not found' });
+    }
+
+    // Delete association
+    const result = await new Promise((resolve, reject) => {
+      db.run(
+        `DELETE FROM item_tags 
+         WHERE item_id = ? AND item_type = ? AND tag_id = ?`,
+        [id, type, tag_id],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ success: true });
+        }
+      );
+    });
+
+    // Commit transaction
+    await new Promise((resolve, reject) => {
+      db.run('COMMIT', (err) => {
+        if (err) reject(err);
+        else resolve(null);
+      });
+    });
+
+    res.json(result);
+  } catch (error) {
+    // Rollback on error
+    await new Promise((resolve) => {
+      db.run('ROLLBACK', () => resolve(null));
+    });
+
+    console.error('Error removing tag:', error);
+    res.status(500).json({ 
+      error: 'Failed to remove tag',
+      details: error.message 
+    });
   }
 });
 

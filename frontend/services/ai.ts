@@ -156,24 +156,33 @@ export async function analyzeContentForTags(content: string): Promise<string[]> 
 }
 
 export async function createTag(name: string, description?: string): Promise<Tag> {
-  // Create a temporary tag object
-  const tempTag = {
-    id: -1,
-    name,
-    description
-  };
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
 
-  // Use the addTagToItem function with a dummy item ID
-  // This will trigger the tag creation logic in the backend
-  const result = await addTagToItem('note', 0, {
-    name
-  });
+  try {
+    const response = await fetch(`${API_BASE}/api/ai/tags`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name, description }),
+    });
 
-  // Return the created tag with the new ID and description
-  return {
-    ...tempTag,
-    id: result.id
-  };
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create tag');
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Error creating tag:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name,
+      description
+    });
+    throw error;
+  }
 }
 
 export async function getAllTags(): Promise<Tag[]> {
