@@ -13,11 +13,21 @@ import TagChip from '@components/TagChip';
 import TagCreator from '@components/TagCreator';
 
 interface TaggingModuleProps {
-  type: 'note' | 'transcript';
+  type: string;
   itemId: number;
   content: string;
-  onTagsUpdate: (tags: Tag[]) => void;
+  initialTags?: Tag[];
+  onTagsUpdate?: (tags: Tag[]) => void;
 }
+
+// Helper function to validate and normalize type
+const normalizeType = (type: string): 'note' | 'transcript' => {
+  const normalized = type.toLowerCase();
+  if (['note', 'transcript'].includes(normalized)) {
+    return normalized as 'note' | 'transcript';
+  }
+  throw new Error(`Invalid type: ${type}. Must be 'note' or 'transcript'`);
+};
 
 const TaggingModule: React.FC<TaggingModuleProps> = ({
   type,
@@ -32,13 +42,21 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load tags when component mounts
+  // Reset state when item changes
+  useEffect(() => {
+    setSelectedTags([]);
+    setSuggestedTags([]);
+    setIsLoadingTags(true);
+  }, [itemId]);
+
+  // Load tags when component mounts or item changes
   useEffect(() => {
     const loadTags = async () => {
       try {
+        const normalizedType = normalizeType(type);
         const [allTags, itemTags] = await Promise.all([
           getAllTags(),
-          getTagsForItem(type, itemId)
+          getTagsForItem(normalizedType, itemId)
         ]);
         setTags(allTags);
         setSelectedTags(itemTags);
@@ -52,18 +70,35 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     loadTags();
   }, [type, itemId]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      setSelectedTags([]);
+      setSuggestedTags([]);
+    };
+  }, []);
+
   // Handle tag selection
   const handleTagSelection = async (tag: Tag) => {
+    console.log('Tagging transcript with ID:', itemId, 'Tag:', tag);
     setIsSaving(true);
     try {
+      const normalizedType = normalizeType(type);
+      console.log('API call details:', {
+        type: normalizedType,
+        id: itemId,
+        tag
+      });
       if (selectedTags.some(t => t.id === tag.id)) {
-        await removeTagFromItem(type, itemId, tag.id);
+        await removeTagFromItem(normalizedType, itemId, tag.id);
         setSelectedTags(prev => prev.filter(t => t.id !== tag.id));
       } else {
-        await addTagToItem(type, itemId, tag.id);
-        setSelectedTags(prev => [...prev, tag]);
+      await addTagToItem(normalizedType, itemId, tag);
+      setSelectedTags(prev => [...prev, tag]);
       }
-      onTagsUpdate(selectedTags);
+      if (onTagsUpdate) {
+        onTagsUpdate(selectedTags);
+      }
     } catch (error) {
       console.error('Error updating tag:', error);
       toast.error('Failed to update tags');

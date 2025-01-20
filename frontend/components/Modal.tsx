@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import TaggingModule from './TaggingModule';
 import { Tag } from '../services/ai';
 
@@ -7,10 +7,24 @@ interface ModalProps {
   onClose: () => void;
   content: string;
   title?: string;
+  itemId: number;
   children?: React.ReactNode;
+  initialTags?: Tag[];
+  onTagsUpdate?: (tags: Tag[]) => void;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, content, title, children }) => {
+const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  content,
+  title,
+  itemId,
+  children,
+  initialTags = [],
+  onTagsUpdate
+}) => {
+  console.log('Modal received itemId:', itemId);
+  const [tags, setTags] = useState<Tag[]>(initialTags);
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -52,13 +66,18 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, content, title, children
             
             {/* Right column - Modules */}
             <div className="p-6 overflow-y-auto">
+              {(() => {
+                console.log('Passing to TaggingModule - type: transcript, itemId:', itemId);
+                return null;
+              })()}
               <TaggingModule
-                type="note"
-                itemId={0} // TODO: Replace with actual note/transcript ID
+                type="transcript"
+                itemId={itemId || 0}
                 content={content}
-                onTagsUpdate={(tags) => {
-                  // TODO: Implement tag update logic
-                  console.log('Updated tags:', tags);
+                initialTags={tags}
+                onTagsUpdate={(newTags) => {
+                  setTags(newTags);
+                  onTagsUpdate?.(newTags);
                 }}
               />
               {children}

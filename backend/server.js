@@ -90,6 +90,25 @@ db.serialize(() => {
     FOREIGN KEY(user_id) REFERENCES users(id)
   )`);
 
+  // Create tags table
+  db.run(`CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Create item_tags join table with proper constraints
+  db.run(`CREATE TABLE IF NOT EXISTS item_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL,
+    item_type TEXT NOT NULL CHECK(item_type IN ('note', 'transcript')),
+    tag_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(item_id, item_type, tag_id),
+    FOREIGN KEY(item_id) REFERENCES notes(id) ON DELETE CASCADE,
+    FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
+  )`);
+
   // Create app_settings table for global AI configuration
   db.run(`CREATE TABLE IF NOT EXISTS app_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

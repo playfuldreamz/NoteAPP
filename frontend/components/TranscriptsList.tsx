@@ -22,6 +22,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
   const [selectedTranscriptTitle, setSelectedTranscriptTitle] = useState<string>('');
+  const [selectedTranscriptId, setSelectedTranscriptId] = useState<number>(0);
   const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,10 +131,12 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     }
   };
 
-  const handleSeeMore = (text: string, title: string) => {
+  const handleSeeMore = (text: string, title: string, id: number) => {
+    console.log('Opening transcript with ID:', id, 'Title:', title);
     setSelectedTranscript(text);
     setIsModalOpen(true);
     setSelectedTranscriptTitle(title);
+    setSelectedTranscriptId(id);
   };
 
   const truncateText = (text: string) => {
@@ -268,7 +271,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                     </p>
                     {transcript.text.split(' ').length > 5 && (
                       <button
-                        onClick={() => handleSeeMore(transcript.text, transcript.title || 'Untitled Transcript')}
+                        onClick={() => handleSeeMore(transcript.text, transcript.title || 'Untitled Transcript', transcript.id)}
                         className="text-blue-500 hover:text-blue-700 transition-colors duration-200 text-xs ml-2"
                       >
                     <Eye size={16} />
@@ -316,11 +319,12 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           </button>
         )}
       </div>
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         content={selectedTranscript}
         title={selectedTranscriptTitle}
+        itemId={selectedTranscriptId || 0}
       >
         <div className="p-4">
           <h4 className="text-lg font-semibold mb-4 dark:text-gray-200">Modules</h4>

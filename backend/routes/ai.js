@@ -201,6 +201,183 @@ router.put('/transcripts/:id/title', async (req, res) => {
   }
 });
 
+
+// Validate item type middleware
+const validateItemType = (req, res, next) => {
+  let { itemType } = req.params;
+  
+  // Convert numeric values to string
+  if (typeof itemType === 'number') {
+    itemType = itemType.toString();
+  }
+  
+  // Handle case where type might be prefixed with route path
+  if (itemType.includes('/')) {
+    itemType = itemType.split('/').pop();
+  }
+
+  console.log(`Validating item type: ${itemType}`);
+  
+  // Normalize to lowercase and check valid types
+  const normalizedType = itemType.toLowerCase();
+  if (!['note', 'transcript'].includes(normalizedType)) {
+    console.error(`Invalid item type: ${itemType}`);
+    return res.status(400).json({
+      error: 'Invalid item type. Must be either "note" or "transcript"'
+    });
+  }
+  
+  // Update params with normalized value
+  req.params.itemType = normalizedType;
+  next();
+};
+
+router.post('/tags/:itemId/:itemType', validateItemType, async (req, res) => {
+  const { itemId, itemType } = req.params;
+  const { tagId, tagName } = req.body;
+  
+  console.log('Received tag assignment request:', {
+    itemId,
+    itemType,
+    tagId,
+    tagName,
+    headers: req.headers,
+    body: req.body
+  });
+
+  try {
+    let finalTagId = tagId;
+    
+    // If we have a tag name but no ID, find or create the tag
+    if (!tagId && tagName) {
+      console.log(`Finding or creating tag: ${tagName}`);
+      
+      // First try to find existing tag
+      const existingTag = await new Promise((resolve, reject) => {
+        db.get(
+          'SELECT id FROM tags WHERE name = ?',
+          [tagName],
+          function(err, row) {
+            if (err) {
+              console.error('Tag lookup error:', err);
+              reject(err);
+            } else {
+              resolve(row);
+            }
+          }
+        );
+      });
+
+      if (existingTag) {
+        finalTagId = existingTag.id;
+      } else {
+        // Create new tag if it doesn't exist
+        finalTagId = await new Promise((resolve, reject) => {
+          db.run(
+            'INSERT INTO tags (name, description) VALUES (?, ?)',
+            [tagName, req.body.tagDescription || null],
+            function(err) {
+              if (err) {
+                console.error('Tag creation error:', {
+                  message: err.message,
+                  code: err.code,
+                  stack: err.stack,
+                  sql: this.sql,
+                  params: [tagName]
+                });
+                reject(err);
+              } else {
+                resolve(this.lastID);
+              }
+            }
+          );
+        });
+      }
+    }
+
+    console.log('Attempting to assign tag:', {
+      itemId,
+      itemType,
+      finalTagId
+    });
+
+    // Assign tag using the unified item_tags table
+    await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO item_tags (item_id, item_type, tag_id)
+         VALUES (?, ?, ?)`,
+        [itemId, itemType, finalTagId],
+        function(err) {
+          if (err) {
+            console.error('Database error details:', {
+              message: err.message,
+              code: err.code,
+              stack: err.stack,
+              sql: this.sql,
+              params: [itemId, finalTagId]
+            });
+            reject(err);
+          } else {
+            resolve(this.lastID);
+          }
+        }
+      );
+    });
+
+    console.log(`Successfully assigned tag ${finalTagId} to item ${itemId}`);
+    res.status(201).json({ success: true });
+  } catch (error) {
+    console.error('Error in tag assignment:', {
+      message: error.message,
+      stack: error.stack,
+      request: {
+        params: req.params,
+        body: req.body,
+        headers: req.headers
+      }
+    });
+    res.status(500).json({ error: 'Failed to assign tag', details: error.message });
+  }
+});
+
+router.delete('/tags/:itemId/:itemType/:tagId', async (req, res) => {
+  const { itemId, itemType, tagId } = req.params;
+
+  try {
+    db.run(
+      `DELETE FROM item_tags
+       WHERE item_id = ? AND item_type = ? AND tag_id = ?`,
+      [itemId, itemType, tagId],
+      function(err) {
+        if (err) throw err;
+        if (this.changes === 0) {
+          return res.status(404).json({ error: 'Tag assignment not found' });
+        }
+        res.json({ message: 'Tag removed' });
+      }
+    );
+  } catch (error) {
+    console.error('Error removing tag:', error);
+    res.status(500).json({ error: 'Failed to remove tag' });
+  }
+});
+
+// Get all tags
+router.get('/tags', async (req, res) => {
+  try {
+    db.all('SELECT * FROM tags ORDER BY name ASC', [], (err, rows) => {
+      if (err) {
+        console.error('Error fetching tags:', err);
+        return res.status(500).json({ error: 'Failed to fetch tags' });
+      }
+      res.json(rows);
+    });
+  } catch (error) {
+    console.error('Error in tags endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Tag analysis endpoint
 router.post('/tags/analyze', async (req, res) => {
   const { content } = req.body;
@@ -243,14 +420,13 @@ router.get('/tags/:type/:id', async (req, res) => {
   const { type, id } = req.params;
   
   try {
-    const table = type === 'note' ? 'note_tags' : 'transcript_tags';
     const query = `
       SELECT t.* FROM tags t
-      JOIN ${table} jt ON t.id = jt.tag_id
-      WHERE jt.${type}_id = ?
+      JOIN item_tags it ON t.id = it.tag_id
+      WHERE it.item_id = ? AND it.item_type = ?
     `;
     
-    db.all(query, [id], (err, rows) => {
+    db.all(query, [id, type], (err, rows) => {
       if (err) {
         return res.status(500).json({ error: 'Failed to fetch tags' });
       }
@@ -262,49 +438,15 @@ router.get('/tags/:type/:id', async (req, res) => {
   }
 });
 
-// Add tag to note or transcript
-router.post('/tags/:type/:id', async (req, res) => {
-  const { type, id } = req.params;
-  const { tag_id } = req.body;
-  
-  if (!tag_id) {
-    return res.status(400).json({ error: 'Tag ID is required' });
-  }
-
-  try {
-    const table = type === 'note' ? 'note_tags' : 'transcript_tags';
-    const column = type === 'note' ? 'note_id' : 'transcript_id';
-    
-    db.run(
-      `INSERT INTO ${table} (${column}, tag_id) VALUES (?, ?)`,
-      [id, tag_id],
-      function(err) {
-        if (err) {
-          if (err.message.includes('UNIQUE constraint failed')) {
-            return res.status(400).json({ error: 'Tag already associated' });
-          }
-          return res.status(500).json({ error: 'Failed to add tag' });
-        }
-        res.status(201).json({ success: true });
-      }
-    );
-  } catch (error) {
-    console.error('Error adding tag:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // Remove tag from note or transcript
 router.delete('/tags/:type/:id/:tag_id', async (req, res) => {
   const { type, id, tag_id } = req.params;
   
   try {
-    const table = type === 'note' ? 'note_tags' : 'transcript_tags';
-    const column = type === 'note' ? 'note_id' : 'transcript_id';
-    
     db.run(
-      `DELETE FROM ${table} WHERE ${column} = ? AND tag_id = ?`,
-      [id, tag_id],
+      `DELETE FROM item_tags WHERE item_id = ? AND item_type = ? AND tag_id = ?`,
+      [id, type, tag_id],
       function(err) {
         if (err) {
           return res.status(500).json({ error: 'Failed to remove tag' });
@@ -321,50 +463,5 @@ router.delete('/tags/:type/:id/:tag_id', async (req, res) => {
   }
 });
 
-// Tag management endpoints
-router.post('/tags', async (req, res) => {
-  const { name, description } = req.body;
-  
-  if (!name) {
-    return res.status(400).json({ error: 'Tag name is required' });
-  }
-
-  try {
-    db.run(
-      'INSERT INTO tags (name, description) VALUES (?, ?)',
-      [name, description],
-      function(err) {
-        if (err) {
-          if (err.message.includes('UNIQUE constraint failed')) {
-            return res.status(400).json({ error: 'Tag already exists' });
-          }
-          return res.status(500).json({ error: 'Failed to create tag' });
-        }
-        res.status(201).json({
-          id: this.lastID,
-          name,
-          description
-        });
-      }
-    );
-  } catch (error) {
-    console.error('Tag creation error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-router.get('/tags', async (req, res) => {
-  try {
-    db.all('SELECT * FROM tags', (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to fetch tags' });
-      }
-      res.json(rows);
-    });
-  } catch (error) {
-    console.error('Tag fetch error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 module.exports = router;

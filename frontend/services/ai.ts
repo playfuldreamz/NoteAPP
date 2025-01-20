@@ -156,24 +156,24 @@ export async function analyzeContentForTags(content: string): Promise<string[]> 
 }
 
 export async function createTag(name: string, description?: string): Promise<Tag> {
-  const token = localStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found');
+  // Create a temporary tag object
+  const tempTag = {
+    id: -1,
+    name,
+    description
+  };
 
-  const response = await fetch(`${API_BASE}/api/ai/tags`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ name, description }),
+  // Use the addTagToItem function with a dummy item ID
+  // This will trigger the tag creation logic in the backend
+  const result = await addTagToItem('note', 0, {
+    name
   });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to create tag');
-  }
-
-  return response.json();
+  // Return the created tag with the new ID and description
+  return {
+    ...tempTag,
+    id: result.id
+  };
 }
 
 export async function getAllTags(): Promise<Tag[]> {
@@ -212,23 +212,33 @@ export async function getTagsForItem(type: 'note' | 'transcript', id: number): P
   return response.json();
 }
 
-export async function addTagToItem(type: 'note' | 'transcript', id: number, tagId: number): Promise<void> {
+export async function addTagToItem(
+  type: 'note' | 'transcript',
+  id: number,
+  tag: { id?: number, name: string, description?: string }
+): Promise<{ id: number }> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE}/api/ai/tags/${type}/${id}`, {
+  const response = await fetch(`${API_BASE}/api/ai/tags/${id}/${type}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ tag_id: tagId }),
+    body: JSON.stringify({
+      tagId: tag.id,
+      tagName: tag.name,
+      tagDescription: tag.description
+    }),
   });
 
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Failed to add tag');
   }
+
+  return response.json();
 }
 
 export async function removeTagFromItem(type: 'note' | 'transcript', id: number, tagId: number): Promise<void> {
