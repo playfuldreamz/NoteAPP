@@ -21,6 +21,7 @@ interface TranscriptsListProps {
 const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialTranscripts, updateTranscripts }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
+  const [selectedTranscriptTitle, setSelectedTranscriptTitle] = useState<string>('');
   const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,9 +130,10 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     }
   };
 
-  const handleSeeMore = (text: string) => {
+  const handleSeeMore = (text: string, title: string) => {
     setSelectedTranscript(text);
     setIsModalOpen(true);
+    setSelectedTranscriptTitle(title);
   };
 
   const truncateText = (text: string) => {
@@ -266,7 +268,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                     </p>
                     {transcript.text.split(' ').length > 5 && (
                       <button
-                        onClick={() => handleSeeMore(transcript.text)}
+                        onClick={() => handleSeeMore(transcript.text, transcript.title || 'Untitled Transcript')}
                         className="text-blue-500 hover:text-blue-700 transition-colors duration-200 text-xs ml-2"
                       >
                     <Eye size={16} />
@@ -318,6 +320,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         content={selectedTranscript}
+        title={selectedTranscriptTitle}
       >
         <div className="p-4">
           <h4 className="text-lg font-semibold mb-4 dark:text-gray-200">Modules</h4>

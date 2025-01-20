@@ -21,6 +21,7 @@ interface NoteListProps {
 const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<string>('');
+  const [selectedNoteTitle, setSelectedNoteTitle] = useState<string>('');
   const [visibleNotes, setVisibleNotes] = useState<Array<{
     id: number;
     content: string;
@@ -99,9 +100,10 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     }
   };
 
-  const handleSeeMore = (content: string) => {
+  const handleSeeMore = (content: string, title: string) => {
     setSelectedNote(content);
     setIsModalOpen(true);
+    setSelectedNoteTitle(title);
   };
 
   const truncateText = (text: string) => {
@@ -265,7 +267,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   </p>
                 {note.content.split(' ').length > 5 && (
                   <button
-                    onClick={() => handleSeeMore(note.content)}
+                    onClick={() => handleSeeMore(note.content, note.title || 'Untitled Note')}
                     className="text-blue-500 hover:underline text-xs ml-2"
                   >
                     <Eye size={16} />
@@ -304,7 +306,12 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           </button>
         )}
       </div>
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} content={selectedNote} />
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        content={selectedNote}
+        title={selectedNoteTitle}
+      />
     </div>
   );
 };
