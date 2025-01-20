@@ -238,6 +238,89 @@ router.post('/tags/analyze', async (req, res) => {
   }
 });
 
+// Get tags for a specific note or transcript
+router.get('/tags/:type/:id', async (req, res) => {
+  const { type, id } = req.params;
+  
+  try {
+    const table = type === 'note' ? 'note_tags' : 'transcript_tags';
+    const query = `
+      SELECT t.* FROM tags t
+      JOIN ${table} jt ON t.id = jt.tag_id
+      WHERE jt.${type}_id = ?
+    `;
+    
+    db.all(query, [id], (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to fetch tags' });
+      }
+      res.json(rows);
+    });
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add tag to note or transcript
+router.post('/tags/:type/:id', async (req, res) => {
+  const { type, id } = req.params;
+  const { tag_id } = req.body;
+  
+  if (!tag_id) {
+    return res.status(400).json({ error: 'Tag ID is required' });
+  }
+
+  try {
+    const table = type === 'note' ? 'note_tags' : 'transcript_tags';
+    const column = type === 'note' ? 'note_id' : 'transcript_id';
+    
+    db.run(
+      `INSERT INTO ${table} (${column}, tag_id) VALUES (?, ?)`,
+      [id, tag_id],
+      function(err) {
+        if (err) {
+          if (err.message.includes('UNIQUE constraint failed')) {
+            return res.status(400).json({ error: 'Tag already associated' });
+          }
+          return res.status(500).json({ error: 'Failed to add tag' });
+        }
+        res.status(201).json({ success: true });
+      }
+    );
+  } catch (error) {
+    console.error('Error adding tag:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Remove tag from note or transcript
+router.delete('/tags/:type/:id/:tag_id', async (req, res) => {
+  const { type, id, tag_id } = req.params;
+  
+  try {
+    const table = type === 'note' ? 'note_tags' : 'transcript_tags';
+    const column = type === 'note' ? 'note_id' : 'transcript_id';
+    
+    db.run(
+      `DELETE FROM ${table} WHERE ${column} = ? AND tag_id = ?`,
+      [id, tag_id],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Failed to remove tag' });
+        }
+        if (this.changes === 0) {
+          return res.status(404).json({ error: 'Tag association not found' });
+        }
+        res.json({ success: true });
+      }
+    );
+  } catch (error) {
+    console.error('Error removing tag:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Tag management endpoints
 router.post('/tags', async (req, res) => {
   const { name, description } = req.body;

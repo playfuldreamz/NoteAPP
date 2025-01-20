@@ -113,14 +113,45 @@ db.serialize(() => {
   )`);
 
 // Create transcripts table with user_id foreign key and title
-  db.run(`CREATE TABLE IF NOT EXISTS transcripts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    text TEXT,
-    title TEXT,
-    user_id INTEGER,
-    date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  )`);
+db.run(`CREATE TABLE IF NOT EXISTS transcripts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  text TEXT,
+  title TEXT,
+  user_id INTEGER,
+  date DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+)`);
+
+// Create tags table
+db.run(`CREATE TABLE IF NOT EXISTS tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL,
+  description TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
+
+// Create note_tags join table
+db.run(`CREATE TABLE IF NOT EXISTS note_tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  note_id INTEGER NOT NULL,
+  tag_id INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(note_id) REFERENCES notes(id),
+  FOREIGN KEY(tag_id) REFERENCES tags(id),
+  UNIQUE(note_id, tag_id)
+)`);
+
+// Create transcript_tags join table
+db.run(`CREATE TABLE IF NOT EXISTS transcript_tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  transcript_id INTEGER NOT NULL,
+  tag_id INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(transcript_id) REFERENCES transcripts(id),
+  FOREIGN KEY(tag_id) REFERENCES tags(id),
+  UNIQUE(transcript_id, tag_id)
+)`);
 });
 
 // Auth routes

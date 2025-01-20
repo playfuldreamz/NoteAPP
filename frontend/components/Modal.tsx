@@ -53,6 +53,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, content, title, children
             {/* Right column - Modules */}
             <div className="p-6 overflow-y-auto">
               <TaggingModule
+                type="note"
+                itemId={0} // TODO: Replace with actual note/transcript ID
                 content={content}
                 onTagsUpdate={(tags) => {
                   // TODO: Implement tag update logic

@@ -194,6 +194,60 @@ export async function getAllTags(): Promise<Tag[]> {
   return response.json();
 }
 
+export async function getTagsForItem(type: 'note' | 'transcript', id: number): Promise<Tag[]> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/tags/${type}/${id}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to fetch tags');
+  }
+
+  return response.json();
+}
+
+export async function addTagToItem(type: 'note' | 'transcript', id: number, tagId: number): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/tags/${type}/${id}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ tag_id: tagId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to add tag');
+  }
+}
+
+export async function removeTagFromItem(type: 'note' | 'transcript', id: number, tagId: number): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/tags/${type}/${id}/${tagId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to remove tag');
+  }
+}
+
 export async function enhanceTranscript(
   transcript: string,
   onProgress?: (progress: number) => void,

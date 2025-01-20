@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 
 interface TagCreatorProps {
   onCreate: (name: string) => void;
+  disabled?: boolean;
 }
 
-const TagCreator: React.FC<TagCreatorProps> = ({ onCreate }) => {
+const TagCreator: React.FC<TagCreatorProps> = ({ onCreate, disabled = false }) => {
   const [tagName, setTagName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -26,11 +27,14 @@ const TagCreator: React.FC<TagCreatorProps> = ({ onCreate }) => {
         value={tagName}
         onChange={(e) => setTagName(e.target.value)}
         placeholder="New tag name"
-        className="flex-1 p-1 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-gray-200"
+        className={`flex-1 p-1 border border-gray-300 dark:border-gray-600 rounded-md ${
+          disabled ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : 'dark:bg-gray-700 dark:text-gray-200'
+        }`}
+        disabled={disabled}
       />
       <button
         onClick={handleCreate}
-        disabled={!tagName.trim()}
+        disabled={!tagName.trim() || disabled}
         className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
       >
         Create
