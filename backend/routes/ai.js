@@ -40,10 +40,6 @@ router.post('/enhance-transcription', async (req, res) => {
       model: "gemini-pro",
       safetySettings: [
         {
-          category: "HARM_CATEGORY_DANGEROUS",
-          threshold: "BLOCK_NONE"
-        },
-        {
           category: "HARM_CATEGORY_HARASSMENT", 
           threshold: "BLOCK_NONE"
         },
@@ -57,6 +53,10 @@ router.post('/enhance-transcription', async (req, res) => {
         },
         {
           category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_CIVIC_INTEGRITY",
           threshold: "BLOCK_NONE"
         }
       ]
