@@ -78,10 +78,11 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     };
   }, []);
 
-  // Handle tag selection
-  const handleTagSelection = async (tag: Tag) => {
+  // Handle tag selection with improved error handling
+  const handleTagSelection = async (tag: Tag, retryCount = 0) => {
     console.log('Tagging transcript with ID:', itemId, 'Tag:', tag);
     setIsSaving(true);
+    
     try {
       const normalizedType = normalizeType(type);
       console.log('API call details:', {
@@ -89,19 +90,74 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         id: itemId,
         tag
       });
+
+      // Validate tag ID for removal
+      if (selectedTags.some(t => t.id === tag.id) && !tag.id) {
+        throw new Error('Tag ID is required for removal');
+      }
+
+      // Execute tag operation
       if (selectedTags.some(t => t.id === tag.id)) {
         await removeTagFromItem(normalizedType, itemId, tag.id);
         setSelectedTags(prev => prev.filter(t => t.id !== tag.id));
       } else {
-      await addTagToItem(normalizedType, itemId, tag);
-      setSelectedTags(prev => [...prev, tag]);
+        await addTagToItem(normalizedType, itemId, tag);
+        setSelectedTags(prev => [...prev, tag]);
       }
+
+      // Notify parent component of updates
       if (onTagsUpdate) {
         onTagsUpdate(selectedTags);
       }
     } catch (error) {
-      console.error('Error updating tag:', error);
-      toast.error('Failed to update tags');
+      console.error('Error updating tag:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        itemId,
+        tag,
+        type,
+        retryCount
+      });
+
+      // Handle specific error cases
+      let errorMessage = 'Failed to update tags';
+      
+      // Type check the error object
+      if (error && typeof error === 'object') {
+        // Handle Error instances
+        if (error instanceof Error) {
+          if (error.message.includes('400')) {
+            errorMessage = 'Invalid request - please check your input';
+          } else if (error.message.includes('404')) {
+            errorMessage = 'Resource not found';
+          } else if (error.message.includes('500')) {
+            errorMessage = 'Server error - please try again';
+          }
+        }
+        
+        // Handle Axios error responses
+        if ('response' in error && 
+            error.response && 
+            typeof error.response === 'object' &&
+            'data' in error.response &&
+            typeof error.response.data === 'object' &&
+            error.response.data !== null) {
+          const responseData = error.response.data as { warning?: string };
+          if (responseData.warning) {
+            errorMessage = responseData.warning;
+          }
+        }
+      }
+
+      // Retry transient errors
+      if (retryCount < 2 && error instanceof Error && 
+          (error.message.includes('500') || error.message.includes('Network Error'))) {
+        console.log(`Retrying tag operation (attempt ${retryCount + 1})`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return handleTagSelection(tag, retryCount + 1);
+      }
+
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }

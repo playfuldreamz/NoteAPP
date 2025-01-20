@@ -22,6 +22,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<string>('');
   const [selectedNoteTitle, setSelectedNoteTitle] = useState<string>('');
+  const [selectedNoteId, setSelectedNoteId] = useState<number>(0);
   const [visibleNotes, setVisibleNotes] = useState<Array<{
     id: number;
     content: string;
@@ -306,11 +307,12 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           </button>
         )}
       </div>
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         content={selectedNote}
         title={selectedNoteTitle}
+        itemId={selectedNoteId}
       />
     </div>
   );

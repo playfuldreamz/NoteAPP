@@ -212,49 +212,116 @@ export async function getTagsForItem(type: 'note' | 'transcript', id: number): P
   return response.json();
 }
 
+interface AddTagResponse {
+  id: number;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export async function addTagToItem(
   type: 'note' | 'transcript',
   id: number,
   tag: { id?: number, name: string, description?: string }
-): Promise<{ id: number }> {
+): Promise<AddTagResponse> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE}/api/ai/tags/${id}/${type}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      tagId: tag.id,
-      tagName: tag.name,
-      tagDescription: tag.description
-    }),
-  });
+  try {
+    const response = await fetch(`${API_BASE}/api/ai/tags/${type}/${id}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tag_id: tag.id
+      }),
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to add tag');
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Failed to add tag:', {
+        status: response.status,
+        error: error.message || 'Unknown error',
+        type,
+        id,
+        tag
+      });
+      
+      // Handle specific error cases
+      let errorMessage = 'Failed to add tag';
+      if (response.status === 400) {
+        errorMessage = 'Invalid request - please check your input';
+      } else if (response.status === 404) {
+        errorMessage = 'Resource not found';
+      } else if (response.status === 500) {
+        errorMessage = 'Server error - please try again';
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const data: AddTagResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error in addTagToItem:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      type,
+      id,
+      tag
+    });
+    throw error;
   }
-
-  return response.json();
 }
 
 export async function removeTagFromItem(type: 'note' | 'transcript', id: number, tagId: number): Promise<void> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE}/api/ai/tags/${type}/${id}/${tagId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+  try {
+    const response = await fetch(`${API_BASE}/api/ai/tags/${type}/${id}/${tagId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to remove tag');
+    if (!response.ok) {
+      // Clone the response to allow multiple reads of the body
+      const responseClone = response.clone();
+      let errorMessage = 'Failed to remove tag';
+      
+      try {
+        // First try to parse as JSON
+        const error = await response.json();
+        errorMessage = error.message || errorMessage;
+      } catch (jsonError) {
+        // If JSON parsing fails, try to get text from the cloned response
+        try {
+          const text = await responseClone.text();
+          if (text.startsWith('<!DOCTYPE')) {
+            errorMessage = 'Server error - please try again later';
+          } else {
+            errorMessage = text || errorMessage;
+          }
+        } catch (textError) {
+          errorMessage = `Server returned status ${response.status}`;
+        }
+      }
+      
+      throw new Error(errorMessage);
+    }
+  } catch (error) {
+    console.error('Error removing tag:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      type,
+      id,
+      tagId
+    });
+    throw error;
   }
 }
 
