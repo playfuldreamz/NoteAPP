@@ -300,13 +300,33 @@ app.delete('/notes/:id', authenticateToken, (req, res) => {
 
 // Transcript routes
 app.get('/transcripts', authenticateToken, (req, res) => {
-    const query = 'SELECT id, text, title, date FROM transcripts WHERE user_id = ? ORDER BY date DESC';
+  const query = `
+    SELECT
+      t.id,
+      t.text,
+      t.title,
+      t.date,
+      json_group_array(json_object('id', tg.id, 'name', tg.name)) AS tags
+    FROM transcripts t
+    LEFT JOIN item_tags it ON t.id = it.item_id AND it.item_type = 'transcript'
+    LEFT JOIN tags tg ON it.tag_id = tg.id
+    WHERE t.user_id = ?
+    GROUP BY t.id
+    ORDER BY t.date DESC
+  `;
+  
+  db.all(query, [req.user.id], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
     
-    db.all(query, [req.user.id], (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-    res.json(rows);
+    // Parse the JSON tags array
+    const transcripts = rows.map(row => ({
+      ...row,
+      tags: JSON.parse(row.tags).filter(tag => tag.id !== null)
+    }));
+    
+    res.json(transcripts);
   });
 });
 
@@ -318,6 +338,7 @@ app.post('/transcripts', authenticateToken, async (req, res) => {
     
     const text = req.body.text;
     const title = req.body.title;
+    const tags = req.body.tags || [];
     
     if (!text) {
       return res.status(400).json({ error: 'Text is required' });
@@ -339,14 +360,64 @@ app.post('/transcripts', authenticateToken, async (req, res) => {
         return res.status(500).json({ error: 'Failed to save transcript' });
       }
 
-      const response = { 
-        id: this.lastID, 
-        text,
-        title: finalTitle,
-        date: new Date().toISOString(),
-        user_id: req.user.id 
-      };
-      res.status(201).json(response);
+      const transcriptId = this.lastID;
+      
+      // Process tags if any
+      if (tags.length > 0) {
+        // Insert tags and create associations
+        const insertTag = 'INSERT OR IGNORE INTO tags (name) VALUES (?)';
+        const insertItemTag = 'INSERT INTO item_tags (item_id, item_type, tag_id) VALUES (?, ?, ?)';
+        
+        tags.forEach(tagName => {
+          // Insert tag if it doesn't exist
+          db.run(insertTag, [tagName], function(err) {
+            if (err) {
+              console.error('Error inserting tag:', err);
+              return;
+            }
+            
+            // Get tag ID
+            db.get('SELECT id FROM tags WHERE name = ?', [tagName], (err, tag) => {
+              if (err) {
+                console.error('Error getting tag ID:', err);
+                return;
+              }
+              
+              // Create item-tag association
+              db.run(insertItemTag, [transcriptId, 'transcript', tag.id], (err) => {
+                if (err) {
+                  console.error('Error creating tag association:', err);
+                }
+              });
+            });
+          });
+        });
+      }
+
+      // Get the full transcript with tags
+      db.get(`
+        SELECT
+          t.id,
+          t.text,
+          t.title,
+          t.date,
+          json_group_array(json_object('id', tg.id, 'name', tg.name)) AS tags
+        FROM transcripts t
+        LEFT JOIN item_tags it ON t.id = it.item_id AND it.item_type = 'transcript'
+        LEFT JOIN tags tg ON it.tag_id = tg.id
+        WHERE t.id = ?
+        GROUP BY t.id
+      `, [transcriptId], (err, row) => {
+        if (err) {
+          return res.status(500).json({ error: 'Failed to fetch transcript' });
+        }
+        
+        const response = {
+          ...row,
+          tags: JSON.parse(row.tags).filter(tag => tag.id !== null)
+        };
+        res.status(201).json(response);
+      });
     });
   } catch (error) {
     console.error('Unexpected error:', error);
@@ -368,6 +439,55 @@ app.delete('/transcripts/:id', authenticateToken, (req, res) => {
       }
       res.json({ message: 'Transcript deleted' });
     });
+});
+
+// Tag management routes
+app.get('/tags', authenticateToken, (req, res) => {
+  db.all('SELECT id, name FROM tags ORDER BY name ASC', (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
+});
+
+app.post('/tags', authenticateToken, (req, res) => {
+  const { name } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: 'Tag name is required' });
+  }
+
+  db.run('INSERT OR IGNORE INTO tags (name) VALUES (?)', [name], function(err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (this.changes === 0) {
+      // Tag already exists
+      db.get('SELECT id, name FROM tags WHERE name = ?', [name], (err, tag) => {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+        res.status(200).json(tag);
+      });
+    } else {
+      // New tag created
+      res.status(201).json({ id: this.lastID, name });
+    }
+  });
+});
+
+app.delete('/tags/:id', authenticateToken, (req, res) => {
+  db.run('DELETE FROM tags WHERE id = ?', [req.params.id], function(err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'Tag not found' });
+    }
+    res.json({ message: 'Tag deleted' });
+  });
 });
 
 app.listen(PORT, () => {

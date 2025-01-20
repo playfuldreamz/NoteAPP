@@ -215,7 +215,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
             }
             // Tag filter - must match all selected tags
             console.log('Note object:', note);
-            if (filters.tags && filters.tags.length > 0) {
+            if (filters.tags.length > 0) {
               console.log('Applying tag filter with selected tags:', filters.tags);
               const itemTags = (note.tags || []).map(tag => tag.name);
               console.log(`Checking note ${note.id} with tags:`, itemTags);
