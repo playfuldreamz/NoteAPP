@@ -116,10 +116,82 @@ export async function updateTranscriptTitle(id: number, title: string): Promise<
   }
 }
 
+export interface Tag {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+export interface TagAnalysisResponse {
+  tags: string[];
+}
+
 export interface EnhancedTranscript {
   enhanced: string;
   confidence: number;
   original: string;
+}
+
+// Tag-related API functions
+export async function analyzeContentForTags(content: string): Promise<string[]> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/tags/analyze`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to analyze content for tags');
+  }
+
+  const data: TagAnalysisResponse = await response.json();
+  return data.tags;
+}
+
+export async function createTag(name: string, description?: string): Promise<Tag> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/tags`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name, description }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to create tag');
+  }
+
+  return response.json();
+}
+
+export async function getAllTags(): Promise<Tag[]> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/tags`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to fetch tags');
+  }
+
+  return response.json();
 }
 
 export async function enhanceTranscript(

@@ -201,4 +201,87 @@ router.put('/transcripts/:id/title', async (req, res) => {
   }
 });
 
+// Tag analysis endpoint
+router.post('/tags/analyze', async (req, res) => {
+  const { content } = req.body;
+  
+  if (!content) {
+    return res.status(400).json({ error: 'Content is required' });
+  }
+
+  if (!genAI) {
+    return res.json({ tags: [] });
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const prompt = `Analyze this content and suggest relevant tags:\n${content}\n\nReturn tags as a comma-separated list`;
+    const result = await model.generateContent(prompt);
+    
+    if (result.response.promptFeedback?.blockReason) {
+      console.warn('Tag analysis blocked:', result.response.promptFeedback.blockReason);
+      throw new Error('Tag analysis blocked by safety filters');
+    }
+    
+    const tags = result.response.text()
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+    
+    res.json({ tags });
+  } catch (error) {
+    console.error('Tag analysis error:', error);
+    res.status(500).json({
+      error: 'Failed to analyze content for tags',
+      tags: []
+    });
+  }
+});
+
+// Tag management endpoints
+router.post('/tags', async (req, res) => {
+  const { name, description } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: 'Tag name is required' });
+  }
+
+  try {
+    db.run(
+      'INSERT INTO tags (name, description) VALUES (?, ?)',
+      [name, description],
+      function(err) {
+        if (err) {
+          if (err.message.includes('UNIQUE constraint failed')) {
+            return res.status(400).json({ error: 'Tag already exists' });
+          }
+          return res.status(500).json({ error: 'Failed to create tag' });
+        }
+        res.status(201).json({
+          id: this.lastID,
+          name,
+          description
+        });
+      }
+    );
+  } catch (error) {
+    console.error('Tag creation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/tags', async (req, res) => {
+  try {
+    db.all('SELECT * FROM tags', (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to fetch tags' });
+      }
+      res.json(rows);
+    });
+  } catch (error) {
+    console.error('Tag fetch error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

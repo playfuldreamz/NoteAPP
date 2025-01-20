@@ -1,4 +1,6 @@
 import React, { useEffect } from 'react';
+import TaggingModule from './TaggingModule';
+import { Tag } from '../services/ai';
 
 interface ModalProps {
   isOpen: boolean;
@@ -50,6 +52,13 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, content, title, children
             
             {/* Right column - Modules */}
             <div className="p-6 overflow-y-auto">
+              <TaggingModule
+                content={content}
+                onTagsUpdate={(tags) => {
+                  // TODO: Implement tag update logic
+                  console.log('Updated tags:', tags);
+                }}
+              />
               {children}
             </div>
           </div>
