@@ -32,20 +32,41 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     fetchProvider();
   }, []);
 
-  const handleProviderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newProvider = e.target.value as AIProvider;
+  const [apiKey, setApiKey] = useState('');
+  const [isKeyValid, setIsKeyValid] = useState(false);
+  const [tempProvider, setTempProvider] = useState<AIProvider>(selectedProvider as AIProvider || 'openai');
+
+  const validateApiKey = (key: string, provider: AIProvider) => {
+    if (provider === 'openai') {
+      return key.length === 51 && key.startsWith('sk-');
+    }
+    if (provider === 'gemini') {
+      return key.length === 39 && key.startsWith('AIza');
+    }
+    return false;
+  };
+
+  const handleSave = async () => {
     try {
+      if (!validateApiKey(apiKey, tempProvider)) {
+        throw new Error(`Invalid API key format for ${tempProvider}`);
+      }
+
       setIsLoading(true);
-      await updateAIProvider(newProvider);
-      setSelectedProvider(newProvider);
-      toast.success(`AI provider updated to ${newProvider}`);
-    } catch (error) {
+      await updateAIProvider({ provider: tempProvider, apiKey });
+      setSelectedProvider(tempProvider);
+      toast.success(`AI provider updated to ${tempProvider}`);
+    } catch (error: any) {
       console.error('Failed to update AI provider:', error);
-      toast.error('Failed to update AI provider');
+      toast.error(error?.message || 'Failed to update AI provider');
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    setIsKeyValid(validateApiKey(apiKey, tempProvider));
+  }, [apiKey, tempProvider]);
 
   if (!isOpen) return null;
 
@@ -62,8 +83,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <span className="text-gray-700 dark:text-gray-200">AI Provider</span>
             </div>
             <select
-              value={selectedProvider}
-              onChange={handleProviderChange}
+              value={tempProvider}
+              onChange={(e) => setTempProvider(e.target.value as AIProvider)}
               disabled={isLoading}
               className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1 text-sm text-gray-700 dark:text-gray-200 focus:ring-blue-500 focus:border-blue-500"
             >
@@ -71,6 +92,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <option value="gemini">Gemini</option>
             </select>
           </div>
+
+          <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              API Key
+            </label>
+            <input
+              type="password"
+              id="apiKey"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className={`w-full px-3 py-2 border ${
+                isKeyValid ? 'border-green-500' : 'border-gray-300 dark:border-gray-600'
+              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800`}
+              placeholder="Enter your API key"
+              disabled={isLoading}
+            />
+            {!isKeyValid && apiKey.length > 0 && (
+              <p className="mt-2 text-sm text-red-600">Invalid API key format</p>
+            )}
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={!isKeyValid || isLoading}
+            className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Saving...' : 'Save Changes'}
+          </button>
         </div>
       )
     },

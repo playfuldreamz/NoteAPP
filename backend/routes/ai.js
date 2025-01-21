@@ -59,30 +59,35 @@ const db = new sqlite3.Database('./database.sqlite', (err) => {
 
 // Initialize Gemini AI client
 let genAI = null;
-try {
-  // First try to get API key from app_settings
-  const getApiKey = () => new Promise((resolve, reject) => {
-    db.get(
-      'SELECT api_key FROM app_settings WHERE is_active = 1 AND provider = ?',
-      ['gemini'],
-      (err, row) => {
-        if (err) return reject(err);
-        resolve(row?.api_key);
-      }
-    );
-  });
 
-  // Check both sources for API key
-  const apiKey = await getApiKey() || process.env.GEMINI_API_KEY;
-  
-  if (apiKey && apiKey !== 'your-gemini-key') {
-    genAI = new GoogleGenerativeAI(apiKey);
-  } else {
-    console.error('Gemini API key not configured');
+const initializeAI = async () => {
+  try {
+    // First try to get API key from app_settings
+    const getApiKey = () => new Promise((resolve, reject) => {
+      db.get(
+        'SELECT api_key FROM app_settings WHERE is_active = 1 AND provider = ?',
+        ['gemini'],
+        (err, row) => {
+          if (err) return reject(err);
+          resolve(row?.api_key);
+        }
+      );
+    });
+
+    // Check both sources for API key
+    const apiKey = await getApiKey() || process.env.GEMINI_API_KEY;
+    
+    if (apiKey && apiKey !== 'your-gemini-key') {
+      genAI = new GoogleGenerativeAI(apiKey);
+    } else {
+      console.error('Gemini API key not configured');
+    }
+  } catch (error) {
+    console.error('Error initializing Gemini:', error);
   }
-} catch (error) {
-  console.error('Error initializing Gemini:', error);
-}
+};
+
+initializeAI();
 
 // Transcription enhancement endpoint
 router.post('/enhance-transcription', async (req, res) => {

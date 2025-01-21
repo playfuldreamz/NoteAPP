@@ -31,7 +31,7 @@ export async function getAIProvider(): Promise<AIProvider> {
   return data.provider;
 }
 
-export async function updateAIProvider(provider: AIProvider): Promise<AIProvider> {
+export async function updateAIProvider(config: { provider: AIProvider, apiKey: string }): Promise<AIProvider> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
@@ -41,7 +41,7 @@ export async function updateAIProvider(provider: AIProvider): Promise<AIProvider
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ provider }),
+    body: JSON.stringify(config),
   });
 
   if (!response.ok) {
