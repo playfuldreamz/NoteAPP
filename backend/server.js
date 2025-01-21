@@ -282,19 +282,43 @@ app.post('/notes', authenticateToken, (req, res) => {
     });
 });
 
-app.delete('/notes/:id', authenticateToken, (req, res) => {
-  db.run('DELETE FROM notes WHERE id = ? AND user_id = ?', 
-    [req.params.id, req.user.id], 
+// Delete note tags endpoint
+app.delete('/notes/:id/tags', authenticateToken, (req, res) => {
+  db.run('DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
+    [req.params.id, 'note'],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
-      if (this.changes === 0) {
-        res.status(404).json({ error: 'Note not found or unauthorized' });
+      res.json({ message: 'Note tags deleted' });
+    });
+});
+
+app.delete('/notes/:id', authenticateToken, (req, res) => {
+  // First delete associated tags
+  db.run('DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
+    [req.params.id, 'note'],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
         return;
       }
-      res.json({ message: 'Note deleted' });
+
+      // Then delete the note
+      db.run('DELETE FROM notes WHERE id = ? AND user_id = ?',
+        [req.params.id, req.user.id],
+        function(err) {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+          if (this.changes === 0) {
+            res.status(404).json({ error: 'Note not found or unauthorized' });
+            return;
+          }
+          res.json({ message: 'Note and associated tags deleted' });
+        });
     });
 });
 
@@ -425,19 +449,43 @@ app.post('/transcripts', authenticateToken, async (req, res) => {
   }
 });
 
-app.delete('/transcripts/:id', authenticateToken, (req, res) => {
-  db.run('DELETE FROM transcripts WHERE id = ? AND user_id = ?',
-    [req.params.id, req.user.id],
+// Delete transcript tags endpoint
+app.delete('/transcripts/:id/tags', authenticateToken, (req, res) => {
+  db.run('DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
+    [req.params.id, 'transcript'],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
-      if (this.changes === 0) {
-        res.status(404).json({ error: 'Transcript not found or unauthorized' });
+      res.json({ message: 'Transcript tags deleted' });
+    });
+});
+
+app.delete('/transcripts/:id', authenticateToken, (req, res) => {
+  // First delete associated tags
+  db.run('DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
+    [req.params.id, 'transcript'],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
         return;
       }
-      res.json({ message: 'Transcript deleted' });
+
+      // Then delete the transcript
+      db.run('DELETE FROM transcripts WHERE id = ? AND user_id = ?',
+        [req.params.id, req.user.id],
+        function(err) {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+          if (this.changes === 0) {
+            res.status(404).json({ error: 'Transcript not found or unauthorized' });
+            return;
+          }
+          res.json({ message: 'Transcript and associated tags deleted' });
+        });
     });
 });
 

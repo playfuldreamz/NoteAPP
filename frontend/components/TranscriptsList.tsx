@@ -167,7 +167,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/transcripts/${id}`, {
+      // First delete associated tags
+      const deleteTagsResponse = await fetch(`http://localhost:5000/transcripts/${id}/tags`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -175,11 +176,25 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         },
       });
 
-      if (response.ok) {
-        toast.success('Transcript deleted!');
+      if (!deleteTagsResponse.ok) {
+        const data = await deleteTagsResponse.json();
+        throw new Error(data.error || 'Failed to delete transcript tags');
+      }
+
+      // Then delete the transcript
+      const deleteResponse = await fetch(`http://localhost:5000/transcripts/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (deleteResponse.ok) {
+        toast.success('Transcript and associated tags deleted!');
         updateTranscripts();
       } else {
-        const data = await response.json();
+        const data = await deleteResponse.json();
         toast.error(data.error || 'Failed to delete transcript');
       }
     } catch (error) {

@@ -111,7 +111,8 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/notes/${id}`, {
+      // First delete associated tags
+      const deleteTagsResponse = await fetch(`http://localhost:5000/notes/${id}/tags`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -119,11 +120,25 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
         },
       });
 
-      if (response.ok) {
+      if (!deleteTagsResponse.ok) {
+        const data = await deleteTagsResponse.json();
+        throw new Error(data.message || 'Failed to delete note tags');
+      }
+
+      // Then delete the note
+      const deleteResponse = await fetch(`http://localhost:5000/notes/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (deleteResponse.ok) {
         onDelete(id);
-        toast.success('Note deleted!');
+        toast.success('Note and associated tags deleted!');
       } else {
-        const data = await response.json().catch(() => ({}));
+        const data = await deleteResponse.json().catch(() => ({}));
         toast.error(data.message || 'Failed to delete note');
       }
     } catch (error) {

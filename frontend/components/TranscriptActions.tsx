@@ -1,4 +1,4 @@
-import { Filter, ArrowUpDown, DownloadCloud, ChevronDown, RefreshCw } from 'lucide-react';
+import { Filter, ArrowUpDown, DownloadCloud, ChevronDown, RefreshCw, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import TagChip from './TagChip';
 import { getAllTags } from '../services/ai';
@@ -22,6 +22,7 @@ interface Filters {
   length?: 'short' | 'medium' | 'long';
   tags: string[];
   showAllTags: boolean;
+  searchTerm?: string;
 }
 
 interface TranscriptActionsProps {
@@ -167,12 +168,39 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport, o
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                Tags
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Tags
+                </label>
+                <div className="relative w-48">
+                  <input
+                    type="text"
+                    placeholder="Filter tags..."
+                    value={filters.searchTerm || ''}
+                    onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
+                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    aria-label="Filter tags"
+                  />
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  {filters.searchTerm && (
+                    <button
+                      onClick={() => setFilters(prev => ({ ...prev, searchTerm: '' }))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
-                  {availableTags.slice(0, 10).map(tag => (
+                  {(filters.searchTerm
+                    ? availableTags.filter((tag: Tag) =>
+                        tag.name.toLowerCase().includes(filters.searchTerm?.toLowerCase() || '')
+                      )
+                    : availableTags
+                  ).slice(0, 10).map((tag: Tag) => (
                     <TagChip
                       key={tag.id}
                       tag={tag}
