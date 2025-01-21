@@ -3,6 +3,8 @@ export type AIProvider = 'openai' | 'gemini';
 
 interface AIConfig {
   provider: AIProvider;
+  source: 'user' | 'app' | 'env';
+  apiKey: string;
 }
 
 interface SummarizeResponse {
@@ -12,7 +14,7 @@ interface SummarizeResponse {
 // API Functions
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-export async function getAIProvider(): Promise<AIProvider> {
+export async function getAIProvider(): Promise<AIConfig> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
@@ -27,11 +29,10 @@ export async function getAIProvider(): Promise<AIProvider> {
     throw new Error(error.message || 'Failed to get AI provider');
   }
 
-  const data: AIConfig = await response.json();
-  return data.provider;
+  return await response.json();
 }
 
-export async function updateAIProvider(config: { provider: AIProvider, apiKey: string }): Promise<AIProvider> {
+export async function updateAIProvider(config: { provider: AIProvider, apiKey: string }): Promise<AIConfig> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
@@ -49,8 +50,7 @@ export async function updateAIProvider(config: { provider: AIProvider, apiKey: s
     throw new Error(error.message || 'Failed to update AI provider');
   }
 
-  const data: AIConfig = await response.json();
-  return data.provider;
+  return await response.json();
 }
 
 export async function summarizeContent(content: string): Promise<string> {

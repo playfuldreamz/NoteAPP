@@ -10,8 +10,16 @@ interface SettingsModalProps {
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+  interface AIConfig {
+    provider: AIProvider;
+    apiKey: string;
+  }
+
   const [selectedGroup, setSelectedGroup] = useState('appearance');
-  const [selectedProvider, setSelectedProvider] = useState('gemini');
+  const [selectedProvider, setSelectedProvider] = useState<AIConfig>({
+    provider: 'gemini',
+    apiKey: ''
+  });
   const [isLoading, setIsLoading] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
 
@@ -19,8 +27,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     const fetchProvider = async () => {
       try {
         setIsLoading(true);
-        const provider = await getAIProvider();
-        setSelectedProvider(provider);
+        const config = await getAIProvider();
+        if (config) {
+          setSelectedProvider({
+            provider: config.provider,
+            apiKey: config.apiKey
+          });
+          setApiKey(config.apiKey);
+          setTempProvider(config.provider);
+        }
       } catch (error) {
         console.error('Failed to fetch AI provider:', error);
         toast.error('Failed to load AI provider settings');
@@ -32,11 +47,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     fetchProvider();
   }, []);
 
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState<string>(selectedProvider.apiKey || '');
   const [isKeyValid, setIsKeyValid] = useState(false);
-  const [tempProvider, setTempProvider] = useState<AIProvider>(selectedProvider as AIProvider || 'openai');
+  const [tempProvider, setTempProvider] = useState<AIProvider>(selectedProvider.provider || 'gemini');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const validateApiKey = (key: string, provider: AIProvider) => {
+  // Ensure consistent state between selectedProvider and tempProvider
+  useEffect(() => {
+    setTempProvider(selectedProvider.provider);
+    setApiKey(selectedProvider.apiKey || '');
+  }, [selectedProvider]);
+
+  const validateApiKey = (key: string | undefined, provider: AIProvider) => {
+    if (!key) return false;
+    
     if (provider === 'openai') {
       return key.length === 51 && key.startsWith('sk-');
     }
@@ -54,7 +78,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
       setIsLoading(true);
       await updateAIProvider({ provider: tempProvider, apiKey });
-      setSelectedProvider(tempProvider);
+      setSelectedProvider({
+        provider: tempProvider,
+        apiKey: apiKey
+      });
       toast.success(`AI provider updated to ${tempProvider}`);
     } catch (error: any) {
       console.error('Failed to update AI provider:', error);
@@ -77,25 +104,60 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       icon: <Globe className="w-4 h-4" />,
       content: (
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-            <div className="flex items-center gap-3">
+          <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <div className="flex items-center gap-3 mb-4">
               <Globe className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-              <span className="text-gray-700 dark:text-gray-200">AI Provider</span>
+              <div>
+                <p className="text-gray-700 dark:text-gray-200">Current AI Provider</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {selectedProvider.provider === 'gemini' && !selectedProvider.apiKey
+                    ? 'Using default Gemini'
+                    : `Using ${selectedProvider.provider}`}
+                </p>
+              </div>
             </div>
-            <select
-              value={tempProvider}
-              onChange={(e) => setTempProvider(e.target.value as AIProvider)}
-              disabled={isLoading}
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1 text-sm text-gray-700 dark:text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="openai">OpenAI</option>
-              <option value="gemini">Gemini</option>
-            </select>
+
+            <div className="relative">
+              <button
+                className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-700 dark:text-gray-200 flex items-center justify-between"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              >
+                <span>{tempProvider === 'openai' ? 'OpenAI' : 'Gemini'}</span>
+                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {isDropdownOpen && (
+                <div className="absolute mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg z-10">
+                  <div 
+                    className="px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    onClick={() => {
+                      setTempProvider('openai');
+                      setApiKey('');
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    OpenAI
+                  </div>
+                  <div 
+                    className="px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    onClick={() => {
+                      setTempProvider('gemini');
+                      setApiKey('');
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    Gemini
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
             <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              API Key
+              {tempProvider === 'openai' ? 'OpenAI API Key' : 'Gemini API Key'}
             </label>
             <input
               type="password"
@@ -105,11 +167,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               className={`w-full px-3 py-2 border ${
                 isKeyValid ? 'border-green-500' : 'border-gray-300 dark:border-gray-600'
               } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800`}
-              placeholder="Enter your API key"
+              placeholder={
+                tempProvider === 'openai' 
+                  ? 'Enter your OpenAI API key (starts with sk-)'
+                  : 'Enter your Gemini API key (starts with AIza)'
+              }
               disabled={isLoading}
             />
-            {!isKeyValid && apiKey.length > 0 && (
-              <p className="mt-2 text-sm text-red-600">Invalid API key format</p>
+            {!isKeyValid && apiKey && apiKey.length > 0 && (
+              <p className="mt-2 text-sm text-red-600">
+                {tempProvider === 'openai'
+                  ? 'OpenAI API keys start with "sk-" and are 51 characters long'
+                  : 'Gemini API keys start with "AIza" and are 39 characters long'}
+              </p>
             )}
           </div>
 

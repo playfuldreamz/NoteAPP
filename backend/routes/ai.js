@@ -7,13 +7,74 @@ const { OpenAI } = require('openai');
 // AI Provider Configuration Endpoints
 router.get('/config', async (req, res) => {
   try {
-    db.get('SELECT provider FROM app_settings WHERE is_active = 1', (err, row) => {
-      if (err) {
-        console.error('Error fetching AI config:', err);
-        return res.status(500).json({ error: 'Failed to fetch AI configuration' });
-      }
-      res.json({ provider: row?.provider || 'gemini' });
-    });
+    // First try to get user-specific config
+    const userId = req.user?.id;
+    if (userId) {
+      db.get(
+        `SELECT provider, 'user' as source FROM user_settings 
+         WHERE user_id = ? AND is_active = 1`,
+        [userId],
+        (err, userRow) => {
+          if (err) {
+            console.error('Error fetching user AI config:', err);
+            return res.status(500).json({ error: 'Failed to fetch AI configuration' });
+          }
+          
+          if (userRow) {
+            return res.json({ 
+              provider: userRow.provider,
+              source: userRow.source,
+              apiKey: userRow.api_key
+            });
+          }
+
+          // Fallback to app settings
+          db.get(
+            `SELECT provider, 'app' as source FROM app_settings 
+             WHERE is_active = 1`,
+            (err, appRow) => {
+              if (err) {
+                console.error('Error fetching app AI config:', err);
+                return res.status(500).json({ error: 'Failed to fetch AI configuration' });
+              }
+              
+              // Final fallback to environment variable
+              const provider = appRow?.provider || 
+                (process.env.GEMINI_API_KEY ? 'gemini' : null);
+              const source = appRow ? 'app' : 'env';
+              
+              res.json({ 
+                provider,
+                source,
+                apiKey: appRow?.api_key || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY
+              });
+            }
+          );
+        }
+      );
+    } else {
+      // For unauthenticated requests, use app settings
+      db.get(
+        `SELECT provider, 'app' as source FROM app_settings 
+         WHERE is_active = 1`,
+        (err, appRow) => {
+          if (err) {
+            console.error('Error fetching app AI config:', err);
+            return res.status(500).json({ error: 'Failed to fetch AI configuration' });
+          }
+          
+          // Final fallback to environment variable
+          const provider = appRow?.provider || 
+            (process.env.GEMINI_API_KEY ? 'gemini' : null);
+          const source = appRow ? 'app' : 'env';
+          
+          res.json({ 
+            provider,
+            source
+          });
+        }
+      );
+    }
   } catch (error) {
     console.error('Error in AI config endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -21,28 +82,59 @@ router.get('/config', async (req, res) => {
 });
 
 router.put('/config', async (req, res) => {
-  const { provider } = req.body;
+  const { provider, apiKey } = req.body;
+  const userId = req.user?.id;
   
   if (!['openai', 'gemini'].includes(provider)) {
     return res.status(400).json({ error: 'Invalid provider specified' });
   }
 
   try {
-    db.run(
-      'UPDATE app_settings SET is_active = 0 WHERE is_active = 1'
-    );
-    
-    db.run(
-      'INSERT INTO app_settings (provider, is_active) VALUES (?, 1)',
-      [provider],
-      function(err) {
-        if (err) {
-          console.error('Error updating AI config:', err);
-          return res.status(500).json({ error: 'Failed to update AI configuration' });
+    if (userId) {
+      // Update user-specific settings
+      db.run(
+        'UPDATE user_settings SET is_active = 0 WHERE user_id = ? AND is_active = 1',
+        [userId]
+      );
+      
+      db.run(
+        `INSERT INTO user_settings (user_id, provider, api_key, is_active) 
+         VALUES (?, ?, ?, 1)`,
+        [userId, provider, apiKey],
+        function(err) {
+          if (err) {
+            console.error('Error updating user AI config:', err);
+            return res.status(500).json({ error: 'Failed to update AI configuration' });
+          }
+          res.json({ 
+            provider,
+            source: 'user',
+            apiKey: apiKey
+          });
         }
-        res.json({ provider });
-      }
-    );
+      );
+    } else {
+      // Update app-wide settings
+      db.run(
+        'UPDATE app_settings SET is_active = 0 WHERE is_active = 1'
+      );
+      
+      db.run(
+        'INSERT INTO app_settings (provider, api_key, is_active) VALUES (?, ?, 1)',
+        [provider, apiKey],
+        function(err) {
+          if (err) {
+            console.error('Error updating app AI config:', err);
+            return res.status(500).json({ error: 'Failed to update AI configuration' });
+          }
+          res.json({ 
+            provider,
+            source: 'app',
+            apiKey: apiKey
+          });
+        }
+      );
+    }
   } catch (error) {
     console.error('Error updating AI config:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -60,22 +152,47 @@ const db = new sqlite3.Database('./database.sqlite', (err) => {
 // Initialize Gemini AI client
 let genAI = null;
 
-const initializeAI = async () => {
+const initializeAI = async (req) => {
   try {
-    // First try to get API key from app_settings
-    const getApiKey = () => new Promise((resolve, reject) => {
-      db.get(
-        'SELECT api_key FROM app_settings WHERE is_active = 1 AND provider = ?',
-        ['gemini'],
-        (err, row) => {
-          if (err) return reject(err);
-          resolve(row?.api_key);
-        }
-      );
+    // Get API key from user_settings, app_settings, or environment
+    const getApiKey = (userId) => new Promise((resolve, reject) => {
+      if (userId) {
+        // First try user settings
+        db.get(
+          `SELECT api_key FROM user_settings 
+           WHERE user_id = ? AND is_active = 1 AND provider = ?`,
+          [userId, 'gemini'],
+          (err, userRow) => {
+            if (err) return reject(err);
+            if (userRow?.api_key) return resolve(userRow.api_key);
+            
+            // Fallback to app settings
+            db.get(
+              'SELECT api_key FROM app_settings WHERE is_active = 1 AND provider = ?',
+              ['gemini'],
+              (err, appRow) => {
+                if (err) return reject(err);
+                resolve(appRow?.api_key);
+              }
+            );
+          }
+        );
+      } else {
+        // For unauthenticated requests, use app settings
+        db.get(
+          'SELECT api_key FROM app_settings WHERE is_active = 1 AND provider = ?',
+          ['gemini'],
+          (err, appRow) => {
+            if (err) return reject(err);
+            resolve(appRow?.api_key);
+          }
+        );
+      }
     });
 
-    // Check both sources for API key
-    const apiKey = await getApiKey() || process.env.GEMINI_API_KEY;
+    // Get the current user ID from the request context
+    const userId = req?.user?.id;
+    const apiKey = await getApiKey(userId) || process.env.GEMINI_API_KEY;
     
     if (apiKey && apiKey !== 'your-gemini-key') {
       genAI = new GoogleGenerativeAI(apiKey);
@@ -87,6 +204,7 @@ const initializeAI = async () => {
   }
 };
 
+// Initialize with no user context
 initializeAI();
 
 // Transcription enhancement endpoint
@@ -97,6 +215,9 @@ router.post('/enhance-transcription', async (req, res) => {
     return res.status(400).json({ error: 'Transcript is required' });
   }
 
+  // Initialize AI with user context
+  await initializeAI(req);
+  
   if (!genAI) {
     return res.json({ enhanced: transcript, confidence: 0 });
   }
@@ -191,6 +312,9 @@ router.post('/summarize', async (req, res) => {
     return res.status(400).json({ error: 'Content is required' });
   }
 
+  // Initialize AI with user context
+  await initializeAI(req);
+  
   if (!genAI) {
     // Fallback to simple title generation if Gemini is not configured
     const fallbackTitle = content.split(/\s+/).slice(0, 5).join(' ') + '...';
@@ -559,6 +683,9 @@ router.post('/tags/analyze', async (req, res) => {
     return res.status(400).json({ error: 'Content is required' });
   }
 
+  // Initialize AI with user context
+  await initializeAI(req);
+  
   if (!genAI) {
     return res.json({ tags: [] });
   }
