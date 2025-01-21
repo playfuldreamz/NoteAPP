@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Moon, Sun, Bell, Lock, User, Globe } from 'lucide-react';
 import useTheme from '../hooks/useTheme';
+import { getAIProvider, updateAIProvider, AIProvider } from '../services/ai';
+import { toast } from 'react-hot-toast';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -9,7 +11,41 @@ interface SettingsModalProps {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [selectedGroup, setSelectedGroup] = useState('appearance');
+  const [selectedProvider, setSelectedProvider] = useState('gemini');
+  const [isLoading, setIsLoading] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
+
+  useEffect(() => {
+    const fetchProvider = async () => {
+      try {
+        setIsLoading(true);
+        const provider = await getAIProvider();
+        setSelectedProvider(provider);
+      } catch (error) {
+        console.error('Failed to fetch AI provider:', error);
+        toast.error('Failed to load AI provider settings');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProvider();
+  }, []);
+
+  const handleProviderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newProvider = e.target.value as AIProvider;
+    try {
+      setIsLoading(true);
+      await updateAIProvider(newProvider);
+      setSelectedProvider(newProvider);
+      toast.success(`AI provider updated to ${newProvider}`);
+    } catch (error) {
+      console.error('Failed to update AI provider:', error);
+      toast.error('Failed to update AI provider');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -26,13 +62,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <span className="text-gray-700 dark:text-gray-200">AI Provider</span>
             </div>
             <select
+              value={selectedProvider}
+              onChange={handleProviderChange}
+              disabled={isLoading}
               className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1 text-sm text-gray-700 dark:text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-              disabled
             >
-              <option>Select Provider</option>
-              <option>OpenAI</option>
-              <option>Anthropic</option>
-              <option>Cohere</option>
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Gemini</option>
             </select>
           </div>
         </div>

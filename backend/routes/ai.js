@@ -2,6 +2,52 @@ const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const sqlite3 = require('sqlite3').verbose();
+const { OpenAI } = require('openai');
+
+// AI Provider Configuration Endpoints
+router.get('/config', async (req, res) => {
+  try {
+    db.get('SELECT provider FROM app_settings WHERE is_active = 1', (err, row) => {
+      if (err) {
+        console.error('Error fetching AI config:', err);
+        return res.status(500).json({ error: 'Failed to fetch AI configuration' });
+      }
+      res.json({ provider: row?.provider || 'gemini' });
+    });
+  } catch (error) {
+    console.error('Error in AI config endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/config', async (req, res) => {
+  const { provider } = req.body;
+  
+  if (!['openai', 'gemini'].includes(provider)) {
+    return res.status(400).json({ error: 'Invalid provider specified' });
+  }
+
+  try {
+    db.run(
+      'UPDATE app_settings SET is_active = 0 WHERE is_active = 1'
+    );
+    
+    db.run(
+      'INSERT INTO app_settings (provider, is_active) VALUES (?, 1)',
+      [provider],
+      function(err) {
+        if (err) {
+          console.error('Error updating AI config:', err);
+          return res.status(500).json({ error: 'Failed to update AI configuration' });
+        }
+        res.json({ provider });
+      }
+    );
+  } catch (error) {
+    console.error('Error updating AI config:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Database connection
 const db = new sqlite3.Database('./database.sqlite', (err) => {
