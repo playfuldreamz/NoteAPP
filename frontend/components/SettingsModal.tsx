@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import { Settings, Moon, Sun, Bell, Lock, User, Globe } from 'lucide-react';
 import useTheme from '../hooks/useTheme';
 import { getAIProvider, updateAIProvider, AIProvider } from '../services/ai';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  setUsername: (username: string) => void;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsername }: SettingsModalProps) => {
   interface AIConfig {
     provider: AIProvider;
     apiKey: string;
@@ -56,6 +58,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [newUsername, setNewUsername] = useState('');
   const [usernamePassword, setUsernamePassword] = useState('');
   const [isChangingUsername, setIsChangingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -94,7 +98,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         throw new Error(errorData.error || 'Failed to update password');
       }
 
-      toast.success('Password updated successfully!');
+      toast.success('Password updated successfully!', {
+        position: "bottom-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+      });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -107,14 +119,37 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleUsernameChange = async () => {
-    if (!newUsername || !usernamePassword) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
     try {
+      // Validate inputs
+      if (!newUsername || !usernamePassword) {
+        setUsernameError('Please enter a new username');
+        setPasswordError('Please enter your current password');
+        toast.error('Please fill in all fields', {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        });
+        return;
+      }
+
+      // Additional validation
+      if (newUsername.length < 3) {
+        throw new Error('Username must be at least 3 characters');
+      }
+      if (newUsername.length > 20) {
+        throw new Error('Username cannot exceed 20 characters');
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
+        throw new Error('Username can only contain letters, numbers and underscores');
+      }
+
       setIsChangingUsername(true);
-      const response = await fetch('/change-username', {
+      
+      const response = await fetch(`${process.env.API_URL}/change-username`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -132,15 +167,65 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       }
 
       const data = await response.json();
+      
+      // Update local storage and state
       localStorage.setItem('token', data.token);
-      toast.success('Username updated successfully!');
+      localStorage.setItem('username', data.username);
+      setUsername(data.username);
+      
+      // Reset form
       setNewUsername('');
       setUsernamePassword('');
+      setIsChangingUsername(false);
+
+      // Show success message
+      toast.success(
+        <div className="flex items-center gap-2">
+          <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>Username updated to <span className="font-semibold">{data.username}</span></span>
+        </div>, 
+        {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        }
+      );
+
     } catch (error: any) {
       console.error('Username change error:', error);
-      toast.error(error.message || 'Failed to update username');
-    } finally {
       setIsChangingUsername(false);
+      
+      // Clear previous errors
+      setUsernameError(null);
+      setPasswordError(null);
+
+      // Handle specific error cases
+      if (error.message.includes('already taken')) {
+        setUsernameError('Username is already taken');
+      } else if (error.message.includes('Invalid password')) {
+        setPasswordError('Invalid password');
+      } else {
+        // Generic error handling
+        const errorMessage = error.message || 'Failed to update username';
+        setUsernameError(errorMessage);
+      }
+
+      // Show error toast
+      toast.error(error.message || 'Failed to update username', {
+        position: "bottom-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+      });
     }
   };
 
@@ -343,35 +428,109 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   <User className="w-5 h-5 text-blue-500" />
                   Username Settings
                 </h4>
-            <form onSubmit={handleUsernameChange} className="space-y-4">
-              <div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              handleUsernameChange();
+            }} className="space-y-4">
+              <div className="relative">
                 <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   New Username
                 </label>
-                <input
-                  id="username"
-                  type="text"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800"
-                  required
-                />
+                <div className="mt-1 relative">
+                  <input
+                    id="username"
+                    type="text"
+                    value={newUsername}
+                    onChange={(e) => {
+                      const value = e.target.value.slice(0, 20); // Enforce max length
+                      setNewUsername(value);
+                      setUsernameError(null);
+                      
+                      // Basic validation
+                      if (value.length < 3) {
+                        setUsernameError('Username must be at least 3 characters');
+                      } else if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+                        setUsernameError('Only letters, numbers and underscores allowed');
+                      } else {
+                        setUsernameError(null);
+                      }
+                    }}
+                    className={`block w-full px-3 py-2 border ${
+                      usernameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                    } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 transition-all duration-200 pr-10`}
+                    required
+                    aria-invalid={!!usernameError}
+                    aria-describedby="username-error"
+                  />
+                  {newUsername.length > 0 && !usernameError && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 space-y-1">
+                  {usernameError ? (
+                    <p id="username-error" className="text-sm text-red-600 dark:text-red-400">
+                      {usernameError}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {newUsername.length > 0 && `Available characters: ${Math.max(0, 20 - newUsername.length)}`}
+                    </p>
+                  )}
+                  <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                    <li className={`flex items-center ${newUsername.length >= 3 ? 'text-green-500' : ''}`}>
+                      <svg className={`w-3 h-3 mr-1 ${newUsername.length >= 3 ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      At least 3 characters
+                    </li>
+                    <li className={`flex items-center ${/^[a-zA-Z0-9_]+$/.test(newUsername) ? 'text-green-500' : 'text-gray-400'}`}>
+                      <svg className={`w-3 h-3 mr-1 ${/^[a-zA-Z0-9_]+$/.test(newUsername) ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Only letters, numbers and underscores
+                    </li>
+                  </ul>
+                </div>
               </div>
 
               <div>
                 <label htmlFor="usernamePassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Current Password
                 </label>
-                <input
-                  id="usernamePassword"
-                  type="password"
-                  placeholder="Enter current password"
-                  value={usernamePassword}
-                  onChange={(e) => setUsernamePassword(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800"
-                  required
-                  minLength={8}
-                />
+                <div className="mt-1 relative">
+                  <input
+                    id="usernamePassword"
+                    type="password"
+                    placeholder="Enter current password"
+                    value={usernamePassword}
+                    onChange={(e) => {
+                      setUsernamePassword(e.target.value);
+                      setPasswordError(null); // Clear error when typing
+                    }}
+                    className={`block w-full px-3 py-2 border ${
+                      passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                    } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800`}
+                    required
+                    aria-invalid={!!passwordError}
+                    aria-describedby="password-error"
+                  />
+                  {passwordError && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                {passwordError && (
+                  <p id="password-error" className="mt-2 text-sm text-red-600 dark:text-red-400">
+                    {passwordError}
+                  </p>
+                )}
               </div>
               <button
                 type="submit"
@@ -419,7 +578,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text"
                       autoComplete="new-password"
                       required
-                      minLength={8}
                     />
                     <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                       Password strength: <span className="font-medium">Medium</span>

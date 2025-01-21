@@ -325,6 +325,7 @@ export default function ClientLayout({
         <SettingsModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
+          setUsername={setUsername}
         />
       </div>
   );

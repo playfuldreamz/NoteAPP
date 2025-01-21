@@ -291,6 +291,7 @@ app.put('/change-username', authenticateToken, async (req, res) => {
   }
 });
 
+
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -507,6 +508,7 @@ app.get('/transcripts', authenticateToken, (req, res) => {
     res.json(transcripts);
   });
 });
+
 
 app.post('/transcripts', authenticateToken, async (req, res) => {
   try {
@@ -761,67 +763,6 @@ app.delete('/tags/:id', authenticateToken, (req, res) => {
   });
 });
 
-// Username change endpoint
-app.put('/change-username', authenticateToken, async (req, res) => {
-  const { newUsername, password } = req.body;
-  const userId = req.user.id;
-
-  if (!newUsername || !password) {
-    return res.status(400).json({ error: 'New username and current password are required' });
-  }
-
-  try {
-    // Verify current password
-    const user = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM users WHERE id = ?', [userId], (err, row) => {
-        if (err) reject(err);
-        resolve(row);
-      });
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid current password' });
-    }
-
-    // Check if new username already exists
-    const existingUser = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM users WHERE username = ?', [newUsername], (err, row) => {
-        if (err) reject(err);
-        resolve(row);
-      });
-    });
-
-    if (existingUser) {
-      return res.status(400).json({ error: 'Username already exists' });
-    }
-
-    // Update username
-    await new Promise((resolve, reject) => {
-      db.run('UPDATE users SET username = ? WHERE id = ?', [newUsername, userId], function(err) {
-        if (err) reject(err);
-        resolve(this);
-      });
-    });
-
-    // Generate new token with updated username
-    const token = jwt.sign({ id: userId, username: newUsername }, JWT_SECRET);
-    
-    res.json({ 
-      message: 'Username updated successfully',
-      token,
-      username: newUsername
-    });
-
-  } catch (error) {
-    console.error('Username change error:', error);
-    res.status(500).json({ error: 'Failed to update username' });
-  }
-});
 
 // Password change endpoint
 app.put('/change-password', authenticateToken, async (req, res) => {
