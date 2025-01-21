@@ -1,24 +1,17 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
+import useTheme from '../hooks/useTheme';
 
 const DarkModeToggle = () => {
-  const [darkMode, setDarkMode] = useState(false);
+  const { darkMode, toggleDarkMode } = useTheme();
+  const [isMounted, setIsMounted] = useState(false);
 
+  // Ensure component is mounted before rendering
   useEffect(() => {
-    // Check localStorage for theme preference
-    const isDark = localStorage.getItem('theme') === 'dark';
-    setDarkMode(isDark);
-    document.documentElement.classList.toggle('dark', isDark);
+    setIsMounted(true);
   }, []);
-
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    document.documentElement.classList.toggle('dark', newDarkMode);
-    localStorage.setItem('theme', newDarkMode ? 'dark' : 'light');
-  };
 
   return (
     <button
@@ -26,7 +19,7 @@ const DarkModeToggle = () => {
       className="fixed bottom-4 right-4 p-3 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
       aria-label="Toggle dark mode"
     >
-      {darkMode ? (
+      {!isMounted ? null : darkMode ? (
         <Sun className="w-6 h-6 text-yellow-400" />
       ) : (
         <Moon className="w-6 h-6 text-gray-800 dark:text-gray-200" />

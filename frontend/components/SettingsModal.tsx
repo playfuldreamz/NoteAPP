@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Settings, Moon, Sun, Bell, Lock, User, Globe } from 'lucide-react';
+import useTheme from '../hooks/useTheme';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface SettingsModalProps {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [selectedGroup, setSelectedGroup] = useState('appearance');
+  const { darkMode, toggleDarkMode } = useTheme();
 
   if (!isOpen) return null;
 
@@ -24,8 +26,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <span className="text-gray-700 dark:text-gray-200">Dark Mode</span>
             </div>
             <div className="relative inline-block w-10 mr-2 align-middle select-none">
-              <input type="checkbox" id="dark-mode" className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-2 border-gray-300 appearance-none cursor-pointer"/>
-              <label htmlFor="dark-mode" className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+              <input
+                type="checkbox"
+                id="dark-mode"
+                checked={darkMode}
+                onChange={toggleDarkMode}
+                className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-2 border-gray-300 appearance-none cursor-pointer transition-transform duration-200 ease-in-out transform translate-x-0 dark:translate-x-4"
+              />
+              <label htmlFor="dark-mode" className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer transition-colors duration-200 ease-in-out dark:bg-blue-500"></label>
             </div>
           </div>
         </div>
