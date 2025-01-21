@@ -15,6 +15,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
   const settingGroups = [
     {
+      id: 'ai',
+      name: 'AI Provider',
+      icon: <Globe className="w-4 h-4" />,
+      content: (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <div className="flex items-center gap-3">
+              <Globe className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              <span className="text-gray-700 dark:text-gray-200">AI Provider</span>
+            </div>
+            <select
+              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1 text-sm text-gray-700 dark:text-gray-200 focus:ring-blue-500 focus:border-blue-500"
+              disabled
+            >
+              <option>Select Provider</option>
+              <option>OpenAI</option>
+              <option>Anthropic</option>
+              <option>Cohere</option>
+            </select>
+          </div>
+        </div>
+      )
+    },
+    {
       id: 'appearance',
       name: 'Appearance',
       icon: <Moon className="w-4 h-4" />,
