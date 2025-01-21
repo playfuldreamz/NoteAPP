@@ -131,47 +131,28 @@ db.serialize(() => {
     FOREIGN KEY(user_id) REFERENCES users(id)
   )`);
 
-// Create transcripts table with user_id foreign key and title
-db.run(`CREATE TABLE IF NOT EXISTS transcripts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  text TEXT,
-  title TEXT,
-  user_id INTEGER,
-  date DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(user_id) REFERENCES users(id)
-)`);
-
-// Create tags table
-db.run(`CREATE TABLE IF NOT EXISTS tags (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT UNIQUE NOT NULL,
-  description TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-)`);
-
-// Create note_tags join table
-db.run(`CREATE TABLE IF NOT EXISTS note_tags (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  note_id INTEGER NOT NULL,
-  tag_id INTEGER NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(note_id) REFERENCES notes(id),
-  FOREIGN KEY(tag_id) REFERENCES tags(id),
-  UNIQUE(note_id, tag_id)
-)`);
-
-// Create transcript_tags join table
-db.run(`CREATE TABLE IF NOT EXISTS transcript_tags (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  transcript_id INTEGER NOT NULL,
-  tag_id INTEGER NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(transcript_id) REFERENCES transcripts(id),
-  FOREIGN KEY(tag_id) REFERENCES tags(id),
-  UNIQUE(transcript_id, tag_id)
-)`);
+  // Create transcripts table with user_id foreign key and title
+  db.run(`CREATE TABLE IF NOT EXISTS transcripts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT,
+    title TEXT,
+    user_id INTEGER,
+    date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )`);
 });
+
+// Helper function to check if a tag is still referenced
+function isTagReferenced(db, tagId, callback) {
+  db.get(
+    'SELECT COUNT(*) as count FROM item_tags WHERE tag_id = ?',
+    [tagId],
+    (err, row) => {
+      if (err) return callback(err);
+      callback(null, row.count > 0);
+    }
+  );
+}
 
 // Auth routes
 app.post('/register', async (req, res) => {
@@ -199,7 +180,7 @@ app.post('/register', async (req, res) => {
 
         // Create token
         const token = jwt.sign({ id: this.lastID, username }, JWT_SECRET);
-        res.status(201).json({ token, username }); // Include username in response
+        res.status(201).json({ token, username });
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -230,7 +211,7 @@ app.post('/login', async (req, res) => {
 
     // Create token
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET);
-    res.json({ token, username: user.username }); // Include username in response
+    res.json({ token, username: user.username });
   });
 });
 
@@ -282,44 +263,113 @@ app.post('/notes', authenticateToken, (req, res) => {
     });
 });
 
-// Delete note tags endpoint
+// Delete note tags endpoint with cleanup
 app.delete('/notes/:id/tags', authenticateToken, (req, res) => {
-  db.run('DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
-    [req.params.id, 'note'],
-    function(err) {
+  const noteId = req.params.id;
+  
+  // Get all tag IDs associated with this note
+  db.all(
+    'SELECT tag_id FROM item_tags WHERE item_id = ? AND item_type = ?',
+    [noteId, 'note'],
+    (err, tagRows) => {
       if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ message: 'Note tags deleted' });
-    });
-});
-
-app.delete('/notes/:id', authenticateToken, (req, res) => {
-  // First delete associated tags
-  db.run('DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
-    [req.params.id, 'note'],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
+        return res.status(500).json({ error: err.message });
       }
 
-      // Then delete the note
-      db.run('DELETE FROM notes WHERE id = ? AND user_id = ?',
-        [req.params.id, req.user.id],
+      // Delete item_tags records
+      db.run(
+        'DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
+        [noteId, 'note'],
         function(err) {
           if (err) {
-            res.status(500).json({ error: err.message });
-            return;
+            return res.status(500).json({ error: err.message });
           }
-          if (this.changes === 0) {
-            res.status(404).json({ error: 'Note not found or unauthorized' });
-            return;
+
+          // Check and delete orphaned tags
+          const tagIds = tagRows.map(row => row.tag_id);
+          tagIds.forEach(tagId => {
+            isTagReferenced(db, tagId, (err, isReferenced) => {
+              if (err) {
+                console.error('Error checking tag reference:', err);
+                return;
+              }
+              
+              if (!isReferenced) {
+                db.run('DELETE FROM tags WHERE id = ?', [tagId], err => {
+                  if (err) {
+                    console.error('Error deleting orphaned tag:', err);
+                  }
+                });
+              }
+            });
+          });
+
+          res.json({ message: 'Note tags deleted successfully' });
+        }
+      );
+    }
+  );
+});
+
+// Delete note endpoint with tag cleanup
+app.delete('/notes/:id', authenticateToken, (req, res) => {
+  const noteId = req.params.id;
+  
+  // Get all tag IDs associated with this note
+  db.all(
+    'SELECT tag_id FROM item_tags WHERE item_id = ? AND item_type = ?',
+    [noteId, 'note'],
+    (err, tagRows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      // Delete item_tags records
+      db.run(
+        'DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
+        [noteId, 'note'],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: err.message });
           }
-          res.json({ message: 'Note and associated tags deleted' });
-        });
-    });
+
+          // Check and delete orphaned tags
+          const tagIds = tagRows.map(row => row.tag_id);
+          tagIds.forEach(tagId => {
+            isTagReferenced(db, tagId, (err, isReferenced) => {
+              if (err) {
+                console.error('Error checking tag reference:', err);
+                return;
+              }
+              
+              if (!isReferenced) {
+                db.run('DELETE FROM tags WHERE id = ?', [tagId], err => {
+                  if (err) {
+                    console.error('Error deleting orphaned tag:', err);
+                  }
+                });
+              }
+            });
+          });
+
+          // Finally delete the note
+          db.run(
+            'DELETE FROM notes WHERE id = ? AND user_id = ?',
+            [noteId, req.user.id],
+            function(err) {
+              if (err) {
+                return res.status(500).json({ error: err.message });
+              }
+              if (this.changes === 0) {
+                return res.status(404).json({ error: 'Note not found or unauthorized' });
+              }
+              res.json({ message: 'Note and associated tags deleted' });
+            }
+          );
+        }
+      );
+    }
+  );
 });
 
 // Transcript routes
@@ -449,44 +499,113 @@ app.post('/transcripts', authenticateToken, async (req, res) => {
   }
 });
 
-// Delete transcript tags endpoint
+// Delete transcript tags endpoint with cleanup
 app.delete('/transcripts/:id/tags', authenticateToken, (req, res) => {
-  db.run('DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
-    [req.params.id, 'transcript'],
-    function(err) {
+  const transcriptId = req.params.id;
+  
+  // Get all tag IDs associated with this transcript
+  db.all(
+    'SELECT tag_id FROM item_tags WHERE item_id = ? AND item_type = ?',
+    [transcriptId, 'transcript'],
+    (err, tagRows) => {
       if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.json({ message: 'Transcript tags deleted' });
-    });
-});
-
-app.delete('/transcripts/:id', authenticateToken, (req, res) => {
-  // First delete associated tags
-  db.run('DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
-    [req.params.id, 'transcript'],
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
+        return res.status(500).json({ error: err.message });
       }
 
-      // Then delete the transcript
-      db.run('DELETE FROM transcripts WHERE id = ? AND user_id = ?',
-        [req.params.id, req.user.id],
+      // Delete item_tags records
+      db.run(
+        'DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
+        [transcriptId, 'transcript'],
         function(err) {
           if (err) {
-            res.status(500).json({ error: err.message });
-            return;
+            return res.status(500).json({ error: err.message });
           }
-          if (this.changes === 0) {
-            res.status(404).json({ error: 'Transcript not found or unauthorized' });
-            return;
+
+          // Check and delete orphaned tags
+          const tagIds = tagRows.map(row => row.tag_id);
+          tagIds.forEach(tagId => {
+            isTagReferenced(db, tagId, (err, isReferenced) => {
+              if (err) {
+                console.error('Error checking tag reference:', err);
+                return;
+              }
+              
+              if (!isReferenced) {
+                db.run('DELETE FROM tags WHERE id = ?', [tagId], err => {
+                  if (err) {
+                    console.error('Error deleting orphaned tag:', err);
+                  }
+                });
+              }
+            });
+          });
+
+          res.json({ message: 'Transcript tags deleted successfully' });
+        }
+      );
+    }
+  );
+});
+
+// Delete transcript endpoint with tag cleanup
+app.delete('/transcripts/:id', authenticateToken, (req, res) => {
+  const transcriptId = req.params.id;
+  
+  // Get all tag IDs associated with this transcript
+  db.all(
+    'SELECT tag_id FROM item_tags WHERE item_id = ? AND item_type = ?',
+    [transcriptId, 'transcript'],
+    (err, tagRows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      // Delete item_tags records
+      db.run(
+        'DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
+        [transcriptId, 'transcript'],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: err.message });
           }
-          res.json({ message: 'Transcript and associated tags deleted' });
-        });
-    });
+
+          // Check and delete orphaned tags
+          const tagIds = tagRows.map(row => row.tag_id);
+          tagIds.forEach(tagId => {
+            isTagReferenced(db, tagId, (err, isReferenced) => {
+              if (err) {
+                console.error('Error checking tag reference:', err);
+                return;
+              }
+              
+              if (!isReferenced) {
+                db.run('DELETE FROM tags WHERE id = ?', [tagId], err => {
+                  if (err) {
+                    console.error('Error deleting orphaned tag:', err);
+                  }
+                });
+              }
+            });
+          });
+
+          // Finally delete the transcript
+          db.run(
+            'DELETE FROM transcripts WHERE id = ? AND user_id = ?',
+            [transcriptId, req.user.id],
+            function(err) {
+              if (err) {
+                return res.status(500).json({ error: err.message });
+              }
+              if (this.changes === 0) {
+                return res.status(404).json({ error: 'Transcript not found or unauthorized' });
+              }
+              res.json({ message: 'Transcript and associated tags deleted' });
+            }
+          );
+        }
+      );
+    }
+  );
 });
 
 // Tag management routes
