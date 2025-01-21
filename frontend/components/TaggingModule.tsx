@@ -47,6 +47,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [isLoadingTags, setIsLoadingTags] = useState(true);
+  const [isLoadingSuggestedTags, setIsLoadingSuggestedTags] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset state when item changes
@@ -54,6 +55,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     setSelectedTags([]);
     setSuggestedTags([]);
     setIsLoadingTags(true);
+    setIsLoadingSuggestedTags(true);
   }, [itemId]);
 
   // Load tags when component mounts or item changes
@@ -84,6 +86,23 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       setSuggestedTags([]);
     };
   }, []);
+
+  // Analyze content for suggested tags
+  useEffect(() => {
+    const analyzeContent = async () => {
+      try {
+        setIsLoadingSuggestedTags(true);
+        const suggestions = await analyzeContentForTags(content);
+        setSuggestedTags(suggestions);
+      } catch (error) {
+        console.error('Error analyzing content:', error);
+      } finally {
+        setIsLoadingSuggestedTags(false);
+      }
+    };
+
+    analyzeContent();
+  }, [content]);
 
   // Handle tag selection with improved error handling
   const handleTagSelection = async (tag: Tag, retryCount = 0) => {
@@ -170,20 +189,6 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     }
   };
 
-  // Analyze content for suggested tags
-  useEffect(() => {
-    const analyzeContent = async () => {
-      try {
-        const suggestions = await analyzeContentForTags(content);
-        setSuggestedTags(suggestions);
-      } catch (error) {
-        console.error('Error analyzing content:', error);
-      }
-    };
-
-    analyzeContent();
-  }, [content]);
-
   // Handle tag creation
   const handleCreateTag = async (tagName: string) => {
     try {
@@ -211,7 +216,20 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       </div>
 
       {/* Suggested Tags */}
-      {suggestedTags.length > 0 && (
+      {isLoadingSuggestedTags ? (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-600">Loading Suggested Tags...</h4>
+          <div className="animate-pulse flex space-x-4">
+            <div className="flex-1 space-y-4 py-1">
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : suggestedTags.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-600">Suggested Tags</h4>
           <div className="flex flex-wrap gap-2">
