@@ -55,6 +55,25 @@ export default function ClientLayout({
   const [notes, setNotes] = useState<Note[]>([]);
   const [username, setUsername] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [currentModel, setCurrentModel] = useState('default gemini');
+
+  const fetchCurrentModel = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const response = await fetch('http://localhost:5000/api/ai/config', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      setCurrentModel(data.provider || 'default gemini');
+    } catch (error) {
+      console.error('Error fetching current model:', error);
+    }
+  }, []);
 
   const fetchNotes = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -226,6 +245,9 @@ export default function ClientLayout({
             <div className="flex justify-between items-center h-16">
               <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Notes</h1>
               <div className="flex items-center space-x-4">
+                <div className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-sm">
+                  AI: {currentModel}
+                </div>
                 {isAuthenticated && (
                   <>
                     <span className="text-gray-500 dark:text-gray-400">Welcome, {username}</span>
