@@ -187,6 +187,110 @@ app.post('/register', async (req, res) => {
   }
 });
 
+// Change password endpoint
+app.put('/change-password', authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current and new password are required' });
+  }
+
+  try {
+    // Verify current password
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE id = ?', [req.user.id], (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+      });
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid current password' });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.user.id], function(err) {
+        if (err) return reject(err);
+        resolve(this);
+      });
+    });
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Change username endpoint
+app.put('/change-username', authenticateToken, async (req, res) => {
+  const { newUsername, password } = req.body;
+  
+  if (!newUsername || !password) {
+    return res.status(400).json({ error: 'New username and password are required' });
+  }
+
+  try {
+    // Get current user
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE id = ?', [req.user.id], (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+      });
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify current password
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid password' });
+    }
+
+    // Check if new username is available
+    const usernameExists = await new Promise((resolve, reject) => {
+      db.get('SELECT id FROM users WHERE username = ? AND id != ?', [newUsername, user.id], (err, row) => {
+        if (err) return reject(err);
+        resolve(!!row);
+      });
+    });
+
+    if (usernameExists) {
+      return res.status(400).json({ error: 'Username already taken' });
+    }
+
+    // Update username
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE users SET username = ? WHERE id = ?', [newUsername, user.id], function(err) {
+        if (err) return reject(err);
+        resolve(this);
+      });
+    });
+
+    // Generate new token with updated username
+    const token = jwt.sign({ id: user.id, username: newUsername }, JWT_SECRET);
+    
+    res.json({ 
+      token,
+      username: newUsername
+    });
+  } catch (err) {
+    console.error('Error changing username:', err);
+    res.status(500).json({ error: 'Failed to change username' });
+  }
+});
+
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -655,6 +759,115 @@ app.delete('/tags/:id', authenticateToken, (req, res) => {
     }
     res.json({ message: 'Tag deleted' });
   });
+});
+
+// Username change endpoint
+app.put('/change-username', authenticateToken, async (req, res) => {
+  const { newUsername, password } = req.body;
+  const userId = req.user.id;
+
+  if (!newUsername || !password) {
+    return res.status(400).json({ error: 'New username and current password are required' });
+  }
+
+  try {
+    // Verify current password
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE id = ?', [userId], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid current password' });
+    }
+
+    // Check if new username already exists
+    const existingUser = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE username = ?', [newUsername], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    // Update username
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE users SET username = ? WHERE id = ?', [newUsername, userId], function(err) {
+        if (err) reject(err);
+        resolve(this);
+      });
+    });
+
+    // Generate new token with updated username
+    const token = jwt.sign({ id: userId, username: newUsername }, JWT_SECRET);
+    
+    res.json({ 
+      message: 'Username updated successfully',
+      token,
+      username: newUsername
+    });
+
+  } catch (error) {
+    console.error('Username change error:', error);
+    res.status(500).json({ error: 'Failed to update username' });
+  }
+});
+
+// Password change endpoint
+app.put('/change-password', authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.id;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current and new password are required' });
+  }
+
+  try {
+    // Verify current password
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE id = ?', [userId], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid current password' });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId], function(err) {
+        if (err) reject(err);
+        resolve(this);
+      });
+    });
+
+    res.json({ message: 'Password updated successfully' });
+
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(500).json({ error: 'Failed to update password' });
+  }
 });
 
 app.listen(PORT, () => {

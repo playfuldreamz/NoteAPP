@@ -51,12 +51,98 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [isKeyValid, setIsKeyValid] = useState(false);
   const [tempProvider, setTempProvider] = useState<AIProvider>(selectedProvider.provider || 'gemini');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  // Username change state
+  const [newUsername, setNewUsername] = useState('');
+  const [usernamePassword, setUsernamePassword] = useState('');
+  const [isChangingUsername, setIsChangingUsername] = useState(false);
+  
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Ensure consistent state between selectedProvider and tempProvider
   useEffect(() => {
     setTempProvider(selectedProvider.provider);
     setApiKey(selectedProvider.apiKey || '');
   }, [selectedProvider]);
+
+  const handlePasswordChange = async () => {
+    if (!currentPassword || !newPassword || newPassword !== confirmPassword) {
+      toast.error('Please fill in all fields and ensure passwords match');
+      return;
+    }
+
+    try {
+      setIsChangingPassword(true);
+      const response = await fetch('/change-password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update password');
+      }
+
+      toast.success('Password updated successfully!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      console.error('Password change error:', error);
+      toast.error(error.message || 'Failed to update password');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleUsernameChange = async () => {
+    if (!newUsername || !usernamePassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    try {
+      setIsChangingUsername(true);
+      const response = await fetch('/change-username', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          newUsername,
+          password: usernamePassword
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update username');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      toast.success('Username updated successfully!');
+      setNewUsername('');
+      setUsernamePassword('');
+    } catch (error: any) {
+      console.error('Username change error:', error);
+      toast.error(error.message || 'Failed to update username');
+    } finally {
+      setIsChangingUsername(false);
+    }
+  };
 
   const validateApiKey = (key: string | undefined, provider: AIProvider) => {
     if (!key) return false;
@@ -186,7 +272,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           <button
             onClick={handleSave}
             disabled={!isKeyValid || isLoading}
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
           >
             {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
@@ -239,13 +325,131 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     },
     {
       id: 'security',
-      name: 'Security',
+      name: 'Login & Security',
       icon: <Lock className="w-4 h-4" />,
       content: (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-            <User className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-            <span className="text-gray-700 dark:text-gray-200">Change Password</span>
+        <div className="space-y-6">
+          <div className="p-6 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-3">
+              <Lock className="w-6 h-6 text-blue-500" />
+              Account Security
+            </h3>
+            
+            {/* Account Credentials Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Username Section */}
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                  <User className="w-5 h-5 text-blue-500" />
+                  Username Settings
+                </h4>
+            <form onSubmit={handleUsernameChange} className="space-y-4">
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  New Username
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="usernamePassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Current Password
+                </label>
+                <input
+                  id="usernamePassword"
+                  type="password"
+                  placeholder="Enter current password"
+                  value={usernamePassword}
+                  onChange={(e) => setUsernamePassword(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800"
+                  required
+                  minLength={8}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isChangingUsername || !newUsername || !usernamePassword}
+                className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {isChangingUsername ? 'Updating...' : 'Update Username'}
+              </button>
+            </form>
+              </div>
+
+              {/* Password Section */}
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-blue-500" />
+                  Password Settings
+                </h4>
+                <form onSubmit={handlePasswordChange} className="space-y-4">
+                  <div>
+                    <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Current Password
+                    </label>
+                    <input
+                      type="password"
+                      id="currentPassword"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Enter current password"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800"
+                      autoComplete="current-password"
+                      required
+                      disabled={false}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      id="newPassword"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text"
+                      autoComplete="new-password"
+                      required
+                      minLength={8}
+                    />
+                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      Password strength: <span className="font-medium">Medium</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      id="confirmPassword"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text"
+                      autoComplete="new-password"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword}
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isChangingPassword ? 'Updating...' : 'Update Password'}
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       )
@@ -270,7 +474,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg w-full max-w-3xl h-[80vh] flex flex-col">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg w-full max-w-5xl h-[85vh] flex flex-col">
           {/* Header */}
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center">
