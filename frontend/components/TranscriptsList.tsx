@@ -3,7 +3,8 @@ import { toast } from 'react-toastify';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
 import TranscriptActions, { TranscriptFilters } from './TranscriptActions';
-import { useDownloadNote, type DownloadOptions } from '../hooks/useDownloadNote';
+import useDownloadNote from '../hooks/useDownloadNote';
+import type { DownloadOptions } from '../hooks/useDownloadNote';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 
 interface Tag {
@@ -37,6 +38,14 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     format: 'txt',
     includeMetadata: true
   });
+
+  const handleDownloadOptionsChange = (prev: DownloadOptions, newFormat: string): DownloadOptions => {
+    return {
+      ...prev,
+      format: newFormat as 'txt' | 'json' | 'pdf'
+    };
+  };
+
   const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({});
 
   const toggleTagsExpansion = (transcriptId: number) => {
@@ -71,6 +80,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
       </div>
     );
   };
+
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
 
@@ -167,8 +177,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         return;
       }
 
-      // First delete associated tags
-      const deleteTagsResponse = await fetch(`http://localhost:5000/transcripts/${id}/tags`, {
+      const response = await fetch(`http://localhost:5000/transcripts/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -176,25 +185,11 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         },
       });
 
-      if (!deleteTagsResponse.ok) {
-        const data = await deleteTagsResponse.json();
-        throw new Error(data.error || 'Failed to delete transcript tags');
-      }
-
-      // Then delete the transcript
-      const deleteResponse = await fetch(`http://localhost:5000/transcripts/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-      });
-
-      if (deleteResponse.ok) {
-        toast.success('Transcript and associated tags deleted!');
+      if (response.ok) {
+        toast.success('Transcript deleted!');
         updateTranscripts();
       } else {
-        const data = await deleteResponse.json();
+        const data = await response.json();
         toast.error(data.error || 'Failed to delete transcript');
       }
     } catch (error) {
@@ -326,7 +321,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                           content: transcript.text,
                           transcript: '',
                           timestamp: transcript.date,
-                          title: transcript.title || `Transcript-${transcript.id}`
+                          title: transcript.title || `Transcript-${transcript.id}`,
+                          tags: transcript.tags || []
                         }, downloadOptions)}
                         disabled={isDownloading}
                         className="text-blue-500 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"

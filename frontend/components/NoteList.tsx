@@ -5,7 +5,8 @@ import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Sparkles, Download } from 'lucide-react';
 import TranscriptActions from './TranscriptActions';
 import useTitleGeneration from '../hooks/useTitleGeneration';
-import { useDownloadNote, DownloadOptions } from '../hooks/useDownloadNote';
+import useDownloadNote from '../hooks/useDownloadNote';
+import type { DownloadOptions } from '../hooks/useDownloadNote';
 
 interface Tag {
   id: number;
