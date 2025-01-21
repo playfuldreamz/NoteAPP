@@ -25,7 +25,6 @@ const Modal: React.FC<ModalProps> = ({
   initialTags = [],
   onTagsUpdate
 }) => {
-  console.log('Modal received itemId:', itemId);
   const [tags, setTags] = useState<Tag[]>(initialTags);
   useEffect(() => {
     if (isOpen) {

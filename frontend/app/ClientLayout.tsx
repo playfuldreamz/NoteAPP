@@ -8,7 +8,8 @@ import AudioRecorder from "../components/AudioRecorder";
 import TranscriptsList from "../components/TranscriptsList";
 import NoteSaver from "../components/NoteSaver";
 import NoteList from "../components/NoteList";
-import { Notebook, Mic, FileText, NotebookPen } from 'lucide-react';
+import { Notebook, Mic, FileText, NotebookPen, Settings, LogOut } from 'lucide-react';
+import SettingsModal from '../components/SettingsModal';
 import { toast, ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -36,14 +37,24 @@ export default function ClientLayout({
   const [isAdmin, setIsAdmin] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
   const [transcripts, setTranscripts] = useState<{ id: number; text: string; title: string; date: string }[]>([]);
-  const [notes, setNotes] = useState<{
+  interface Tag {
+    id: number;
+    name: string;
+  }
+
+  interface Note {
     id: number;
     content: string;
     transcript: string;
     timestamp: string;
     title: string;
-  }[]>([]);
+    user_id: number;
+    tags: Tag[];
+  }
+
+  const [notes, setNotes] = useState<Note[]>([]);
   const [username, setUsername] = useState('');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const fetchNotes = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -59,7 +70,17 @@ export default function ClientLayout({
 
       if (response.ok) {
         const data = await response.json();
-        setNotes(data);
+        // Transform data to match Note type
+        const formattedNotes = data.map((note: any) => ({
+          id: note.id,
+          content: note.content,
+          transcript: note.transcript || '',
+          timestamp: note.timestamp || new Date().toISOString(),
+          title: note.title || 'Untitled Note',
+          user_id: note.user_id || 0,
+          tags: note.tags || []
+        }));
+        setNotes(formattedNotes);
       } else {
         console.error('Failed to fetch notes');
         toast.error('Failed to fetch notes');
@@ -217,21 +238,25 @@ export default function ClientLayout({
                       </button>
                       <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black dark:ring-gray-600 ring-opacity-5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                         <div className="py-1" role="menu">
-                          {isAdmin && (
-                            <a
-                              href="/admin/settings"
-                              className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
-                              role="menuitem"
-                            >
-                              Settings
-                            </a>
-                          )}
+                          <button
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
+                            role="menuitem"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Settings className="w-4 h-4" />
+                              <span>Settings</span>
+                            </div>
+                          </button>
                           <button
                             onClick={handleLogout}
                             className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
                             role="menuitem"
                           >
-                            Logout
+                            <div className="flex items-center gap-2">
+                              <LogOut className="w-4 h-4" />
+                              <span>Logout</span>
+                            </div>
                           </button>
                         </div>
                       </div>
@@ -275,6 +300,10 @@ export default function ClientLayout({
             </div>
           )}
         </main>
-    </div>
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      </div>
   );
 }
