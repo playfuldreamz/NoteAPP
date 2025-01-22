@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import { Settings, Moon, Sun, Bell, Lock, User, Globe } from 'lucide-react';
 import useTheme from '../hooks/useTheme';
-import { getAIProvider, updateAIProvider, AIProvider } from '../services/ai';
+import { getAIProvider, updateAIProvider, AIProvider, API_BASE } from '../services/ai';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -59,13 +59,56 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   const [usernamePassword, setUsernamePassword] = useState('');
   const [isChangingUsername, setIsChangingUsername] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
   
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
+  const [passwordStrength, setPasswordStrength] = useState<number>(0);
+
+  const validatePassword = (password: string, setError: React.Dispatch<React.SetStateAction<string | null>>) => {
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return false;
+    }
+    if (password.length > 64) {
+      setError('Password cannot exceed 64 characters');
+      return false;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError('Password must contain at least one uppercase letter');
+      return false;
+    }
+    if (!/[a-z]/.test(password)) {
+      setError('Password must contain at least one lowercase letter');
+      return false;
+    }
+    if (!/[0-9]/.test(password)) {
+      setError('Password must contain at least one number');
+      return false;
+    }
+    if (!/[!@#$%^&*]/.test(password)) {
+      setError('Password must contain at least one special character');
+      return false;
+    }
+    setError(null);
+    return true;
+  };
+
+  const calculatePasswordStrength = (password: string) => {
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (password.length >= 12) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[!@#$%^&*]/.test(password)) strength++;
+    setPasswordStrength(strength);
+  };
 
   // Ensure consistent state between selectedProvider and tempProvider
   useEffect(() => {
@@ -74,14 +117,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   }, [selectedProvider]);
 
   const handlePasswordChange = async () => {
-    if (!currentPassword || !newPassword || newPassword !== confirmPassword) {
-      toast.error('Please fill in all fields and ensure passwords match');
+    // Validate all fields are filled
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    // Validate password strength
+    if (!validatePassword(newPassword, setNewPasswordError)) {
+      toast.error('Please fix password requirements');
       return;
     }
 
     try {
       setIsChangingPassword(true);
-      const response = await fetch('/change-password', {
+      const response = await fetch(`${API_BASE}/change-password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -93,12 +149,50 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
         })
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update password');
+        throw new Error(data.error || 'Failed to update password');
       }
 
-      toast.success('Password updated successfully!', {
+      // Clear form fields
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordError(null);
+      setConfirmPasswordError(null);
+      setPasswordStrength(0);
+
+      // Show success message
+      toast.success(
+        <div className="flex items-center gap-2">
+          <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>Password updated successfully!</span>
+        </div>, 
+        {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        }
+      );
+    } catch (error: any) {
+      console.error('Password change error:', error);
+      
+      // Handle specific error cases
+      if (error.message.includes('Invalid current password')) {
+        setPasswordError('Invalid current password');
+      } else {
+        setPasswordError(error.message || 'Failed to update password');
+      }
+
+      // Show error toast
+      toast.error(error.message || 'Failed to update password', {
         position: "bottom-right",
         autoClose: 5000,
         hideProgressBar: false,
@@ -107,12 +201,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
         draggable: true,
         progress: undefined,
       });
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (error: any) {
-      console.error('Password change error:', error);
-      toast.error(error.message || 'Failed to update password');
     } finally {
       setIsChangingPassword(false);
     }
@@ -149,7 +237,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
 
       setIsChangingUsername(true);
       
-      const response = await fetch(`${process.env.API_URL}/change-username`, {
+      const response = await fetch(`${API_BASE}/change-username`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -548,7 +636,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                   <Lock className="w-5 h-5 text-blue-500" />
                   Password Settings
                 </h4>
-                <form onSubmit={handlePasswordChange} className="space-y-4">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  handlePasswordChange();
+                }} className="space-y-4">
                   <div>
                     <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Current Password
@@ -569,18 +660,90 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                     <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       New Password
                     </label>
-                    <input
-                      type="password"
-                      id="newPassword"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text"
-                      autoComplete="new-password"
-                      required
-                    />
-                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      Password strength: <span className="font-medium">Medium</span>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        id="newPassword"
+                        value={newPassword}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setNewPassword(value);
+                          calculatePasswordStrength(value);
+                          validatePassword(value, setNewPasswordError);
+                        }}
+                        placeholder="Enter new password"
+                        className={`w-full px-3 py-2 border ${
+                          passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                        } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text`}
+                        autoComplete="new-password"
+                        required
+                        aria-invalid={!!passwordError}
+                        aria-describedby="password-error"
+                      />
+                      {passwordError && (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                          <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                        <div
+                          className={`h-2 rounded-full ${
+                            passwordStrength < 3 ? 'bg-red-500' :
+                            passwordStrength < 5 ? 'bg-yellow-500' :
+                            'bg-green-500'
+                          }`}
+                          style={{ width: `${(passwordStrength / 6) * 100}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        Password strength: {' '}
+                        <span className="font-medium">
+                          {passwordStrength < 3 ? 'Weak' :
+                           passwordStrength < 5 ? 'Medium' :
+                           'Strong'}
+                        </span>
+                      </div>
+                      {passwordError && (
+                        <p id="password-error" className="text-sm text-red-600 dark:text-red-400">
+                          {passwordError}
+                        </p>
+                      )}
+                      <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                        <li className={`flex items-center ${newPassword.length >= 8 ? 'text-green-500' : ''}`}>
+                          <svg className={`w-3 h-3 mr-1 ${newPassword.length >= 8 ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          At least 8 characters
+                        </li>
+                        <li className={`flex items-center ${/[A-Z]/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`}>
+                          <svg className={`w-3 h-3 mr-1 ${/[A-Z]/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          At least one uppercase letter
+                        </li>
+                        <li className={`flex items-center ${/[a-z]/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`}>
+                          <svg className={`w-3 h-3 mr-1 ${/[a-z]/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          At least one lowercase letter
+                        </li>
+                        <li className={`flex items-center ${/[0-9]/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`}>
+                          <svg className={`w-3 h-3 mr-1 ${/[0-9]/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          At least one number
+                        </li>
+                        <li className={`flex items-center ${/[!@#$%^&*]/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`}>
+                          <svg className={`w-3 h-3 mr-1 ${/[!@#$%^&*]/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          At least one special character
+                        </li>
+                      </ul>
                     </div>
                   </div>
                   <div>

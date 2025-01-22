@@ -3,6 +3,7 @@ const router = express.Router();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const sqlite3 = require('sqlite3').verbose();
 const { OpenAI } = require('openai');
+const bcrypt = require('bcrypt');
 
 // AI Provider Configuration Endpoints
 router.get('/config', async (req, res) => {
@@ -579,6 +580,65 @@ router.post('/tags/:type/:id', validateItemType, async (req, res) => {
       error: 'Failed to assign tag',
       details: error.message 
     });
+  }
+});
+
+// Password change endpoint
+router.put('/change-password', async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current and new password are required' });
+  }
+
+  try {
+    // Get user from token
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Verify current password
+    db.get(
+      'SELECT password FROM users WHERE id = ?',
+      [req.user.id],
+      async (err, user) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+        
+        if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Verify current password
+        const validPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!validPassword) {
+          return res.status(401).json({ error: 'Invalid current password' });
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        
+        // Update password
+        db.run(
+          'UPDATE users SET password = ? WHERE id = ?',
+          [hashedPassword, req.user.id],
+          function(err) {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Failed to update password' });
+            }
+            
+            res.json({ success: true });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

@@ -12,7 +12,7 @@ interface SummarizeResponse {
 }
 
 // API Functions
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export async function getAIProvider(): Promise<AIConfig> {
   const token = localStorage.getItem('token');
