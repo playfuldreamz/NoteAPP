@@ -545,10 +545,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                     }}
                     className={`block w-full px-3 py-2 border ${
                       usernameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                    } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 transition-all duration-200 pr-10`}
+                    } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 transition-all duration-200 pr-10 input-animation`}
                     required
                     aria-invalid={!!usernameError}
                     aria-describedby="username-error"
+                    onFocus={(e) => {
+                      e.target.placeholder = '';
+                    }}
+                    onBlur={(e) => {
+                      if (!e.target.value) {
+                        e.target.placeholder = 'New Username';
+                      }
+                    }}
                   />
                   {newUsername.length > 0 && !usernameError && (
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -601,10 +609,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                     }}
                     className={`block w-full px-3 py-2 border ${
                       passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                    } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800`}
+                    } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 input-animation`}
                     required
                     aria-invalid={!!passwordError}
                     aria-describedby="password-error"
+                    onFocus={(e) => {
+                      e.target.placeholder = '';
+                    }}
+                    onBlur={(e) => {
+                      if (!e.target.value) {
+                        e.target.placeholder = 'Enter current password';
+                      }
+                    }}
                   />
                   {passwordError && (
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -650,10 +666,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="Enter current password"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 input-animation"
                       autoComplete="current-password"
                       required
                       disabled={false}
+                      onFocus={(e) => {
+                        e.target.placeholder = '';
+                      }}
+                      onBlur={(e) => {
+                        if (!e.target.value) {
+                          e.target.placeholder = 'Enter current password';
+                        }
+                      }}
                     />
                   </div>
                   <div>
@@ -674,11 +698,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                         placeholder="Enter new password"
                         className={`w-full px-3 py-2 border ${
                           passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                        } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text`}
+                        } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text input-animation`}
                         autoComplete="new-password"
                         required
                         aria-invalid={!!passwordError}
                         aria-describedby="password-error"
+                        onFocus={(e) => {
+                          e.target.placeholder = '';
+                        }}
+                        onBlur={(e) => {
+                          if (!e.target.value) {
+                            e.target.placeholder = 'Enter new password';
+                          }
+                        }}
                       />
                       {passwordError && (
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -756,9 +788,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm new password"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text input-animation"
                       autoComplete="new-password"
                       required
+                      onFocus={(e) => {
+                        e.target.placeholder = '';
+                      }}
+                      onBlur={(e) => {
+                        if (!e.target.value) {
+                          e.target.placeholder = 'Confirm new password';
+                        }
+                      }}
                     />
                   </div>
                   <button

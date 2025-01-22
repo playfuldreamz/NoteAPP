@@ -30,3 +30,11 @@
 .bg-off-white {
   @apply bg-[#f5f5dc] dark:bg-gray-800;
 }
+
+.input-animation {
+  transition: transform 0.1s ease-in-out;
+}
+
+.input-animation:focus {
+  transform: scale(1.02);
+}
