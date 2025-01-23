@@ -66,3 +66,29 @@ function getUserIdFromToken(token: string): string {
   }
 }
 
+export async function addUserTag(tagId: number): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('Please log in to add user tags');
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/ai/user-tags`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-User-Id': getUserIdFromToken(token)
+      },
+      body: JSON.stringify({ tag_id: tagId })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to add user tag');
+    }
+  } catch (error) {
+    console.error('Error adding user tag:', error);
+    throw error;
+  }
+}

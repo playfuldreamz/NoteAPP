@@ -8,6 +8,7 @@ import {
   removeTagFromItem,
   Tag
 } from '../services/ai';
+import { addUserTag } from '../services/userTags';
 import { toast } from 'react-toastify';
 import TagChip from '@components/TagChip';
 import TagCreator from '@components/TagCreator';
@@ -194,12 +195,13 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     try {
       const newTag = await createTag(tagName);
       setTags(prev => [...prev, newTag]);
+      await addUserTag(newTag.id); // Add this line
       await handleTagSelection(newTag);
     } catch (error) {
       console.error('Error creating tag:', error);
       toast.error('Failed to create tag');
     }
-  };
+  };  
 
   return (
     <div className="space-y-4">

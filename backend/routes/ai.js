@@ -766,6 +766,96 @@ router.get('/user-tags', async (req, res) => {
   }
 });
 
+router.post('/user-tags', async (req, res) => {
+  const { tag_id } = req.body;
+  const userId = req.headers['x-user-id'];
+
+  // Validate input
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized - missing user ID' });
+  }
+  if (!tag_id || isNaN(tag_id) || tag_id <= 0) {
+    return res.status(400).json({ error: 'Invalid tag ID' });
+  }
+
+  try {
+    // Begin transaction
+    await new Promise((resolve, reject) => {
+      db.run('BEGIN TRANSACTION', (err) => {
+        if (err) reject(err);
+        else resolve(null);
+      });
+    });
+
+    // Check if tag exists
+    const tagExists = await new Promise((resolve, reject) => {
+      db.get('SELECT id FROM tags WHERE id = ?', [tag_id], (err, row) => {
+        if (err) reject(err);
+        else resolve(!!row);
+      });
+    });
+
+    if (!tagExists) {
+      await new Promise((resolve) => {
+        db.run('ROLLBACK', () => resolve(null));
+      });
+      return res.status(404).json({ error: 'Tag not found' });
+    }
+
+    // Check if association already exists
+    const associationExists = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT 1 FROM user_tags WHERE user_id = ? AND tag_id = ?',
+        [userId, tag_id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(!!row);
+        }
+      );
+    });
+
+    if (associationExists) {
+      await new Promise((resolve) => {
+        db.run('ROLLBACK', () => resolve(null));
+      });
+      return res.status(409).json({ error: 'Tag already associated with user' });
+    }
+
+    // Create new association
+    const result = await new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO user_tags (user_id, tag_id) VALUES (?, ?)',
+        [userId, tag_id],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ user_id: userId, tag_id });
+        }
+      );
+    });
+
+    // Commit transaction
+    await new Promise((resolve, reject) => {
+      db.run('COMMIT', (err) => {
+        if (err) reject(err);
+        else resolve(null);
+      });
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    // Rollback on error
+    await new Promise((resolve) => {
+      db.run('ROLLBACK', () => resolve(null));
+    });
+
+    console.error('Error creating user tag association:', error);
+    res.status(500).json({ 
+      error: 'Failed to create user tag association',
+      details: error.message 
+    });
+  }
+});
+
 // Tag analysis endpoint
 router.post('/tags/analyze', async (req, res) => {
   const { content } = req.body;
