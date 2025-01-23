@@ -1,5 +1,6 @@
 const GeminiProvider = require('./providers/gemini');
 const OpenAIProvider = require('./providers/openai');
+const DeepSeekProvider = require('./providers/deepseek');
 
 class AIProviderFactory {
   static async createProvider(type, config) {
@@ -11,6 +12,9 @@ class AIProviderFactory {
         break;
       case 'openai':
         provider = new OpenAIProvider(config.apiKey);
+        break;
+      case 'deepseek':
+        provider = new DeepSeekProvider(config.apiKey);
         break;
       default:
         throw new Error(`Unsupported AI provider: ${type}`);

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Save } from 'lucide-react';
-import { summarizeContent } from '../services/ai';
+import { Save, Settings } from 'lucide-react';
+import { summarizeContent, InvalidAPIKeyError } from '../services/ai';
+import Link from 'next/link';
 
 interface NoteSaverProps {
   transcript: string;
@@ -38,7 +39,23 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
         console.log('Generated title:', title);
       } catch (error) {
         console.error('Title generation error:', error);
-        toast.warning('Could not generate title. Using default title...');
+        if (error instanceof InvalidAPIKeyError) {
+          toast.error(
+            <div className="flex flex-col gap-2">
+              <div>AI Provider API key is invalid or expired</div>
+              <Link 
+                href="/settings?tab=ai" 
+                className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
+              >
+                <Settings size={14} />
+                Update API Key in Settings
+              </Link>
+            </div>,
+            { autoClose: false, closeOnClick: false }
+          );
+        } else {
+          toast.warning('Could not generate title. Using default title...');
+        }
       }
       
       // Save note with generated or default title

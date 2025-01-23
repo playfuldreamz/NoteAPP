@@ -63,6 +63,19 @@ router.post('/enhance-transcription', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Transcription enhancement error:', error);
+    
+    // Check for API key related errors
+    if (error.message?.includes('API Key not found') || 
+        error.message?.includes('API_KEY_INVALID') ||
+        error.message?.includes('Invalid API key') ||
+        error.status === 401 || 
+        error.status === 403) {
+      return res.status(401).json({ 
+        error: 'Invalid or expired API key. Please check your AI provider settings.',
+        code: 'INVALID_API_KEY'
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Failed to enhance transcription',
       enhanced: transcript,
@@ -89,6 +102,19 @@ router.post('/summarize', async (req, res) => {
     res.json({ title });
   } catch (error) {
     console.error('Content summarization error:', error);
+    
+    // Check for API key related errors
+    if (error.message?.includes('API Key not found') || 
+        error.message?.includes('API_KEY_INVALID') ||
+        error.message?.includes('Invalid API key') ||
+        error.status === 401 || 
+        error.status === 403) {
+      return res.status(401).json({ 
+        error: 'Invalid or expired API key. Please check your AI provider settings.',
+        code: 'INVALID_API_KEY'
+      });
+    }
+    
     res.status(500).json({ error: 'Failed to generate title' });
   }
 });
@@ -110,6 +136,19 @@ router.post('/tags/analyze', async (req, res) => {
     res.json({ tags });
   } catch (error) {
     console.error('Tag analysis error:', error);
+    
+    // Check for API key related errors
+    if (error.message?.includes('API Key not found') || 
+        error.message?.includes('API_KEY_INVALID') ||
+        error.message?.includes('Invalid API key') ||
+        error.status === 401 || 
+        error.status === 403) {
+      return res.status(401).json({ 
+        error: 'Invalid or expired API key. Please check your AI provider settings.',
+        code: 'INVALID_API_KEY'
+      });
+    }
+    
     res.status(500).json({ error: 'Failed to analyze tags' });
   }
 });
@@ -721,6 +760,19 @@ router.post('/tags/analyze', async (req, res) => {
     res.json({ tags });
   } catch (error) {
     console.error('Tag analysis error:', error);
+    
+    // Check for API key related errors
+    if (error.message?.includes('API Key not found') || 
+        error.message?.includes('API_KEY_INVALID') ||
+        error.message?.includes('Invalid API key') ||
+        error.status === 401 || 
+        error.status === 403) {
+      return res.status(401).json({ 
+        error: 'Invalid or expired API key. Please check your AI provider settings.',
+        code: 'INVALID_API_KEY'
+      });
+    }
+    
     res.status(500).json({ error: 'Failed to analyze tags' });
   }
 });

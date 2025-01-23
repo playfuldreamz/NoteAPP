@@ -6,12 +6,15 @@ import {
   getTagsForItem,
   addTagToItem,
   removeTagFromItem,
-  Tag
+  Tag,
+  InvalidAPIKeyError
 } from '../services/ai';
 import { addUserTag, deleteUserTag } from '../services/userTags';
 import { toast } from 'react-toastify';
 import TagChip from '@components/TagChip';
 import TagCreator from '@components/TagCreator';
+import { Settings } from 'lucide-react';
+import Link from 'next/link';
 
 interface TaggingModuleProps {
   type?: string;
@@ -103,21 +106,42 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       try {
         setIsLoadingSuggestedTags(true);
         const suggestions = await analyzeContentForTags(content);
-        // Filter out suggestions that are already selected
-        const filteredSuggestions = suggestions.filter(suggestion => 
-          !selectedTags.some(tag => tag.name.toLowerCase() === suggestion.toLowerCase())
+        
+        // Filter out tags that are already selected
+        const filteredSuggestions = suggestions.filter(
+          suggestion => !selectedTags.some(tag => 
+            tag.name.toLowerCase() === suggestion.toLowerCase()
+          )
         );
+        
         setSuggestedTags(filteredSuggestions);
       } catch (error) {
         console.error('Error analyzing content:', error);
-        toast.error('Failed to analyze content for tags');
+        if (error instanceof InvalidAPIKeyError) {
+          toast.error(
+            <div className="flex flex-col gap-2">
+              <div>AI Provider API key is invalid or expired</div>
+              <Link 
+                href="/settings?tab=ai" 
+                className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
+              >
+                <Settings size={14} />
+                Update API Key in Settings
+              </Link>
+            </div>,
+            { autoClose: false, closeOnClick: false }
+          );
+        } else {
+          toast.error('Failed to analyze content for tags');
+        }
+        setSuggestedTags([]);
       } finally {
         setIsLoadingSuggestedTags(false);
       }
     };
 
-    const debounceTimeout = setTimeout(analyzeContent, 500);
-    return () => clearTimeout(debounceTimeout);
+    const debounceTimer = setTimeout(analyzeContent, 1000);
+    return () => clearTimeout(debounceTimer);
   }, [content, selectedTags]);
 
   // Handle tag selection with improved error handling

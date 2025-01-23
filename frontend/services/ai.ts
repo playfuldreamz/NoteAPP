@@ -1,5 +1,5 @@
 // Types
-export type AIProvider = 'openai' | 'gemini';
+export type AIProvider = 'openai' | 'gemini' | 'deepseek';
 
 interface AIConfig {
   provider: AIProvider;
@@ -53,6 +53,23 @@ export async function updateAIProvider(config: { provider: AIProvider, apiKey: s
   return await response.json();
 }
 
+// Custom error class for API key issues
+export class InvalidAPIKeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidAPIKeyError';
+  }
+}
+
+// Helper function to handle API errors
+async function handleAPIError(response: Response): Promise<never> {
+  const error = await response.json();
+  if (error.code === 'INVALID_API_KEY') {
+    throw new InvalidAPIKeyError(error.error);
+  }
+  throw new Error(error.message || 'An error occurred');
+}
+
 export async function summarizeContent(content: string): Promise<string> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
@@ -67,8 +84,7 @@ export async function summarizeContent(content: string): Promise<string> {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to summarize content');
+    await handleAPIError(response);
   }
 
   const data: SummarizeResponse = await response.json();
@@ -89,8 +105,7 @@ export async function generateTranscriptTitle(content: string): Promise<string> 
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to generate transcript title');
+    await handleAPIError(response);
   }
 
   const data: SummarizeResponse = await response.json();
@@ -147,8 +162,7 @@ export async function analyzeContentForTags(content: string): Promise<string[]> 
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to analyze content for tags');
+    await handleAPIError(response);
   }
 
   const data: TagAnalysisResponse = await response.json();
@@ -380,8 +394,7 @@ export async function enhanceTranscript(
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to enhance transcript');
+    await handleAPIError(response);
   }
 
   // Handle progress updates if callback provided
@@ -413,5 +426,5 @@ export async function enhanceTranscript(
     }
   }
 
-  return response.json();
+  return await response.json();
 }

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader, ChevronDown, ChevronUp } from 'lucide-react';
-import { generateTranscriptTitle, enhanceTranscript } from '../services/ai';
+import { generateTranscriptTitle, enhanceTranscript, InvalidAPIKeyError } from '../services/ai';
+import Link from 'next/link';
 
 interface Window {
   SpeechRecognition: new () => SpeechRecognition;
@@ -160,30 +161,30 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       
       if (confidence >= confidenceThreshold) {
         setEnhancedTranscript(enhanced);
-        toast.success(`🎉 Transcript enhanced with ${confidence}% confidence!`, {
-          position: "bottom-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-        });
+        toast.success(`🎉 Transcript enhanced with ${confidence}% confidence!`);
       } else {
-        toast.warn(`🤔 Low confidence enhancement (${confidence}%). Keeping original transcript.`, {
-          position: "bottom-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-        });
+        toast.warn(`🤔 Low confidence enhancement (${confidence}%). Keeping original transcript.`);
         setEnhancedTranscript(transcript);
       }
     } catch (error) {
       console.error('Enhancement error:', error);
-      toast.error('Failed to enhance transcript');
+      if (error instanceof InvalidAPIKeyError) {
+        toast.error(
+          <div className="flex flex-col gap-2">
+            <div>AI Provider API key is invalid or expired</div>
+            <Link 
+              href="/settings?tab=ai" 
+              className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
+            >
+              <Settings size={14} />
+              Update API Key in Settings
+            </Link>
+          </div>,
+          { autoClose: false, closeOnClick: false }
+        );
+      } else {
+        toast.error('Failed to enhance transcript');
+      }
       setEnhancedTranscript(transcript);
     } finally {
       setIsEnhancing(false);
@@ -201,73 +202,67 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       return;
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      toast.error('Please login to save transcript');
-      return;
-    }
-
     try {
-      const titleResponse = await fetch('http://localhost:5000/api/ai/summarize', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: finalTranscript })
-      });
+      let title = 'Untitled Transcript';
+      try {
+        title = await generateTranscriptTitle(finalTranscript);
+      } catch (error) {
+        console.error('Title generation error:', error);
+        if (error instanceof InvalidAPIKeyError) {
+          toast.error(
+            <div className="flex flex-col gap-2">
+              <div>AI Provider API key is invalid or expired</div>
+              <Link 
+                href="/settings?tab=ai" 
+                className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
+              >
+                <Settings size={14} />
+                Update API Key in Settings
+              </Link>
+            </div>,
+            { autoClose: false, closeOnClick: false }
+          );
+        } else {
+          toast.warning('Could not generate title. Using default title...');
+        }
+      }
 
-      if (!titleResponse.ok) throw new Error('Failed to generate title');
-      const titleData = await titleResponse.json();
-      const generatedTitle = titleData.title || 'Untitled Transcript';
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please login to save transcript');
+        return;
+      }
 
-      const saveResponse = await fetch('http://localhost:5000/transcripts', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          text: finalTranscript,
-          title: generatedTitle
-        })
-      });
-
-      if (saveResponse.ok) {
-        toast.success(`💾 Transcript saved successfully!`, {
-          position: "bottom-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
+      try {
+        const saveResponse = await fetch('http://localhost:5000/transcripts', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            text: finalTranscript,
+            title: title
+          })
         });
-        updateTranscripts();
-      } else {
-        const saveData = await saveResponse.json();
-        toast.error(`❌ Failed to save transcript: ${saveData.error || 'Please try again'}`, {
-          position: "bottom-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-        });
+
+        if (saveResponse.ok) {
+          toast.success(`💾 Transcript saved successfully!`);
+          updateTranscripts();
+        } else {
+          const saveData = await saveResponse.json();
+          toast.error(`❌ Failed to save transcript: ${saveData.error || 'Please try again'}`);
+        }
+      } catch (error) {
+        console.error('Save error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Please try again';
+        toast.error(`❌ Failed to save transcript: ${errorMessage}`);
+      } finally {
+        setIsSaving(false);
       }
     } catch (error) {
       console.error('Save error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Please try again';
-      toast.error(`❌ Failed to save transcript: ${errorMessage}`, {
-        position: "bottom-right",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-      });
+      toast.error('Failed to save transcript');
     } finally {
       setIsSaving(false);
     }
