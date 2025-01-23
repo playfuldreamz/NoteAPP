@@ -335,8 +335,8 @@ router.post('/summarize', async (req, res) => {
     .substring(0, 5000);
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const prompt = `Generate a brief, descriptive title for this content: ${sanitizedContent}`;
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const prompt = `Generate a brief, descriptive title(no more than 5 words) for this content without adding any explanations, prefixes, suffixes or options: ${sanitizedContent}`;
     const result = await model.generateContent(prompt);
     
     // Handle safety filters
