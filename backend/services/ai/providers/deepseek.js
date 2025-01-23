@@ -60,14 +60,17 @@ Do not add any explanations or additional content.`;
       messages: [
         { 
           role: "system", 
-          content: "Generate a concise title for the given content. Return only the title without any additional text or explanations." 
+          content: "Generate a concise title (maximum 8 words) for this content. Return ONLY the title without any bullet points, options, explanations, quotes or additional formatting:" 
         },
         { role: "user", content }
       ],
       temperature: 0.3
     });
 
-    return completion.choices[0].message.content.trim();
+    // Clean up the response: remove quotes and trim whitespace
+    return completion.choices[0].message.content
+      .trim()
+      .replace(/^["']|["']$/g, ''); // Remove leading/trailing quotes
   }
 
   async analyzeTags(content) {

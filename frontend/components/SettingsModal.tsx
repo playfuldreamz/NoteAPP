@@ -19,48 +19,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
     source: string;
   }
 
+  interface SavedAPIKeys {
+    [key: string]: string;
+  }
+
   const [selectedGroup, setSelectedGroup] = useState('appearance');
   const [selectedProvider, setSelectedProvider] = useState<AIConfig>({
     provider: 'gemini',
     apiKey: '',
     source: ''
   });
+  const [savedApiKeys, setSavedApiKeys] = useState<SavedAPIKeys>({});
+  const [apiKey, setApiKey] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const { darkMode, toggleDarkMode } = useTheme();
-
-  // AI Provider options
-  const providerOptions = [
-    { value: 'gemini', label: 'Google Gemini' },
-    { value: 'openai', label: 'OpenAI' },
-    { value: 'deepseek', label: 'DeepSeek' }
-  ];
-
-  useEffect(() => {
-    const fetchProvider = async () => {
-      try {
-        setIsLoading(true);
-        const config = await getAIProvider();
-        if (config) {
-          setSelectedProvider({
-            provider: config.provider,
-            apiKey: config.apiKey,
-            source: config.source
-          });
-          setApiKey(config.apiKey);
-          setTempProvider(config.provider);
-        }
-      } catch (error) {
-        console.error('Failed to fetch AI provider:', error);
-        toast.error('Failed to load AI provider settings');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProvider();
-  }, []);
-
-  const [apiKey, setApiKey] = useState<string>(selectedProvider.apiKey || '');
   const [isKeyValid, setIsKeyValid] = useState(false);
   const [tempProvider, setTempProvider] = useState<AIProvider>(selectedProvider.provider || 'gemini');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -82,6 +53,45 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   const [passwordStrength, setPasswordStrength] = useState<number>(0);
 
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
+
+  const { darkMode, toggleDarkMode } = useTheme();
+
+  // AI Provider options
+  const providerOptions = [
+    { value: 'gemini', label: 'Google Gemini' },
+    { value: 'openai', label: 'OpenAI' },
+    { value: 'deepseek', label: 'DeepSeek' }
+  ];
+
+  useEffect(() => {
+    const fetchProvider = async () => {
+      try {
+        setIsLoading(true);
+        const config = await getAIProvider();
+        if (config) {
+          setSelectedProvider({
+            provider: config.provider,
+            apiKey: config.apiKey,
+            source: config.source
+          });
+          // Initialize saved keys with the current key
+          setSavedApiKeys(prev => ({
+            ...prev,
+            [config.provider]: config.apiKey
+          }));
+          setApiKey(config.apiKey);
+          setTempProvider(config.provider);
+        }
+      } catch (error) {
+        console.error('Failed to fetch AI provider:', error);
+        toast.error('Failed to load AI provider settings');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProvider();
+  }, []);
 
   const validatePassword = (password: string, setError: React.Dispatch<React.SetStateAction<string | null>>) => {
     if (password.length < 8) {
@@ -333,8 +343,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   const validateApiKey = (key: string | undefined, provider: AIProvider) => {
     if (!key) return false;
     
-    if (provider === 'openai' || provider === 'deepseek') {
+    if (provider === 'openai') {
       return key.length === 51 && key.startsWith('sk-');
+    }
+    if (provider === 'deepseek') {
+      return key.length === 35 && key.startsWith('sk-');
     }
     if (provider === 'gemini') {
       return key.length === 39 && key.startsWith('AIza');
@@ -354,8 +367,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
         apiKey: config.apiKey,
         source: config.source
       });
+      // Update saved keys when saving
+      setSavedApiKeys(prev => ({
+        ...prev,
+        [config.provider]: config.apiKey
+      }));
       toast.success('Settings saved successfully');
-      onClose(); // Close modal to trigger parent refresh
+      onClose();
     } catch (error) {
       console.error('Failed to update AI provider:', error);
       toast.error('Failed to update AI provider');
@@ -400,8 +418,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   }, []);
 
   const handleProviderChange = (provider: { value: string; label: string }) => {
-    setTempProvider(provider.value as AIProvider);
-    setIsKeyValid(validateApiKey(apiKey, provider.value as AIProvider));
+    const newProvider = provider.value as AIProvider;
+    setTempProvider(newProvider);
+    
+    // Set the API key to the saved value for this provider, or empty if none exists
+    const savedKey = savedApiKeys[newProvider] || '';
+    setApiKey(savedKey);
+    setIsKeyValid(validateApiKey(savedKey, newProvider));
+    setIsDropdownOpen(false);
+    
+    // Focus the API key input field
+    setTimeout(() => {
+      document.getElementById('apiKey')?.focus();
+    }, 0);
   };
 
   if (!isOpen) return null;
@@ -460,26 +489,52 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
             <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               {tempProvider === 'gemini' ? 'Gemini API Key' : 'API Key'}
             </label>
-            <input
-              type="password"
-              id="apiKey"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className={`w-full px-3 py-2 border ${
-                isKeyValid ? 'border-green-500' : 'border-gray-300 dark:border-gray-600'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800`}
-              placeholder={
-                tempProvider === 'gemini' 
-                  ? 'Enter your Gemini API key (starts with AIza)'
-                  : 'Enter your API key (starts with sk-)'
-              }
-              disabled={isLoading}
-            />
+            <div className="relative">
+              <input
+                type="password"
+                id="apiKey"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className={`w-full px-3 py-2 border ${
+                  isKeyValid ? 'border-green-500' : 'border-gray-300 dark:border-gray-600'
+                } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 text-transparent selection:bg-blue-500 selection:text-transparent caret-gray-900 dark:caret-white font-mono`}
+                style={{ caretColor: 'currentcolor' }}
+                placeholder={
+                  tempProvider === 'gemini' 
+                    ? 'Enter your Gemini API key (starts with AIza)'
+                    : tempProvider === 'openai'
+                      ? 'Enter your OpenAI API key (starts with sk-)'
+                      : 'Enter your DeepSeek API key (starts with sk-)'
+                }
+                onFocus={(e) => e.target.placeholder = ''}
+                onBlur={(e) => {
+                  if (!e.target.value) {
+                    e.target.placeholder = tempProvider === 'gemini' 
+                      ? 'Enter your Gemini API key (starts with AIza)'
+                      : tempProvider === 'openai'
+                        ? 'Enter your OpenAI API key (starts with sk-)'
+                        : 'Enter your DeepSeek API key (starts with sk-)';
+                  }
+                }}
+                disabled={isLoading}
+              />
+              {apiKey && (
+                <div 
+                  className="absolute top-0 left-0 px-3 py-2 pointer-events-none text-sm font-mono"
+                  aria-hidden="true"
+                >
+                  <span className="text-gray-900 dark:text-gray-100">{apiKey.slice(0, 5)}</span>
+                  <span className="text-gray-400">{'•'.repeat(Math.max(0, apiKey.length - 5))}</span>
+                </div>
+              )}
+            </div>
             {!isKeyValid && apiKey && apiKey.length > 0 && (
               <p className="mt-2 text-sm text-red-600">
                 {tempProvider === 'gemini'
                   ? 'Gemini API keys start with "AIza" and are 39 characters long'
-                  : 'API keys start with "sk-" and are 51 characters long'}
+                  : tempProvider === 'openai'
+                    ? 'OpenAI API keys start with "sk-" and are 51 characters long'
+                    : 'DeepSeek API keys start with "sk-" and are 32 characters long'}
               </p>
             )}
           </div>
@@ -740,7 +795,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                         placeholder="Enter new password"
                         className={`w-full px-3 py-2 border ${
                           passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                        } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text input-animation`}
+                        } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text input-animation text-transparent selection:bg-blue-500 selection:text-transparent`}
                         autoComplete="new-password"
                         required
                         aria-invalid={!!passwordError}
