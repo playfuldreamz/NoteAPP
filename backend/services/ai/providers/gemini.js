@@ -78,7 +78,7 @@ class GeminiProvider extends AIProvider {
 
   async summarizeContent(content) {
     const model = await this.getModel();
-    const prompt = `Generate a concise title for this content without any additional explanations:\n${content}`;
+    const prompt = `Generate a concise title (maximum 8 words) for this content. Return ONLY the title without any bullet points, options, explanations, or additional formatting:\n${content}`;
     
     const result = await model.generateContent(prompt);
     if (result.response.promptFeedback?.blockReason) {

@@ -4,7 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Sparkles, Download } from 'lucide-react';
 import TranscriptActions from './TranscriptActions';
-import { Note, Tag, generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
+import { generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
 import useDownloadNote, { DownloadOptions } from '../hooks/useDownloadNote';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 

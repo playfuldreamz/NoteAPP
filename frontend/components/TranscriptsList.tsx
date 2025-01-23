@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
 import TranscriptActions, { TranscriptFilters } from './TranscriptActions';
-import { Transcript, Tag, generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
+import { generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
 import useDownloadNote, { DownloadOptions } from '../hooks/useDownloadNote';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 

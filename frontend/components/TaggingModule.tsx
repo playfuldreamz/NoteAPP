@@ -41,23 +41,24 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   type,
   itemId,
   content,
+  initialTags = [],
   onTagsUpdate
 }) => {
   // State management
   const [tags, setTags] = useState<Tag[]>([]);
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>(initialTags);
   const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isLoadingSuggestedTags, setIsLoadingSuggestedTags] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset state when item changes
   useEffect(() => {
-    setSelectedTags([]);
+    setSelectedTags(initialTags);
     setSuggestedTags([]);
     setIsLoadingTags(true);
     setIsLoadingSuggestedTags(true);
-  }, [itemId]);
+  }, [itemId, initialTags]);
 
   // Load tags when component mounts or item changes
   useEffect(() => {
@@ -69,148 +70,139 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
           getTagsForItem(normalizedType, itemId)
         ]);
         setTags(allTags);
-        setSelectedTags(itemTags);
+        setSelectedTags(prevTags => {
+          // Merge initial tags with item tags, avoiding duplicates
+          const mergedTags = [...itemTags];
+          initialTags.forEach(tag => {
+            if (!mergedTags.some(t => t.id === tag.id)) {
+              mergedTags.push(tag);
+            }
+          });
+          return mergedTags;
+        });
       } catch (error) {
         console.error('Error loading tags:', error);
+        toast.error('Failed to load tags');
       } finally {
         setIsLoadingTags(false);
       }
     };
 
     loadTags();
-  }, [type, itemId]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      setSelectedTags([]);
-      setSuggestedTags([]);
-    };
-  }, []);
+  }, [type, itemId, initialTags]);
 
   // Analyze content for suggested tags
   useEffect(() => {
     const analyzeContent = async () => {
+      if (!content.trim()) {
+        setSuggestedTags([]);
+        setIsLoadingSuggestedTags(false);
+        return;
+      }
+
       try {
         setIsLoadingSuggestedTags(true);
         const suggestions = await analyzeContentForTags(content);
-        setSuggestedTags(suggestions);
+        // Filter out suggestions that are already selected
+        const filteredSuggestions = suggestions.filter(suggestion => 
+          !selectedTags.some(tag => tag.name.toLowerCase() === suggestion.toLowerCase())
+        );
+        setSuggestedTags(filteredSuggestions);
       } catch (error) {
         console.error('Error analyzing content:', error);
+        toast.error('Failed to analyze content for tags');
       } finally {
         setIsLoadingSuggestedTags(false);
       }
     };
 
-    analyzeContent();
-  }, [content]);
+    const debounceTimeout = setTimeout(analyzeContent, 500);
+    return () => clearTimeout(debounceTimeout);
+  }, [content, selectedTags]);
 
   // Handle tag selection with improved error handling
   const handleTagSelection = async (tag: Tag, retryCount = 0) => {
+    if (isSaving) return;
     setIsSaving(true);
     
     try {
       const normalizedType = normalizeType(type);
+      const isSelected = selectedTags.some(t => t.id === tag.id);
 
-      // Execute tag operation
-      if (selectedTags.some(t => t.id === tag.id)) {
+      if (isSelected) {
         await removeTagFromItem(normalizedType, itemId, tag.id);
         const updatedTags = selectedTags.filter(t => t.id !== tag.id);
         setSelectedTags(updatedTags);
-        // Check if the tag is a user tag before deleting
-        if (tag.created_at) {
+        
+        // Check if created_at exists using optional chaining
+        if ('created_at' in tag && tag.created_at) {
           try {
             await deleteUserTag(tag.id);
           } catch (error) {
             console.error('Error deleting user tag:', error);
-            toast.error('Failed to delete user tag');
           }
         }
-        // Notify parent component of updates
-        if (onTagsUpdate) {
-          onTagsUpdate(updatedTags);
-        }
+        
+        onTagsUpdate?.(updatedTags);
       } else {
         const response = await addTagToItem(normalizedType, itemId, tag);
-        // Convert the response to a Tag object
+        if (!response || typeof response.id !== 'number') {
+          throw new Error('Invalid response from addTagToItem');
+        }
+
         const addedTag: Tag = {
           id: response.id,
           name: response.name,
-          description: response.description,
-          created_at: response.created_at,
-          updated_at: response.updated_at
+          description: response.description || ''
         };
+
         const updatedTags = [...selectedTags, addedTag];
         setSelectedTags(updatedTags);
-        // Notify parent component of updates
-        if (onTagsUpdate) {
-          onTagsUpdate(updatedTags);
-        }
+        onTagsUpdate?.(updatedTags);
       }
     } catch (error) {
       console.error('Error updating tag:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
+        error,
         itemId,
         tag,
         type,
         retryCount
       });
 
-      // Handle specific error cases
-      let errorMessage = 'Failed to update tags';
-      
-      // Type check the error object
-      if (error && typeof error === 'object') {
-        // Handle Error instances
-        if (error instanceof Error) {
-          if (error.message.includes('400')) {
-            errorMessage = 'Invalid request - please check your input';
-          } else if (error.message.includes('404')) {
-            errorMessage = 'Resource not found';
-          } else if (error.message.includes('500')) {
-            errorMessage = 'Server error - please try again';
-          }
-        }
-        
-        // Handle Axios error responses
-        if ('response' in error && 
-            error.response && 
-            typeof error.response === 'object' &&
-            'data' in error.response &&
-            typeof error.response.data === 'object' &&
-            error.response.data !== null) {
-          const responseData = error.response.data as { warning?: string };
-          if (responseData.warning) {
-            errorMessage = responseData.warning;
-          }
-        }
-      }
-
-      // Retry transient errors
+      // Retry logic for network errors
       if (retryCount < 2 && error instanceof Error && 
           (error.message.includes('500') || error.message.includes('Network Error'))) {
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        setIsSaving(false);
         return handleTagSelection(tag, retryCount + 1);
       }
 
-      toast.error(errorMessage);
+      toast.error(getErrorMessage(error));
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Handle tag creation
-  const handleCreateTag = async (tagName: string) => {
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+      if (error.message.includes('400')) return 'Invalid request - please check your input';
+      if (error.message.includes('404')) return 'Resource not found';
+      if (error.message.includes('500')) return 'Server error - please try again';
+      return error.message;
+    }
+    return 'Failed to update tags';
+  };
+
+  const handleCreateTag = async (tagName: string): Promise<Tag | null> => {
+    if (isSaving) return null;
+    setIsSaving(true);
+
     try {
-      setIsSaving(true);
       const newTag = await createTag(tagName);
-      if (!newTag || !newTag.id) {
-        throw new Error('Invalid response from createTag');
-      }
+      if (!newTag?.id) throw new Error('Invalid response from createTag');
       
-      setTags(prev => [...prev, newTag]);
       await addUserTag(newTag.id);
+      setTags(prev => [...prev, newTag]);
       return newTag;
     } catch (error) {
       console.error('Error creating tag:', error);
@@ -225,7 +217,6 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     if (isSaving) return;
     
     try {
-      setIsSaving(true);
       if (existingTag) {
         await handleTagSelection(existingTag);
       } else {
@@ -237,9 +228,22 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     } catch (error) {
       console.error('Error handling tag click:', error);
       toast.error('Failed to process tag');
-    } finally {
-      setIsSaving(false);
     }
+  };
+
+  const parseSuggestedTags = (suggestions: string[]): string[] => {
+    if (suggestions.length === 0) return [];
+    
+    // Handle the case where the first item contains delimiters
+    if (typeof suggestions[0] === 'string' && suggestions[0].match(/[,*\n]/)) {
+      return suggestions[0]
+        .replace(/^Tags:\s*/, '')
+        .split(/[,*\n]+/)
+        .map(tag => tag.trim().replace(/^-/, '').trim())
+        .filter(tag => tag.length > 0);
+    }
+    
+    return suggestions;
   };
 
   return (
@@ -274,33 +278,17 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-600">Suggested Tags</h4>
           <div className="flex flex-wrap gap-2">
-            {suggestedTags.length > 0 && (
-              (typeof suggestedTags[0] === 'string' && suggestedTags[0].match(/[,*\n]/)) ?
-                suggestedTags[0].replace(/^Tags:\s*/, '').split(/[,*\n]+/).map((tagName) => {
-                  const trimmedTagName = tagName.trim().replace(/^-/, '').trim();
-                  if (!trimmedTagName) return null;
-                  const existingTag = tags.find(t => t.name === trimmedTagName);
-                  return (
-                    <TagChip
-                      key={`suggested-${existingTag?.id || trimmedTagName}`}
-                      tag={existingTag || { id: -1, name: trimmedTagName }}
-                      onClick={() => handleTagClick(existingTag, trimmedTagName)}
-                      disabled={isSaving}
-                    />
-                  );
-                }) :
-                suggestedTags.map((tagName) => {
-                  const existingTag = tags.find(t => t.name === tagName);
-                  return (
-                    <TagChip
-                      key={`suggested-${existingTag?.id || tagName}`}
-                      tag={existingTag || { id: -1, name: tagName }}
-                      onClick={() => handleTagClick(existingTag, tagName)}
-                      disabled={isSaving}
-                    />
-                  );
-                })
-            )}
+            {parseSuggestedTags(suggestedTags).map(tagName => {
+              const existingTag = tags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+              return (
+                <TagChip
+                  key={`suggested-${existingTag?.id || tagName}`}
+                  tag={existingTag || { id: -1, name: tagName }}
+                  onClick={() => handleTagClick(existingTag || null, tagName)}
+                  disabled={isSaving}
+                />
+              );
+            })}
           </div>
         </div>
       )}
