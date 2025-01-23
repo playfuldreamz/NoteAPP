@@ -225,7 +225,7 @@ router.post('/enhance-transcription', async (req, res) => {
 
   try {
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-pro",
+      model: "gemini-2.0-flash-exp",
       safetySettings: [
         {
           category: "HARM_CATEGORY_HARASSMENT", 
@@ -251,7 +251,7 @@ router.post('/enhance-transcription', async (req, res) => {
     });
     
     // First pass: Basic formatting and punctuation
-    const formatPrompt = `Add proper punctuation and formatting to this transcript:\n${transcript}`;
+    const formatPrompt = `Add proper punctuation and capitalization to this transcript without adding any explanations, prefixes, suffixes or options:\n${transcript}`;
     const formatResult = await model.generateContent(formatPrompt);
     
     // Check for blocked content
@@ -263,7 +263,7 @@ router.post('/enhance-transcription', async (req, res) => {
     let formattedText = formatResult.response.text();
     
     // Second pass: Context-aware correction
-    const correctPrompt = `Correct any transcription errors in this text while preserving meaning:\n${formattedText}`;
+    const correctPrompt = `Correct any transcription errors in this text while preserving meaning, without adding any explanations, prefixes, suffixes or options:\n${formattedText}`;
     const correctResult = await model.generateContent(correctPrompt);
     
     // Check for blocked content
@@ -948,10 +948,32 @@ router.post('/tags/analyze', async (req, res) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const prompt = `Analyze this content and suggest relevant tags:
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp", 
+      safetySettings: [
+      {
+        category: "HARM_CATEGORY_HARASSMENT", 
+        threshold: "BLOCK_NONE"
+      },
+      {
+        category: "HARM_CATEGORY_HATE_SPEECH",
+        threshold: "BLOCK_NONE"
+      },
+      {
+        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold: "BLOCK_NONE"
+      },
+      {
+        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold: "BLOCK_NONE"
+      },
+      {
+        category: "HARM_CATEGORY_CIVIC_INTEGRITY",
+        threshold: "BLOCK_NONE"
+      }
+    ] });
+    const prompt = `Analyze this content and suggest relevant tags, it does not matter if its code or gibberish:
                     ${content}
-                    Return only the tags as a comma-separated list without any additional text.`;
+                    Return only the tags as a comma-separated list without any additional text before or after.`;
     const result = await model.generateContent(prompt);
     
     if (result.response.promptFeedback?.blockReason) {
