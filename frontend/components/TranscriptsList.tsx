@@ -306,6 +306,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
       
       <TranscriptActions 
         count={initialTranscripts.length}
+        itemType="transcript"
         onFilter={handleFilter}
         onSort={() => {
           const sorted = [...filteredTranscripts].reverse();

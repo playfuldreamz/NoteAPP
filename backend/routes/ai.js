@@ -494,25 +494,42 @@ router.get('/tags', async (req, res) => {
 // Get user-specific tags
 router.get('/user-tags', async (req, res) => {
   const userId = req.user.id;
+  const itemType = req.query.type; // Get type from query parameter
+
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized - missing user ID' });
   }
 
   try {
-    db.all(
-      `SELECT t.* FROM tags t
-       JOIN user_tags ut ON t.id = ut.tag_id
-       WHERE ut.user_id = ?
-       ORDER BY t.name ASC`,
-      [userId],
-      (err, rows) => {
-        if (err) {
-          console.error('Error fetching user tags:', err);
-          return res.status(500).json({ error: 'Failed to fetch user tags' });
-        }
-        res.json(rows);
+    let query = `
+      SELECT DISTINCT t.* 
+      FROM tags t
+      JOIN user_tags ut ON t.id = ut.tag_id
+      WHERE ut.user_id = ?
+    `;
+    const params = [userId];
+
+    // If type is specified, filter by item_type
+    if (itemType === 'note' || itemType === 'transcript') {
+      query = `
+        SELECT DISTINCT t.* 
+        FROM tags t
+        JOIN user_tags ut ON t.id = ut.tag_id
+        JOIN item_tags it ON t.id = it.tag_id
+        WHERE ut.user_id = ? 
+        AND it.item_type = ?
+        ORDER BY t.name ASC
+      `;
+      params.push(itemType);
+    }
+
+    db.all(query, params, (err, rows) => {
+      if (err) {
+        console.error('Error fetching user tags:', err);
+        return res.status(500).json({ error: 'Failed to fetch user tags' });
       }
-    );
+      res.json(rows);
+    });
   } catch (error) {
     console.error('Error in user tags endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });

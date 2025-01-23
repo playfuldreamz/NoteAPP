@@ -1,7 +1,8 @@
 import { Filter, ArrowUpDown, DownloadCloud, ChevronDown, RefreshCw, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import UserTagChip from './UserTagChip';
-import { getUserTags } from '../services/userTags';
+import { getUserTags, API_BASE } from '../services/userTags';
+import { getUserIdFromToken } from '../services/userTags';
 
 interface Tag {
   id: number;
@@ -31,9 +32,17 @@ interface TranscriptActionsProps {
   onSort: () => void;
   onExport: () => void;
   onRefresh: () => void;
+  itemType?: 'note' | 'transcript';
 }
 
-export default function TranscriptActions({ count, onFilter, onSort, onExport, onRefresh }: TranscriptActionsProps) {
+export default function TranscriptActions({ 
+  count, 
+  onFilter, 
+  onSort, 
+  onExport, 
+  onRefresh,
+  itemType = 'transcript'
+}: TranscriptActionsProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     dateRange: { start: '', end: '' },
@@ -46,14 +55,25 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport, o
   useEffect(() => {
     const loadTags = async () => {
       try {
-        const tags = await getUserTags();
+        const response = await fetch(`${API_BASE}/api/ai/user-tags?type=${itemType}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'X-User-Id': getUserIdFromToken(localStorage.getItem('token') || '')
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch tags');
+        }
+
+        const tags = await response.json();
         setAvailableTags(tags);
       } catch (error) {
         console.error('Error loading tags:', error);
       }
     };
     loadTags();
-  }, []);
+  }, [itemType]);
 
   const handleApplyFilters = () => {
     onFilter({
@@ -61,7 +81,7 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport, o
       keyword: filters.keyword.trim() || undefined,
       length: filters.length,
       tags: filters.tags,
-      itemType: 'transcript' // Add itemType to filter criteria
+      itemType: itemType
     });
     setShowFilters(false);
   };

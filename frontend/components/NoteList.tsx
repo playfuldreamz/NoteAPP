@@ -274,6 +274,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
       
       <TranscriptActions 
         count={notes.length}
+        itemType="note"
         onFilter={(filters) => {
           const filtered = notes.filter(note => {
             // Keyword filter

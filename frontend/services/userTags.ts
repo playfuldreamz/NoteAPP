@@ -50,7 +50,7 @@ export async function getUserTags(): Promise<UserTag[]> {
   }
 }
 
-function getUserIdFromToken(token: string): string {
+export function getUserIdFromToken(token: string): string {
   try {
     const decoded: { id?: number } = jwtDecode(token);
     
