@@ -62,11 +62,13 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Database setup
-const db = new sqlite3.Database('database.sqlite', (err) => {
+const path = require('path');
+const dbPath = path.join(__dirname, 'database.sqlite');
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
-    console.error(err.message);
+    console.error('Error connecting to database:', err.message);
   }
-  console.log('Connected to the SQLite database.');
+  console.log('Connected to database:', dbPath);
 });
 
 // Create tables if they don't exist
@@ -150,6 +152,40 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
   )`);
+
+  // Insert default app settings if none exist
+  db.get('SELECT COUNT(*) as count FROM app_settings', (err, row) => {
+    if (err) {
+      console.error('Error checking app_settings:', err);
+      return;
+    }
+
+    if (row.count === 0) {
+      // Get API keys from environment
+      const geminiKey = process.env.GEMINI_API_KEY;
+      const openaiKey = process.env.OPENAI_API_KEY;
+      
+      // Only insert default settings if we have a valid API key
+      if (geminiKey || openaiKey) {
+        const defaultProvider = geminiKey ? 'gemini' : 'openai';
+        const defaultApiKey = defaultProvider === 'gemini' ? geminiKey : openaiKey;
+        
+        db.run(
+          'INSERT INTO app_settings (provider, api_key, is_active) VALUES (?, ?, 1)',
+          [defaultProvider, defaultApiKey],
+          (err) => {
+            if (err) {
+              console.error('Error inserting default app settings:', err);
+            } else {
+              console.log('Default app settings created successfully with', defaultProvider);
+            }
+          }
+        );
+      } else {
+        console.log('No API keys found in environment variables. Default settings not created.');
+      }
+    }
+  });
 });
 
 // Helper function to check if a tag is still referenced

@@ -1,5 +1,14 @@
 const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./database.db');
+const path = require('path');
+
+// Use absolute path from project root
+const dbPath = path.join(__dirname, '../../database.sqlite');
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error connecting to database:', err.message);
+  }
+  console.log('Connected to database:', dbPath);
+});
 
 class AIConfigManager {
   /**
@@ -13,7 +22,7 @@ class AIConfigManager {
         // First try user settings
         db.get(
           `SELECT provider, api_key FROM user_settings 
-           WHERE user_id = ? AND is_active = 1`,
+           WHERE user_id = ? AND is_active = 1 AND api_key IS NOT NULL AND api_key != ''`,
           [userId],
           (err, userRow) => {
             if (err) return reject(err);
@@ -43,7 +52,8 @@ class AIConfigManager {
   static async getDefaultConfig() {
     return new Promise((resolve, reject) => {
       db.get(
-        'SELECT provider, api_key FROM app_settings WHERE is_active = 1',
+        `SELECT provider, api_key FROM app_settings 
+         WHERE is_active = 1 AND api_key IS NOT NULL AND api_key != ''`,
         (err, appRow) => {
           if (err) return reject(err);
           
@@ -55,14 +65,15 @@ class AIConfigManager {
           }
           
           // Final fallback to environment variables
-          const provider = process.env.GEMINI_API_KEY ? 'gemini' : 
-                         process.env.OPENAI_API_KEY ? 'openai' : null;
-          const apiKey = process.env[`${provider?.toUpperCase()}_API_KEY`];
+          const geminiKey = process.env.GEMINI_API_KEY;
+          const openaiKey = process.env.OPENAI_API_KEY;
           
-          if (provider && apiKey) {
-            resolve({ provider, apiKey });
+          if (geminiKey) {
+            resolve({ provider: 'gemini', apiKey: geminiKey });
+          } else if (openaiKey) {
+            resolve({ provider: 'openai', apiKey: openaiKey });
           } else {
-            reject(new Error('No AI provider configuration found'));
+            reject(new Error('No valid AI provider configuration found. Please configure an API key.'));
           }
         }
       );
@@ -76,6 +87,10 @@ class AIConfigManager {
    * @returns {Promise<void>}
    */
   static async updateConfig(userId, config) {
+    if (!config.apiKey || config.apiKey === 'your-api-key') {
+      throw new Error('Invalid API key provided');
+    }
+
     return new Promise((resolve, reject) => {
       // First deactivate any existing config for this user
       db.run(

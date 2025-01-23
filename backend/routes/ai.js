@@ -7,13 +7,15 @@ const SummarizationTask = require('../services/ai/tasks/summarization');
 const TaggingTask = require('../services/ai/tasks/tagging');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
+const path = require('path');
 
 // Database connection
-const db = new sqlite3.Database('./database.sqlite', (err) => {
+const dbPath = path.join(__dirname, '../database.sqlite');
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
-    console.error(err.message);
+    console.error('Error connecting to database:', err.message);
   }
-  console.log('Connected to the AI routes SQLite database.');
+  console.log('Connected to database:', dbPath);
 });
 
 // AI Provider Configuration Endpoints
