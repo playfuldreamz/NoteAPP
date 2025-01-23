@@ -21,7 +21,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 // AI Provider Configuration Endpoints
 router.get('/config', async (req, res) => {
   try {
-    const config = await AIConfigManager.getUserConfig(req.user?.id);
+    const config = await AIConfigManager.getUserConfig(req.user.id);
     res.json(config);
   } catch (error) {
     console.error('Error fetching AI config:', error);
@@ -32,7 +32,7 @@ router.get('/config', async (req, res) => {
 router.put('/config', async (req, res) => {
   try {
     const { provider, apiKey } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user.id;
 
     if (!userId) {
       return res.status(401).json({ error: 'User authentication required' });
@@ -55,7 +55,7 @@ router.post('/enhance-transcription', async (req, res) => {
   }
 
   try {
-    const config = await AIConfigManager.getUserConfig(req.user?.id);
+    const config = await AIConfigManager.getUserConfig(req.user.id);
     const provider = await AIProviderFactory.createProvider(config.provider, config);
     const transcriptionTask = new TranscriptionTask(provider);
     
@@ -81,7 +81,7 @@ router.post('/summarize', async (req, res) => {
   }
 
   try {
-    const config = await AIConfigManager.getUserConfig(req.user?.id);
+    const config = await AIConfigManager.getUserConfig(req.user.id);
     const provider = await AIProviderFactory.createProvider(config.provider, config);
     const summarizationTask = new SummarizationTask(provider);
     
@@ -102,7 +102,7 @@ router.post('/tags/analyze', async (req, res) => {
   }
 
   try {
-    const config = await AIConfigManager.getUserConfig(req.user?.id);
+    const config = await AIConfigManager.getUserConfig(req.user.id);
     const provider = await AIProviderFactory.createProvider(config.provider, config);
     const taggingTask = new TaggingTask(provider);
     
@@ -493,7 +493,7 @@ router.get('/tags', async (req, res) => {
 
 // Get user-specific tags
 router.get('/user-tags', async (req, res) => {
-  const userId = req.headers['x-user-id'];
+  const userId = req.user.id;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized - missing user ID' });
   }
@@ -521,7 +521,7 @@ router.get('/user-tags', async (req, res) => {
 
 router.post('/user-tags', async (req, res) => {
   const { tag_id } = req.body;
-  const userId = req.headers['x-user-id'];
+  const userId = req.user.id;
 
   // Validate input
   if (!userId) {
@@ -612,7 +612,7 @@ router.post('/user-tags', async (req, res) => {
 // Delete user tag endpoint
 router.delete('/user-tags/:tag_id', async (req, res) => {
   const { tag_id } = req.params;
-  const userId = req.headers['x-user-id'];
+  const userId = req.user.id;
 
   // Validate input
   if (!userId) {
@@ -688,13 +688,14 @@ router.delete('/user-tags/:tag_id', async (req, res) => {
 // Tag analysis endpoint
 router.post('/tags/analyze', async (req, res) => {
   const { content } = req.body;
+  const userId = req.user.id;
   
   if (!content) {
     return res.status(400).json({ error: 'Content is required' });
   }
 
   // Initialize AI with user context
-  const config = await AIConfigManager.getUserConfig(req.user?.id);
+  const config = await AIConfigManager.getUserConfig(userId);
   const provider = await AIProviderFactory.createProvider(config.provider, config);
   const taggingTask = new TaggingTask(provider);
   

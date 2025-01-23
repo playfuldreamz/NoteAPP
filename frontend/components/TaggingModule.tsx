@@ -126,7 +126,8 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       // Execute tag operation
       if (selectedTags.some(t => t.id === tag.id)) {
         await removeTagFromItem(normalizedType, itemId, tag.id);
-        setSelectedTags(prev => prev.filter(t => t.id !== tag.id));
+        const updatedTags = selectedTags.filter(t => t.id !== tag.id);
+        setSelectedTags(updatedTags);
         // Check if the tag is a user tag before deleting
         if (tag.created_at) {
           try {
@@ -136,15 +137,20 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
             toast.error('Failed to delete user tag');
           }
         }
+        // Notify parent component of updates
+        if (onTagsUpdate) {
+          onTagsUpdate(updatedTags);
+        }
       } else {
-        await addTagToItem(normalizedType, itemId, tag);
-        setSelectedTags(prev => [...prev, tag]);
+        const response = await addTagToItem(normalizedType, itemId, tag);
+        const updatedTags = [...selectedTags, response];
+        setSelectedTags(updatedTags);
+        // Notify parent component of updates
+        if (onTagsUpdate) {
+          onTagsUpdate(updatedTags);
+        }
       }
 
-      // Notify parent component of updates
-      if (onTagsUpdate) {
-        onTagsUpdate(selectedTags);
-      }
     } catch (error) {
       console.error('Error updating tag:', {
         message: error instanceof Error ? error.message : 'Unknown error',
@@ -204,13 +210,32 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     try {
       const newTag = await createTag(tagName);
       setTags(prev => [...prev, newTag]);
-      await addUserTag(newTag.id); // Add this line
-      await handleTagSelection(newTag);
+      await addUserTag(newTag.id);
+      return newTag;
     } catch (error) {
       console.error('Error creating tag:', error);
       toast.error('Failed to create tag');
+      return null;
     }
-  };  
+  };
+
+  const handleTagClick = async (existingTag: Tag | null, tagName: string) => {
+    if (isSaving) return;
+    
+    try {
+      if (existingTag) {
+        await handleTagSelection(existingTag);
+      } else {
+        const newTag = await handleCreateTag(tagName);
+        if (newTag) {
+          await handleTagSelection(newTag);
+        }
+      }
+    } catch (error) {
+      console.error('Error handling tag click:', error);
+      toast.error('Failed to process tag');
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -218,7 +243,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       <div className="flex flex-wrap gap-2">
         {selectedTags.map(tag => (
           <TagChip
-            key={tag.id}
+            key={`selected-${tag.id}-${tag.name}`}
             tag={tag}
             onRemove={() => handleTagSelection(tag)}
             disabled={isSaving}
@@ -246,38 +271,26 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
           <div className="flex flex-wrap gap-2">
             {suggestedTags.length > 0 && (
               (typeof suggestedTags[0] === 'string' && suggestedTags[0].match(/[,*\n]/)) ?
-                suggestedTags[0].replace(/^Tags:\s*/, '').split(/[,*\n]+/).map((tagName, index) => {
+                suggestedTags[0].replace(/^Tags:\s*/, '').split(/[,*\n]+/).map((tagName) => {
                   const trimmedTagName = tagName.trim().replace(/^-/, '').trim();
                   if (!trimmedTagName) return null;
                   const existingTag = tags.find(t => t.name === trimmedTagName);
                   return (
                     <TagChip
-                      key={index}
+                      key={`suggested-${existingTag?.id || trimmedTagName}`}
                       tag={existingTag || { id: -1, name: trimmedTagName }}
-                      onClick={() => {
-                        if (existingTag) {
-                          handleTagSelection(existingTag);
-                        } else {
-                          handleCreateTag(trimmedTagName);
-                        }
-                      }}
+                      onClick={() => handleTagClick(existingTag, trimmedTagName)}
                       disabled={isSaving}
                     />
                   );
                 }) :
-                suggestedTags.map((tagName, index) => {
+                suggestedTags.map((tagName) => {
                   const existingTag = tags.find(t => t.name === tagName);
                   return (
                     <TagChip
-                      key={index}
+                      key={`suggested-${existingTag?.id || tagName}`}
                       tag={existingTag || { id: -1, name: tagName }}
-                      onClick={() => {
-                        if (existingTag) {
-                          handleTagSelection(existingTag);
-                        } else {
-                          handleCreateTag(tagName);
-                        }
-                      }}
+                      onClick={() => handleTagClick(existingTag, tagName)}
                       disabled={isSaving}
                     />
                   );

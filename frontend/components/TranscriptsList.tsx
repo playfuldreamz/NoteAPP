@@ -147,6 +147,19 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setShowLoadMore(filtered.length > 5);
   };
 
+  const handleTagsUpdate = (updatedTags: Tag[]) => {
+    // Update the tags for the selected transcript in both filteredTranscripts and visibleTranscripts
+    const updateTranscript = (transcript: Transcript) => {
+      if (transcript.id === selectedTranscriptId) {
+        return { ...transcript, tags: updatedTags };
+      }
+      return transcript;
+    };
+
+    setFilteredTranscripts(prev => prev.map(updateTranscript));
+    setVisibleTranscripts(prev => prev.map(updateTranscript));
+  };
+
   useEffect(() => {
     handleFilter({ tags: [] }); // Initial load with no filters
   }, [initialTranscripts]);
@@ -414,6 +427,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         content={selectedTranscript}
         title={selectedTranscriptTitle}
         itemId={selectedTranscriptId || 0}
+        onTagsUpdate={handleTagsUpdate}
       >
         <div className="p-4">
           <h4 className="text-lg font-semibold mb-4 dark:text-gray-200">Modules</h4>

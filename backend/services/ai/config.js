@@ -14,7 +14,7 @@ class AIConfigManager {
   /**
    * Get AI configuration for a specific user
    * @param {number} userId - The user ID
-   * @returns {Promise<{provider: string, apiKey: string}>}
+   * @returns {Promise<{provider: string, apiKey: string, source: string}>}
    */
   static async getUserConfig(userId) {
     return new Promise((resolve, reject) => {
@@ -30,7 +30,8 @@ class AIConfigManager {
             if (userRow?.provider && userRow?.api_key) {
               return resolve({
                 provider: userRow.provider,
-                apiKey: userRow.api_key
+                apiKey: userRow.api_key,
+                source: 'user'
               });
             }
             
@@ -47,7 +48,7 @@ class AIConfigManager {
 
   /**
    * Get default AI configuration from app settings or environment
-   * @returns {Promise<{provider: string, apiKey: string}>}
+   * @returns {Promise<{provider: string, apiKey: string, source: string}>}
    */
   static async getDefaultConfig() {
     return new Promise((resolve, reject) => {
@@ -60,7 +61,8 @@ class AIConfigManager {
           if (appRow?.provider && appRow?.api_key) {
             return resolve({
               provider: appRow.provider,
-              apiKey: appRow.api_key
+              apiKey: appRow.api_key,
+              source: 'app'
             });
           }
           
@@ -69,9 +71,9 @@ class AIConfigManager {
           const openaiKey = process.env.OPENAI_API_KEY;
           
           if (geminiKey) {
-            resolve({ provider: 'gemini', apiKey: geminiKey });
+            resolve({ provider: 'gemini', apiKey: geminiKey, source: 'env' });
           } else if (openaiKey) {
-            resolve({ provider: 'openai', apiKey: openaiKey });
+            resolve({ provider: 'openai', apiKey: openaiKey, source: 'env' });
           } else {
             reject(new Error('No valid AI provider configuration found. Please configure an API key.'));
           }

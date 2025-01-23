@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal';
@@ -52,6 +52,42 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
       [noteId]: !prev[noteId]
     }));
   };
+
+  const handleTagsUpdate = useCallback((updatedTags: Tag[]) => {
+    // Update the tags for the selected note in both filteredNotes and visibleNotes
+    const updateNote = (note: Note) => {
+      if (note.id === selectedNoteId) {
+        return { ...note, tags: updatedTags };
+      }
+      return note;
+    };
+
+    setFilteredNotes(prev => prev.map(updateNote));
+    setVisibleNotes(prev => prev.map(updateNote));
+  }, [selectedNoteId]);
+
+  const handleDownloadOptionsChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setDownloadOptions(prev => ({
+      ...prev,
+      format: e.target.value as 'txt' | 'json' | 'pdf'
+    }));
+  }, []);
+
+  const renderNoteTags = useCallback((note: Note) => {
+    const tags = note.tags || [];
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        {tags.map(tag => (
+          <span 
+            key={`${note.id}-${tag.id}-${tag.name}`} 
+            className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
+          >
+            {tag.name}
+          </span>
+        ))}
+      </div>
+    );
+  }, []);
 
   const renderTags = (note: Note) => {
     const tags = note.tags || [];
@@ -340,21 +376,12 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {(note.tags || []).map(tag => (
-                  <span key={tag.id} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
+              {renderNoteTags(note)}
               <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
                 <span>{new Date(note.timestamp).toLocaleString()}</span>
                 <select
                   value={downloadOptions.format}
-                  onChange={(e) => setDownloadOptions((prev: DownloadOptions) => ({
-                    ...prev,
-                    format: e.target.value as 'txt' | 'json' | 'pdf'
-                  }))}
+                  onChange={handleDownloadOptionsChange}
                   className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5"
                 >
                   <option value="txt">TXT</option>
@@ -386,6 +413,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
         title={selectedNoteTitle}
         itemId={selectedNoteId}
         type="note"
+        onTagsUpdate={handleTagsUpdate}
       />
     </div>
   );

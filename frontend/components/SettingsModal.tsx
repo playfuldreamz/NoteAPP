@@ -15,12 +15,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   interface AIConfig {
     provider: AIProvider;
     apiKey: string;
+    source: string;
   }
 
   const [selectedGroup, setSelectedGroup] = useState('appearance');
   const [selectedProvider, setSelectedProvider] = useState<AIConfig>({
     provider: 'gemini',
-    apiKey: ''
+    apiKey: '',
+    source: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
@@ -33,7 +35,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
         if (config) {
           setSelectedProvider({
             provider: config.provider,
-            apiKey: config.apiKey
+            apiKey: config.apiKey,
+            source: config.source
           });
           setApiKey(config.apiKey);
           setTempProvider(config.provider);
@@ -331,20 +334,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
 
   const handleSave = async () => {
     try {
-      if (!validateApiKey(apiKey, tempProvider)) {
-        throw new Error(`Invalid API key format for ${tempProvider}`);
-      }
-
       setIsLoading(true);
-      await updateAIProvider({ provider: tempProvider, apiKey });
-      setSelectedProvider({
+      const config = await updateAIProvider({
         provider: tempProvider,
-        apiKey: apiKey
+        apiKey: apiKey,
       });
-      toast.success(`AI provider updated to ${tempProvider}`);
-    } catch (error: any) {
+      setSelectedProvider({
+        provider: config.provider,
+        apiKey: config.apiKey,
+        source: config.source
+      });
+      toast.success('Settings saved successfully');
+      onClose(); // Close modal to trigger parent refresh
+    } catch (error) {
       console.error('Failed to update AI provider:', error);
-      toast.error(error?.message || 'Failed to update AI provider');
+      toast.error('Failed to update AI provider');
     } finally {
       setIsLoading(false);
     }
@@ -369,9 +373,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
               <div>
                 <p className="text-gray-700 dark:text-gray-200">Current AI Provider</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {selectedProvider.provider === 'gemini' && !selectedProvider.apiKey
-                    ? 'Using default Gemini'
-                    : `Using ${selectedProvider.provider}`}
+                  {selectedProvider.provider} ({selectedProvider.source || 'env'})
                 </p>
               </div>
             </div>

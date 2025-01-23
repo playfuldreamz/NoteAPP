@@ -12,6 +12,7 @@ import { Notebook, Mic, FileText, NotebookPen, Settings, LogOut } from 'lucide-r
 import SettingsModal from '../components/SettingsModal';
 import { toast, ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
+import { getAIProvider } from '../services/ai';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -55,7 +56,8 @@ export default function ClientLayout({
   const [notes, setNotes] = useState<Note[]>([]);
   const [username, setUsername] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [currentModel, setCurrentModel] = useState('default gemini');
+  const [currentModel, setCurrentModel] = useState<string>('');
+  const [modelSource, setModelSource] = useState<string>('');
 
   const fetchCurrentModel = useCallback(async () => {
     try {
@@ -167,6 +169,21 @@ export default function ClientLayout({
     setIsLoading(false);
   }, [pathname, router, fetchNotes, fetchTranscripts]);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      const fetchAIProvider = async () => {
+        try {
+          const config = await getAIProvider();
+          setCurrentModel(config.provider);
+          setModelSource(config.source);
+        } catch (error) {
+          console.error('Failed to fetch AI provider:', error);
+        }
+      };
+      fetchAIProvider();
+    }
+  }, [isSettingsOpen, isAuthenticated]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
@@ -246,7 +263,7 @@ export default function ClientLayout({
               <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Notes</h1>
               <div className="flex items-center space-x-4">
                 <div className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-sm">
-                  AI: {currentModel}
+                  AI: {currentModel} ({modelSource})
                 </div>
                 {isAuthenticated && (
                   <>

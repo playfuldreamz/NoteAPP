@@ -40,9 +40,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Mount routes
-app.use('/api/ai', aiRoutes);
-
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -60,6 +57,9 @@ const authenticateToken = (req, res, next) => {
     res.status(400).json({ error: 'Invalid token' });
   }
 };
+
+// Mount routes
+app.use('/api/ai', authenticateToken, aiRoutes);
 
 // Database setup
 const path = require('path');
