@@ -92,3 +92,28 @@ export async function addUserTag(tagId: number): Promise<void> {
     throw error;
   }
 }
+
+export async function deleteUserTag(tagId: number): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('Please log in to delete user tags');
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/ai/user-tags/${tagId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-User-Id': getUserIdFromToken(token)
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to delete user tag');
+    }
+  } catch (error) {
+    console.error('Error deleting user tag:', error);
+    throw error;
+  }
+}

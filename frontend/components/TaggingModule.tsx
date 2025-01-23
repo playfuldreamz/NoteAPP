@@ -8,7 +8,7 @@ import {
   removeTagFromItem,
   Tag
 } from '../services/ai';
-import { addUserTag } from '../services/userTags';
+import { addUserTag, deleteUserTag } from '../services/userTags';
 import { toast } from 'react-toastify';
 import TagChip from '@components/TagChip';
 import TagCreator from '@components/TagCreator';
@@ -106,7 +106,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   }, [content]);
 
   // Handle tag selection with improved error handling
-  const handleTagSelection = async (tag: Tag, retryCount = 0) => {
+  const handleTagSelection = async (tag: any, retryCount = 0) => {
     console.log('Tagging transcript with ID:', itemId, 'Tag:', tag);
     setIsSaving(true);
     
@@ -127,6 +127,15 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       if (selectedTags.some(t => t.id === tag.id)) {
         await removeTagFromItem(normalizedType, itemId, tag.id);
         setSelectedTags(prev => prev.filter(t => t.id !== tag.id));
+        // Check if the tag is a user tag before deleting
+        if (tag.created_at) {
+          try {
+            await deleteUserTag(tag.id);
+          } catch (error) {
+            console.error('Error deleting user tag:', error);
+            toast.error('Failed to delete user tag');
+          }
+        }
       } else {
         await addTagToItem(normalizedType, itemId, tag);
         setSelectedTags(prev => [...prev, tag]);

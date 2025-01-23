@@ -177,6 +177,21 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         return;
       }
 
+      // First delete associated tags
+      const deleteTagsResponse = await fetch(`http://localhost:5000/transcripts/${id}/tags`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (!deleteTagsResponse.ok) {
+        const data = await deleteTagsResponse.json();
+        throw new Error(data.message || 'Failed to delete transcript tags');
+      }
+
+      // Then delete the transcript
       const response = await fetch(`http://localhost:5000/transcripts/${id}`, {
         method: 'DELETE',
         headers: {

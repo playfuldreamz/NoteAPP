@@ -856,6 +856,82 @@ router.post('/user-tags', async (req, res) => {
   }
 });
 
+// Delete user tag endpoint
+router.delete('/user-tags/:tag_id', async (req, res) => {
+  const { tag_id } = req.params;
+  const userId = req.headers['x-user-id'];
+
+  // Validate input
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized - missing user ID' });
+  }
+  if (!tag_id || isNaN(tag_id) || tag_id <= 0) {
+    return res.status(400).json({ error: 'Invalid tag ID' });
+  }
+
+  try {
+    // Begin transaction
+    await new Promise((resolve, reject) => {
+      db.run('BEGIN TRANSACTION', (err) => {
+        if (err) reject(err);
+        else resolve(null);
+      });
+    });
+
+    // Check if association exists
+    const associationExists = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT 1 FROM user_tags WHERE user_id = ? AND tag_id = ?',
+        [userId, tag_id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(!!row);
+        }
+      );
+    });
+
+    if (!associationExists) {
+      await new Promise((resolve) => {
+        db.run('ROLLBACK', () => resolve(null));
+      });
+      return res.status(404).json({ error: 'Tag association not found' });
+    }
+
+    // Delete association
+    const result = await new Promise((resolve, reject) => {
+      db.run(
+        'DELETE FROM user_tags WHERE user_id = ? AND tag_id = ?',
+        [userId, tag_id],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ success: true });
+        }
+      );
+    });
+
+    // Commit transaction
+    await new Promise((resolve, reject) => {
+      db.run('COMMIT', (err) => {
+        if (err) reject(err);
+        else resolve(null);
+      });
+    });
+
+    res.json(result);
+  } catch (error) {
+    // Rollback on error
+    await new Promise((resolve) => {
+      db.run('ROLLBACK', () => resolve(null));
+    });
+
+    console.error('Error deleting user tag association:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete user tag association',
+      details: error.message 
+    });
+  }
+});
+
 // Tag analysis endpoint
 router.post('/tags/analyze', async (req, res) => {
   const { content } = req.body;
