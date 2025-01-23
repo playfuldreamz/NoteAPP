@@ -1,12 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Sparkles, Download } from 'lucide-react';
 import TranscriptActions from './TranscriptActions';
+import { Note, Tag, generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
+import useDownloadNote, { DownloadOptions } from '../hooks/useDownloadNote';
 import useTitleGeneration from '../hooks/useTitleGeneration';
-import useDownloadNote from '../hooks/useDownloadNote';
-import type { DownloadOptions } from '../hooks/useDownloadNote';
 
 interface Tag {
   id: number;
@@ -37,6 +37,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
+  const [isRegeneratingTitle, setIsRegeneratingTitle] = useState(false);
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
   const { downloadNote, isDownloading } = useDownloadNote();
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>({
@@ -46,12 +47,12 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   });
   const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({});
 
-  const toggleTagsExpansion = (noteId: number) => {
+  const toggleTagsExpansion = useCallback((noteId: number) => {
     setExpandedTags(prev => ({
       ...prev,
       [noteId]: !prev[noteId]
     }));
-  };
+  }, []);
 
   const handleTagsUpdate = useCallback((updatedTags: Tag[]) => {
     // Update the tags for the selected note in both filteredNotes and visibleNotes
@@ -75,19 +76,32 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
 
   const renderNoteTags = useCallback((note: Note) => {
     const tags = note.tags || [];
+    const maxVisibleTags = 3;
+    const showAll = expandedTags[note.id] || false;
+    
     return (
-      <div className="flex flex-wrap gap-2 mt-2">
-        {tags.map(tag => (
-          <span 
-            key={`${note.id}-${tag.id}-${tag.name}`} 
-            className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
+      <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-wrap gap-2">
+          {(showAll ? tags : tags.slice(0, maxVisibleTags)).map(tag => (
+            <span 
+              key={`${note.id}-${tag.id}-${tag.name}`}
+              className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
+            >
+              {tag.name}
+            </span>
+          ))}
+        </div>
+        {tags.length > maxVisibleTags && (
+          <button
+            onClick={() => toggleTagsExpansion(note.id)}
+            className="text-xs text-blue-500 hover:underline self-start"
           >
-            {tag.name}
-          </span>
-        ))}
+            {showAll ? 'Show less' : `+${tags.length - maxVisibleTags} more`}
+          </button>
+        )}
       </div>
     );
-  }, []);
+  }, [expandedTags, toggleTagsExpansion]);
 
   const renderTags = (note: Note) => {
     const tags = note.tags || [];
@@ -186,9 +200,38 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
 
   const handleSeeMore = (content: string, title: string, id: number) => {
     setSelectedNote(content);
-    setIsModalOpen(true);
     setSelectedNoteTitle(title);
     setSelectedNoteId(id);
+    setIsModalOpen(true);
+  };
+
+  const handleRegenerateTitle = async () => {
+    if (!selectedNote || !selectedNoteId) return;
+    
+    setIsRegeneratingTitle(true);
+    try {
+      const newTitle = await generateTranscriptTitle(selectedNote);
+      await updateTranscriptTitle(selectedNoteId, newTitle);
+      setSelectedNoteTitle(newTitle);
+      
+      // Update the title in the notes list
+      const updateNote = (note: Note) => {
+        if (note.id === selectedNoteId) {
+          return { ...note, title: newTitle };
+        }
+        return note;
+      };
+      
+      setFilteredNotes(prev => prev.map(updateNote));
+      setVisibleNotes(prev => prev.map(updateNote));
+      
+      toast.success('Title regenerated successfully');
+    } catch (error) {
+      console.error('Error regenerating title:', error);
+      toast.error('Failed to regenerate title');
+    } finally {
+      setIsRegeneratingTitle(false);
+    }
   };
 
   const truncateText = (text: string) => {
@@ -406,15 +449,22 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           </button>
         )}
       </div>
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        content={selectedNote}
-        title={selectedNoteTitle}
-        itemId={selectedNoteId}
-        type="note"
-        onTagsUpdate={handleTagsUpdate}
-      />
+      {isModalOpen && (
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          content={selectedNote}
+          title={selectedNoteTitle}
+          itemId={selectedNoteId}
+          type="note"
+          onTagsUpdate={handleTagsUpdate}
+          onRegenerateTitle={handleRegenerateTitle}
+          isRegeneratingTitle={isRegeneratingTitle}
+        >
+          <div className="mt-4">
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

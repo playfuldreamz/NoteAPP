@@ -106,22 +106,11 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   }, [content]);
 
   // Handle tag selection with improved error handling
-  const handleTagSelection = async (tag: any, retryCount = 0) => {
-    console.log('Tagging transcript with ID:', itemId, 'Tag:', tag);
+  const handleTagSelection = async (tag: Tag, retryCount = 0) => {
     setIsSaving(true);
     
     try {
       const normalizedType = normalizeType(type);
-      console.log('API call details:', {
-        type: normalizedType,
-        id: itemId,
-        tag
-      });
-
-      // Validate tag ID for removal
-      if (selectedTags.some(t => t.id === tag.id) && !tag.id) {
-        throw new Error('Tag ID is required for removal');
-      }
 
       // Execute tag operation
       if (selectedTags.some(t => t.id === tag.id)) {
@@ -143,14 +132,21 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         }
       } else {
         const response = await addTagToItem(normalizedType, itemId, tag);
-        const updatedTags = [...selectedTags, response];
+        // Convert the response to a Tag object
+        const addedTag: Tag = {
+          id: response.id,
+          name: response.name,
+          description: response.description,
+          created_at: response.created_at,
+          updated_at: response.updated_at
+        };
+        const updatedTags = [...selectedTags, addedTag];
         setSelectedTags(updatedTags);
         // Notify parent component of updates
         if (onTagsUpdate) {
           onTagsUpdate(updatedTags);
         }
       }
-
     } catch (error) {
       console.error('Error updating tag:', {
         message: error instanceof Error ? error.message : 'Unknown error',
@@ -194,7 +190,6 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       // Retry transient errors
       if (retryCount < 2 && error instanceof Error && 
           (error.message.includes('500') || error.message.includes('Network Error'))) {
-        console.log(`Retrying tag operation (attempt ${retryCount + 1})`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
         return handleTagSelection(tag, retryCount + 1);
       }
@@ -208,7 +203,12 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   // Handle tag creation
   const handleCreateTag = async (tagName: string) => {
     try {
+      setIsSaving(true);
       const newTag = await createTag(tagName);
+      if (!newTag || !newTag.id) {
+        throw new Error('Invalid response from createTag');
+      }
+      
       setTags(prev => [...prev, newTag]);
       await addUserTag(newTag.id);
       return newTag;
@@ -216,6 +216,8 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       console.error('Error creating tag:', error);
       toast.error('Failed to create tag');
       return null;
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -223,6 +225,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     if (isSaving) return;
     
     try {
+      setIsSaving(true);
       if (existingTag) {
         await handleTagSelection(existingTag);
       } else {
@@ -234,6 +237,8 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     } catch (error) {
       console.error('Error handling tag click:', error);
       toast.error('Failed to process tag');
+    } finally {
+      setIsSaving(false);
     }
   };
 

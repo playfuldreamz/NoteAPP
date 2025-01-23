@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
 import TranscriptActions, { TranscriptFilters } from './TranscriptActions';
-import useDownloadNote from '../hooks/useDownloadNote';
-import type { DownloadOptions } from '../hooks/useDownloadNote';
+import { Transcript, Tag, generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
+import useDownloadNote, { DownloadOptions } from '../hooks/useDownloadNote';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 
 interface Tag {
@@ -30,6 +30,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
   const [selectedTranscriptTitle, setSelectedTranscriptTitle] = useState<string>('');
   const [selectedTranscriptId, setSelectedTranscriptId] = useState<number>(0);
+  const [isRegeneratingTitle, setIsRegeneratingTitle] = useState(false);
   const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,23 +40,23 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     includeMetadata: true
   });
 
-  const handleDownloadOptionsChange = (prev: DownloadOptions, newFormat: string): DownloadOptions => {
-    return {
+  const handleDownloadOptionsChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setDownloadOptions(prev => ({
       ...prev,
-      format: newFormat as 'txt' | 'json' | 'pdf'
-    };
-  };
+      format: e.target.value as 'txt' | 'json' | 'pdf'
+    }));
+  }, []);
 
   const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({});
 
-  const toggleTagsExpansion = (transcriptId: number) => {
+  const toggleTagsExpansion = useCallback((transcriptId: number) => {
     setExpandedTags(prev => ({
       ...prev,
       [transcriptId]: !prev[transcriptId]
     }));
-  };
+  }, []);
 
-  const renderTags = (transcript: Transcript) => {
+  const renderTranscriptTags = useCallback((transcript: Transcript) => {
     const tags = transcript.tags || [];
     const maxVisibleTags = 3;
     const showAll = expandedTags[transcript.id] || false;
@@ -64,7 +65,10 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
       <div className="flex flex-col gap-2 mt-2">
         <div className="flex flex-wrap gap-2">
           {(showAll ? tags : tags.slice(0, maxVisibleTags)).map(tag => (
-            <span key={tag.id} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+            <span 
+              key={`${transcript.id}-${tag.id}-${tag.name}`}
+              className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
+            >
               {tag.name}
             </span>
           ))}
@@ -79,7 +83,20 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         )}
       </div>
     );
-  };
+  }, [expandedTags, toggleTagsExpansion]);
+
+  const handleTagsUpdate = useCallback((updatedTags: Tag[]) => {
+    // Update the tags for the selected transcript in both filteredTranscripts and visibleTranscripts
+    const updateTranscript = (transcript: Transcript) => {
+      if (transcript.id === selectedTranscriptId) {
+        return { ...transcript, tags: updatedTags };
+      }
+      return transcript;
+    };
+
+    setFilteredTranscripts(prev => prev.map(updateTranscript));
+    setVisibleTranscripts(prev => prev.map(updateTranscript));
+  }, [selectedTranscriptId]);
 
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
@@ -145,19 +162,6 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setFilteredTranscripts(filtered);
     setVisibleTranscripts(filtered.slice(0, 5));
     setShowLoadMore(filtered.length > 5);
-  };
-
-  const handleTagsUpdate = (updatedTags: Tag[]) => {
-    // Update the tags for the selected transcript in both filteredTranscripts and visibleTranscripts
-    const updateTranscript = (transcript: Transcript) => {
-      if (transcript.id === selectedTranscriptId) {
-        return { ...transcript, tags: updatedTags };
-      }
-      return transcript;
-    };
-
-    setFilteredTranscripts(prev => prev.map(updateTranscript));
-    setVisibleTranscripts(prev => prev.map(updateTranscript));
   };
 
   useEffect(() => {
@@ -226,11 +230,11 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     }
   };
 
-  const handleSeeMore = (text: string, title: string, id: number) => {
-    setSelectedTranscript(text);
-    setIsModalOpen(true);
+  const handleSeeMore = (content: string, title: string, id: number) => {
+    setSelectedTranscript(content);
     setSelectedTranscriptTitle(title);
     setSelectedTranscriptId(id);
+    setIsModalOpen(true);
   };
 
   const truncateText = (text: string) => {
@@ -248,6 +252,35 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const handleShowLess = () => {
     setVisibleTranscripts(filteredTranscripts.slice(0, 5));
     setShowLoadMore(filteredTranscripts.length > 5);
+  };
+
+  const handleRegenerateTitle = async () => {
+    if (!selectedTranscript || !selectedTranscriptId) return;
+    
+    setIsRegeneratingTitle(true);
+    try {
+      const newTitle = await generateTranscriptTitle(selectedTranscript);
+      await updateTranscriptTitle(selectedTranscriptId, newTitle);
+      setSelectedTranscriptTitle(newTitle);
+      
+      // Update the title in the transcripts list
+      const updateTranscript = (transcript: Transcript) => {
+        if (transcript.id === selectedTranscriptId) {
+          return { ...transcript, title: newTitle };
+        }
+        return transcript;
+      };
+      
+      setFilteredTranscripts(prev => prev.map(updateTranscript));
+      setVisibleTranscripts(prev => prev.map(updateTranscript));
+      
+      toast.success('Title regenerated successfully');
+    } catch (error) {
+      console.error('Error regenerating title:', error);
+      toast.error('Failed to regenerate title');
+    } finally {
+      setIsRegeneratingTitle(false);
+    }
   };
 
   return (
@@ -367,35 +400,18 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                     {transcript.text.split(' ').length > 5 && (
                       <button
                         onClick={() => handleSeeMore(transcript.text, transcript.title || 'Untitled Transcript', transcript.id)}
-                        className="text-blue-500 hover:text-blue-700 transition-colors duration-200 text-xs ml-2"
+                        className="text-blue-500 hover:underline text-xs ml-2"
                       >
                         <Eye size={16} />
                       </button>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {(transcript.tags || []).map(tag => (
-                      <span key={tag.id} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                        {tag.name}
-                      </span>
-                    ))}
-                  </div>
+                  {renderTranscriptTags(transcript)}
                   <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
-                    <span>
-                      {new Date(transcript.date).toLocaleString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
+                    <span>{new Date(transcript.date).toLocaleString()}</span>
                     <select
                       value={downloadOptions.format}
-                      onChange={(e) => setDownloadOptions(prev => ({
-                        ...prev,
-                        format: e.target.value as 'txt' | 'json' | 'pdf'
-                      }))}
+                      onChange={handleDownloadOptionsChange}
                       className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5"
                     >
                       <option value="txt">TXT</option>
@@ -421,23 +437,28 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           </button>
         )}
       </div>
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        content={selectedTranscript}
-        title={selectedTranscriptTitle}
-        itemId={selectedTranscriptId || 0}
-        onTagsUpdate={handleTagsUpdate}
-      >
-        <div className="p-4">
-          <h4 className="text-lg font-semibold mb-4 dark:text-gray-200">Modules</h4>
-          <div className="space-y-2">
-            <div className="text-sm text-gray-600 dark:text-gray-300">
-              Coming soon: Additional modules will appear here
+      {isModalOpen && (
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          content={selectedTranscript}
+          title={selectedTranscriptTitle}
+          itemId={selectedTranscriptId}
+          type="transcript"
+          onTagsUpdate={handleTagsUpdate}
+          onRegenerateTitle={handleRegenerateTitle}
+          isRegeneratingTitle={isRegeneratingTitle}
+        >
+          <div className="mt-4">
+            <h4 className="text-lg font-semibold mb-4 dark:text-gray-200">Modules</h4>
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                Coming soon: Additional modules will appear here
+              </div>
             </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </div>
   );
 };

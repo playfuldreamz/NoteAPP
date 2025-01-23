@@ -262,9 +262,7 @@ export async function addTagToItem(
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        tag_id: tag.id
-      }),
+      body: JSON.stringify(tag.id ? { tag_id: tag.id } : { name: tag.name, description: tag.description }),
     });
 
     if (!response.ok) {
@@ -290,7 +288,19 @@ export async function addTagToItem(
       throw new Error(errorMessage);
     }
 
-    const data: AddTagResponse = await response.json();
+    const data = await response.json();
+    
+    // If we're using an existing tag, return it in the expected format
+    if (tag.id) {
+      return {
+        id: tag.id,
+        name: tag.name,
+        description: tag.description,
+        created_at: data.created_at || new Date().toISOString(),
+        updated_at: data.updated_at || new Date().toISOString()
+      };
+    }
+    
     return data;
   } catch (error) {
     console.error('Error in addTagToItem:', {

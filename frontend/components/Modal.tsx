@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import TaggingModule from './TaggingModule';
 import { Tag } from '../services/ai';
+import { RotateCw } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ interface ModalProps {
   children?: React.ReactNode;
   initialTags?: Tag[];
   onTagsUpdate?: (tags: Tag[]) => void;
+  onRegenerateTitle?: () => void;
+  isRegeneratingTitle?: boolean;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -23,7 +26,9 @@ const Modal: React.FC<ModalProps> = ({
   type,
   children,
   initialTags = [],
-  onTagsUpdate
+  onTagsUpdate,
+  onRegenerateTitle,
+  isRegeneratingTitle = false
 }) => {
   const [tags, setTags] = useState<Tag[]>(initialTags);
   useEffect(() => {
@@ -48,9 +53,26 @@ const Modal: React.FC<ModalProps> = ({
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg h-[calc(100vh-6rem)] w-full flex flex-col overflow-hidden"> {/* Constrained height */}
           {/* Header */}
           <div className="sticky top-0 bg-white dark:bg-gray-900 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 text-center flex-1">
-              {title || 'Content'}
-            </h3>
+            <div className="flex-1 flex items-center justify-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {title || 'Content'}
+              </h3>
+              {onRegenerateTitle && (
+                <button
+                  onClick={onRegenerateTitle}
+                  disabled={isRegeneratingTitle}
+                  className={`p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    isRegeneratingTitle ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  title="Regenerate title"
+                >
+                  <RotateCw 
+                    size={18} 
+                    className={`text-gray-500 dark:text-gray-400 ${isRegeneratingTitle ? 'animate-spin' : ''}`}
+                  />
+                </button>
+              )}
+            </div>
             <button 
               onClick={onClose} 
               className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"

@@ -16,7 +16,6 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:500
 
 export async function getUserTags(): Promise<UserTag[]> {
   const token = localStorage.getItem('token');
-  console.log('Token from localStorage:', token); // Add this line
   if (!token) {
     console.error('No authentication token found in localStorage');
     throw new Error('Please log in to access user tags');
@@ -54,7 +53,6 @@ export async function getUserTags(): Promise<UserTag[]> {
 function getUserIdFromToken(token: string): string {
   try {
     const decoded: { id?: number } = jwtDecode(token);
-    console.log('Decoded token:', decoded);
     
     if (!decoded.id) {
       throw new Error('Invalid token: missing user ID');
