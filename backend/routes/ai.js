@@ -949,7 +949,9 @@ router.post('/tags/analyze', async (req, res) => {
 
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const prompt = `Analyze this content and suggest relevant tags:\n${content}\n\nReturn tags as a comma-separated list`;
+    const prompt = `Analyze this content and suggest relevant tags:
+                    ${content}
+                    Return only the tags as a comma-separated list without any additional text.`;
     const result = await model.generateContent(prompt);
     
     if (result.response.promptFeedback?.blockReason) {

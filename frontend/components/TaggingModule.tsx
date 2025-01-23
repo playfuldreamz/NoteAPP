@@ -244,23 +244,45 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-600">Suggested Tags</h4>
           <div className="flex flex-wrap gap-2">
-            {suggestedTags.map((tagName, index) => {
-              const existingTag = tags.find(t => t.name === tagName);
-              return (
-                <TagChip
-                  key={index}
-                  tag={existingTag || { id: -1, name: tagName }}
-                  onClick={() => {
-                    if (existingTag) {
-                      handleTagSelection(existingTag);
-                    } else {
-                      handleCreateTag(tagName);
-                    }
-                  }}
-                  disabled={isSaving}
-                />
-              );
-            })}
+            {suggestedTags.length > 0 && (
+              (typeof suggestedTags[0] === 'string' && suggestedTags[0].match(/[,*\n]/)) ?
+                suggestedTags[0].replace(/^Tags:\s*/, '').split(/[,*\n]+/).map((tagName, index) => {
+                  const trimmedTagName = tagName.trim().replace(/^-/, '').trim();
+                  if (!trimmedTagName) return null;
+                  const existingTag = tags.find(t => t.name === trimmedTagName);
+                  return (
+                    <TagChip
+                      key={index}
+                      tag={existingTag || { id: -1, name: trimmedTagName }}
+                      onClick={() => {
+                        if (existingTag) {
+                          handleTagSelection(existingTag);
+                        } else {
+                          handleCreateTag(trimmedTagName);
+                        }
+                      }}
+                      disabled={isSaving}
+                    />
+                  );
+                }) :
+                suggestedTags.map((tagName, index) => {
+                  const existingTag = tags.find(t => t.name === tagName);
+                  return (
+                    <TagChip
+                      key={index}
+                      tag={existingTag || { id: -1, name: tagName }}
+                      onClick={() => {
+                        if (existingTag) {
+                          handleTagSelection(existingTag);
+                        } else {
+                          handleCreateTag(tagName);
+                        }
+                      }}
+                      disabled={isSaving}
+                    />
+                  );
+                })
+            )}
           </div>
         </div>
       )}
