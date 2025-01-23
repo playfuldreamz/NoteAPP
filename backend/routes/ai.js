@@ -722,15 +722,46 @@ router.delete('/tags/:type/:id/:tag_id', validateItemType, async (req, res) => {
 // Get all tags
 router.get('/tags', async (req, res) => {
   try {
-    db.all('SELECT * FROM tags ORDER BY name ASC', [], (err, rows) => {
-      if (err) {
-        console.error('Error fetching tags:', err);
-        return res.status(500).json({ error: 'Failed to fetch tags' });
+    db.all(
+      `SELECT * FROM tags ORDER BY name ASC`,
+      (err, rows) => {
+        if (err) {
+          console.error('Error fetching tags:', err);
+          return res.status(500).json({ error: 'Failed to fetch tags' });
+        }
+        res.json(rows);
       }
-      res.json(rows);
-    });
+    );
   } catch (error) {
     console.error('Error in tags endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get user-specific tags
+router.get('/user-tags', async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized - missing user ID' });
+  }
+
+  try {
+    db.all(
+      `SELECT t.* FROM tags t
+       JOIN user_tags ut ON t.id = ut.tag_id
+       WHERE ut.user_id = ?
+       ORDER BY t.name ASC`,
+      [userId],
+      (err, rows) => {
+        if (err) {
+          console.error('Error fetching user tags:', err);
+          return res.status(500).json({ error: 'Failed to fetch user tags' });
+        }
+        res.json(rows);
+      }
+    );
+  } catch (error) {
+    console.error('Error in user tags endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

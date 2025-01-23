@@ -12,6 +12,7 @@ interface TagChipProps {
   onRemove?: () => void;
   onClick?: () => void;
   disabled?: boolean;
+  className?: string;
 }
 
 const TagChip: React.FC<TagChipProps> = ({
@@ -20,7 +21,8 @@ const TagChip: React.FC<TagChipProps> = ({
   onToggle,
   onRemove,
   onClick,
-  disabled = false
+  disabled = false,
+  className = ''
 }) => {
   const tagName = typeof tag === 'string' ? tag : tag.name;
   
@@ -34,7 +36,8 @@ const TagChip: React.FC<TagChipProps> = ({
             ? 'bg-blue-500 text-white hover:bg-blue-600'
             : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
         }
-        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+        ${className}`}
     >
       {tagName}
       {onRemove && (

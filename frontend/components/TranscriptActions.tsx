@@ -1,7 +1,7 @@
 import { Filter, ArrowUpDown, DownloadCloud, ChevronDown, RefreshCw, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import TagChip from './TagChip';
-import { getAllTags } from '../services/ai';
+import UserTagChip from './UserTagChip';
+import { getUserTags } from '../services/userTags';
 
 interface Tag {
   id: number;
@@ -46,7 +46,7 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport, o
   useEffect(() => {
     const loadTags = async () => {
       try {
-        const tags = await getAllTags();
+        const tags = await getUserTags();
         setAvailableTags(tags);
       } catch (error) {
         console.error('Error loading tags:', error);
@@ -201,7 +201,7 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport, o
                       )
                     : availableTags
                   ).slice(0, 10).map((tag: Tag) => (
-                    <TagChip
+                    <UserTagChip
                       key={tag.id}
                       tag={tag}
                       isSelected={filters.tags.includes(tag.name)}
@@ -227,7 +227,7 @@ export default function TranscriptActions({ count, onFilter, onSort, onExport, o
                 {filters.showAllTags && (
                   <div className="flex flex-wrap gap-2">
                     {availableTags.slice(10).map(tag => (
-                      <TagChip
+                      <UserTagChip
                         key={tag.id}
                         tag={tag}
                         isSelected={filters.tags.includes(tag.name)}

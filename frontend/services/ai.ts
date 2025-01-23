@@ -203,6 +203,24 @@ export async function getAllTags(): Promise<Tag[]> {
   return response.json();
 }
 
+export async function getUserTags(): Promise<Tag[]> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/user-tags`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to fetch user tags');
+  }
+
+  return response.json();
+}
+
 export async function getTagsForItem(type: 'note' | 'transcript', id: number): Promise<Tag[]> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');

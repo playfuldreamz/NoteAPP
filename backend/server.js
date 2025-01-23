@@ -27,11 +27,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? 
+  origin: process.env.NODE_ENV === 'production' ?
     process.env.FRONTEND_URL : 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
 }));
 app.use(express.json());
 
