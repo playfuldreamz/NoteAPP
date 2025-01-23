@@ -1,146 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AIProviderFactory = require('../services/ai/factory');
+const AIConfigManager = require('../services/ai/config');
+const TranscriptionTask = require('../services/ai/tasks/transcription');
+const SummarizationTask = require('../services/ai/tasks/summarization');
+const TaggingTask = require('../services/ai/tasks/tagging');
 const sqlite3 = require('sqlite3').verbose();
-const { OpenAI } = require('openai');
 const bcrypt = require('bcrypt');
-
-// AI Provider Configuration Endpoints
-router.get('/config', async (req, res) => {
-  try {
-    // First try to get user-specific config
-    const userId = req.user?.id;
-    if (userId) {
-      db.get(
-        `SELECT provider, 'user' as source FROM user_settings 
-         WHERE user_id = ? AND is_active = 1`,
-        [userId],
-        (err, userRow) => {
-          if (err) {
-            console.error('Error fetching user AI config:', err);
-            return res.status(500).json({ error: 'Failed to fetch AI configuration' });
-          }
-          
-          if (userRow) {
-            return res.json({ 
-              provider: userRow.provider,
-              source: userRow.source,
-              apiKey: userRow.api_key
-            });
-          }
-
-          // Fallback to app settings
-          db.get(
-            `SELECT provider, 'app' as source FROM app_settings 
-             WHERE is_active = 1`,
-            (err, appRow) => {
-              if (err) {
-                console.error('Error fetching app AI config:', err);
-                return res.status(500).json({ error: 'Failed to fetch AI configuration' });
-              }
-              
-              // Final fallback to environment variable
-              const provider = appRow?.provider || 
-                (process.env.GEMINI_API_KEY ? 'gemini' : null);
-              const source = appRow ? 'app' : 'env';
-              
-              res.json({ 
-                provider,
-                source,
-                apiKey: appRow?.api_key || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY
-              });
-            }
-          );
-        }
-      );
-    } else {
-      // For unauthenticated requests, use app settings
-      db.get(
-        `SELECT provider, 'app' as source FROM app_settings 
-         WHERE is_active = 1`,
-        (err, appRow) => {
-          if (err) {
-            console.error('Error fetching app AI config:', err);
-            return res.status(500).json({ error: 'Failed to fetch AI configuration' });
-          }
-          
-          // Final fallback to environment variable
-          const provider = appRow?.provider || 
-            (process.env.GEMINI_API_KEY ? 'gemini' : null);
-          const source = appRow ? 'app' : 'env';
-          
-          res.json({ 
-            provider,
-            source
-          });
-        }
-      );
-    }
-  } catch (error) {
-    console.error('Error in AI config endpoint:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-router.put('/config', async (req, res) => {
-  const { provider, apiKey } = req.body;
-  const userId = req.user?.id;
-  
-  if (!['openai', 'gemini'].includes(provider)) {
-    return res.status(400).json({ error: 'Invalid provider specified' });
-  }
-
-  try {
-    if (userId) {
-      // Update user-specific settings
-      db.run(
-        'UPDATE user_settings SET is_active = 0 WHERE user_id = ? AND is_active = 1',
-        [userId]
-      );
-      
-      db.run(
-        `INSERT INTO user_settings (user_id, provider, api_key, is_active) 
-         VALUES (?, ?, ?, 1)`,
-        [userId, provider, apiKey],
-        function(err) {
-          if (err) {
-            console.error('Error updating user AI config:', err);
-            return res.status(500).json({ error: 'Failed to update AI configuration' });
-          }
-          res.json({ 
-            provider,
-            source: 'user',
-            apiKey: apiKey
-          });
-        }
-      );
-    } else {
-      // Update app-wide settings
-      db.run(
-        'UPDATE app_settings SET is_active = 0 WHERE is_active = 1'
-      );
-      
-      db.run(
-        'INSERT INTO app_settings (provider, api_key, is_active) VALUES (?, ?, 1)',
-        [provider, apiKey],
-        function(err) {
-          if (err) {
-            console.error('Error updating app AI config:', err);
-            return res.status(500).json({ error: 'Failed to update AI configuration' });
-          }
-          res.json({ 
-            provider,
-            source: 'app',
-            apiKey: apiKey
-          });
-        }
-      );
-    }
-  } catch (error) {
-    console.error('Error updating AI config:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // Database connection
 const db = new sqlite3.Database('./database.sqlite', (err) => {
@@ -150,63 +16,33 @@ const db = new sqlite3.Database('./database.sqlite', (err) => {
   console.log('Connected to the AI routes SQLite database.');
 });
 
-// Initialize Gemini AI client
-let genAI = null;
-
-const initializeAI = async (req) => {
+// AI Provider Configuration Endpoints
+router.get('/config', async (req, res) => {
   try {
-    // Get API key from user_settings, app_settings, or environment
-    const getApiKey = (userId) => new Promise((resolve, reject) => {
-      if (userId) {
-        // First try user settings
-        db.get(
-          `SELECT api_key FROM user_settings 
-           WHERE user_id = ? AND is_active = 1 AND provider = ?`,
-          [userId, 'gemini'],
-          (err, userRow) => {
-            if (err) return reject(err);
-            if (userRow?.api_key) return resolve(userRow.api_key);
-            
-            // Fallback to app settings
-            db.get(
-              'SELECT api_key FROM app_settings WHERE is_active = 1 AND provider = ?',
-              ['gemini'],
-              (err, appRow) => {
-                if (err) return reject(err);
-                resolve(appRow?.api_key);
-              }
-            );
-          }
-        );
-      } else {
-        // For unauthenticated requests, use app settings
-        db.get(
-          'SELECT api_key FROM app_settings WHERE is_active = 1 AND provider = ?',
-          ['gemini'],
-          (err, appRow) => {
-            if (err) return reject(err);
-            resolve(appRow?.api_key);
-          }
-        );
-      }
-    });
-
-    // Get the current user ID from the request context
-    const userId = req?.user?.id;
-    const apiKey = await getApiKey(userId) || process.env.GEMINI_API_KEY;
-    
-    if (apiKey && apiKey !== 'your-gemini-key') {
-      genAI = new GoogleGenerativeAI(apiKey);
-    } else {
-      console.error('Gemini API key not configured');
-    }
+    const config = await AIConfigManager.getUserConfig(req.user?.id);
+    res.json(config);
   } catch (error) {
-    console.error('Error initializing Gemini:', error);
+    console.error('Error fetching AI config:', error);
+    res.status(500).json({ error: 'Failed to fetch AI configuration' });
   }
-};
+});
 
-// Initialize with no user context
-initializeAI();
+router.put('/config', async (req, res) => {
+  try {
+    const { provider, apiKey } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User authentication required' });
+    }
+
+    await AIConfigManager.updateConfig(userId, { provider, apiKey });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating AI config:', error);
+    res.status(500).json({ error: 'Failed to update AI configuration' });
+  }
+});
 
 // Transcription enhancement endpoint
 router.post('/enhance-transcription', async (req, res) => {
@@ -216,94 +52,23 @@ router.post('/enhance-transcription', async (req, res) => {
     return res.status(400).json({ error: 'Transcript is required' });
   }
 
-  // Initialize AI with user context
-  await initializeAI(req);
-  
-  if (!genAI) {
-    return res.json({ enhanced: transcript, confidence: 0 });
-  }
-
   try {
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
-      safetySettings: [
-        {
-          category: "HARM_CATEGORY_HARASSMENT", 
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_HATE_SPEECH",
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_CIVIC_INTEGRITY",
-          threshold: "BLOCK_NONE"
-        }
-      ]
-    });
+    const config = await AIConfigManager.getUserConfig(req.user?.id);
+    const provider = await AIProviderFactory.createProvider(config.provider, config);
+    const transcriptionTask = new TranscriptionTask(provider);
     
-    // First pass: Basic formatting and punctuation
-    const formatPrompt = `Add proper punctuation and capitalization to this transcript without adding any explanations, prefixes, suffixes or options:\n${transcript}`;
-    const formatResult = await model.generateContent(formatPrompt);
-    
-    // Check for blocked content
-    if (formatResult.response.promptFeedback?.blockReason) {
-      console.warn('Formatting blocked:', formatResult.response.promptFeedback.blockReason);
-      throw new Error('Formatting blocked by safety filters');
-    }
-    
-    let formattedText = formatResult.response.text();
-    
-    // Second pass: Context-aware correction
-    const correctPrompt = `Correct any transcription errors in this text while preserving meaning, without adding any explanations, prefixes, suffixes or options:\n${formattedText}`;
-    const correctResult = await model.generateContent(correctPrompt);
-    
-    // Check for blocked content
-    if (correctResult.response.promptFeedback?.blockReason) {
-      console.warn('Correction blocked:', correctResult.response.promptFeedback.blockReason);
-      throw new Error('Correction blocked by safety filters');
-    }
-    
-    const correctedText = correctResult.response.text();
-    
-    // Calculate confidence score
-    const similarity = calculateSimilarity(transcript, correctedText);
-    const confidence = Math.min(100, Math.max(0, Math.round(similarity * 100)));
-    
-    res.json({ 
-      enhanced: correctedText,
-      confidence,
-      original: transcript
-    });
+    const result = await transcriptionTask.enhance(transcript, language);
+    res.json(result);
   } catch (error) {
     console.error('Transcription enhancement error:', error);
     res.status(500).json({ 
       error: 'Failed to enhance transcription',
       enhanced: transcript,
-      confidence: 0
+      confidence: 0,
+      original: transcript
     });
   }
 });
-
-// Helper function to calculate text similarity
-function calculateSimilarity(original, enhanced) {
-  const originalWords = new Set(original.toLowerCase().split(/\s+/));
-  const enhancedWords = new Set(enhanced.toLowerCase().split(/\s+/));
-  
-  const intersection = new Set(
-    [...originalWords].filter(word => enhancedWords.has(word))
-  );
-  
-  return intersection.size / originalWords.size;
-}
 
 // Generate title for content
 router.post('/summarize', async (req, res) => {
@@ -313,50 +78,37 @@ router.post('/summarize', async (req, res) => {
     return res.status(400).json({ error: 'Content is required' });
   }
 
-  // Initialize AI with user context
-  await initializeAI(req);
+  try {
+    const config = await AIConfigManager.getUserConfig(req.user?.id);
+    const provider = await AIProviderFactory.createProvider(config.provider, config);
+    const summarizationTask = new SummarizationTask(provider);
+    
+    const title = await summarizationTask.summarize(content);
+    res.json({ title });
+  } catch (error) {
+    console.error('Content summarization error:', error);
+    res.status(500).json({ error: 'Failed to generate title' });
+  }
+});
+
+// Analyze content for tags
+router.post('/tags/analyze', async (req, res) => {
+  const { content } = req.body;
   
-  if (!genAI) {
-    // Fallback to simple title generation if Gemini is not configured
-    const fallbackTitle = content.split(/\s+/).slice(0, 5).join(' ') + '...';
-    return res.json({ title: fallbackTitle });
+  if (!content) {
+    return res.status(400).json({ error: 'Content is required' });
   }
-
-  // Validate content
-  if (typeof content !== 'string' || content.length > 10000) {
-    return res.status(400).json({ error: 'Invalid content format or length' });
-  }
-
-  // Sanitize content by removing potentially problematic characters
-  const sanitizedContent = content
-    .replace(/[<>{}[\]]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .substring(0, 5000);
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
-    const prompt = `Generate a brief, descriptive title(no more than 5 words) for this content without adding any explanations, prefixes, suffixes or options: ${sanitizedContent}`;
-    const result = await model.generateContent(prompt);
+    const config = await AIConfigManager.getUserConfig(req.user?.id);
+    const provider = await AIProviderFactory.createProvider(config.provider, config);
+    const taggingTask = new TaggingTask(provider);
     
-    // Handle safety filters
-    if (result.response.promptFeedback?.blockReason) {
-      console.warn('Content blocked by safety filters:', result.response.promptFeedback.blockReason);
-      throw new Error('Content blocked by safety filters');
-    }
-    
-    const title = result.response.text();
-    res.json({ title: title.trim() });
+    const tags = await taggingTask.analyze(content);
+    res.json({ tags });
   } catch (error) {
-    console.error('Gemini error:', error);
-    // Enhanced fallback mechanism
-    const fallbackTitle = sanitizedContent
-      .split(/\s+/)
-      .slice(0, 5)
-      .join(' ')
-      .replace(/[^\w\s]/g, '')
-      .trim();
-    res.json({ title: fallbackTitle || 'Untitled' });
+    console.error('Tag analysis error:', error);
+    res.status(500).json({ error: 'Failed to analyze tags' });
   }
 });
 
@@ -391,7 +143,6 @@ router.put('/transcripts/:id/title', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
 
 // Validate item type middleware
 const validateItemType = (req, res, next) => {
@@ -941,58 +692,16 @@ router.post('/tags/analyze', async (req, res) => {
   }
 
   // Initialize AI with user context
-  await initializeAI(req);
+  const config = await AIConfigManager.getUserConfig(req.user?.id);
+  const provider = await AIProviderFactory.createProvider(config.provider, config);
+  const taggingTask = new TaggingTask(provider);
   
-  if (!genAI) {
-    return res.json({ tags: [] });
-  }
-
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp", 
-      safetySettings: [
-      {
-        category: "HARM_CATEGORY_HARASSMENT", 
-        threshold: "BLOCK_NONE"
-      },
-      {
-        category: "HARM_CATEGORY_HATE_SPEECH",
-        threshold: "BLOCK_NONE"
-      },
-      {
-        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-        threshold: "BLOCK_NONE"
-      },
-      {
-        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-        threshold: "BLOCK_NONE"
-      },
-      {
-        category: "HARM_CATEGORY_CIVIC_INTEGRITY",
-        threshold: "BLOCK_NONE"
-      }
-    ] });
-    const prompt = `Analyze this content and suggest relevant tags, it does not matter if its code or gibberish:
-                    ${content}
-                    Return only the tags as a comma-separated list without any additional text before or after.`;
-    const result = await model.generateContent(prompt);
-    
-    if (result.response.promptFeedback?.blockReason) {
-      console.warn('Tag analysis blocked:', result.response.promptFeedback.blockReason);
-      throw new Error('Tag analysis blocked by safety filters');
-    }
-    
-    const tags = result.response.text()
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-    
+    const tags = await taggingTask.analyze(content);
     res.json({ tags });
   } catch (error) {
     console.error('Tag analysis error:', error);
-    res.status(500).json({
-      error: 'Failed to analyze content for tags',
-      tags: []
-    });
+    res.status(500).json({ error: 'Failed to analyze tags' });
   }
 });
 
@@ -1018,7 +727,6 @@ router.get('/tags/:type/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
 
 // Remove tag from note or transcript
 router.delete('/tags/:type/:id/:tag_id', validateItemType, async (req, res) => {
@@ -1054,6 +762,5 @@ router.delete('/tags/:type/:id/:tag_id', validateItemType, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
 
 module.exports = router;
