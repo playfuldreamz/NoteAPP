@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader, ChevronDown, ChevronUp } from 'lucide-react';
+import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { generateTranscriptTitle, enhanceTranscript, InvalidAPIKeyError } from '../services/ai';
 import Link from 'next/link';
 
@@ -44,6 +44,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [isEnhancedCollapsed, setIsEnhancedCollapsed] = useState(false);
   const [isOriginalCollapsed, setIsOriginalCollapsed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const originalTranscriptRef = useRef<HTMLDivElement>(null);
   const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
@@ -132,6 +134,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     if (recognitionRef.current && !isRecording) {
       recognitionRef.current.start();
       setIsRecording(true);
+      timerIntervalRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
     }
   };
 
@@ -140,7 +145,34 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       recognitionRef.current.stop();
       setIsRecording(false);
       setInterimTranscript('');
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
     }
+  };
+
+  const clearRecording = () => {
+    setTranscript('');
+    setElapsedTime(0);
+    setInterimTranscript('');
+    setEnhancedTranscript('');
+    setShowEnhanced(false);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleEnhanceTranscript = async () => {
@@ -268,15 +300,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     }
   };
 
-  const handleResetTranscripts = () => {
-    setTranscript('');
-    setEnhancedTranscript('');
-    setShowEnhanced(false);
-    setIsEnhancedCollapsed(false);
-    setIsOriginalCollapsed(false);
-    toast.success('Transcript reset!');
-  };
-
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
       <div className="flex items-center justify-between mb-4">
@@ -289,7 +312,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
           >
             {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
           </button>
-          {isRecording && <div className="ml-2 w-6 h-6 bg-red-600 rounded-full animate-pulse" />}
+          {isRecording && (
+            <div className="ml-2 flex items-center text-sm font-medium text-gray-600">
+              <span className="animate-pulse mr-2">●</span>
+              {formatTime(elapsedTime)}
+            </div>
+          )}
         </div>
         <button
           onClick={() => setShowSettings(!showSettings)}
@@ -388,49 +416,51 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex items-center gap-4">
         <button 
           onClick={handleEnhanceTranscript}
           className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
-            (isRecording || !transcript.trim() || isEnhancing) 
-              ? 'bg-blue-200 dark:bg-blue-900 text-blue-50 dark:text-blue-200 cursor-not-allowed' 
-              : 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 hover:shadow-md active:scale-[0.98]'
+            isRecording || !transcript || isEnhancing
+              ? 'bg-green-200 dark:bg-green-900 text-green-50 dark:text-green-200 cursor-not-allowed'
+              : 'bg-green-600 dark:bg-green-500 text-white hover:bg-green-700 dark:hover:bg-green-600 hover:shadow-md active:scale-[0.98]'
           }`}
-          disabled={isRecording || !transcript.trim() || isEnhancing}
+          disabled={isRecording || !transcript || isEnhancing}
         >
           {isEnhancing ? (
-            <Loader className="w-5 h-5 animate-spin" />
+            <>
+              <Loader size={18} className="shrink-0 animate-spin" />
+              <span>{Math.round(enhancementProgress * 100)}%</span>
+            </>
           ) : (
-            <RefreshCw size={18} className="shrink-0" />
+            <>
+              <RefreshCw size={18} className="shrink-0" />
+              <span>Enhance</span>
+            </>
           )}
-          <span>{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
         </button>
-        
+
         <button
           onClick={handleSaveTranscript}
           className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
-            isRecording || isSaving
-              ? 'bg-emerald-200 dark:bg-emerald-900 text-emerald-50 dark:text-emerald-200 cursor-not-allowed'
-              : 'bg-emerald-600 dark:bg-emerald-500 text-white hover:bg-emerald-700 dark:hover:bg-emerald-600 hover:shadow-md active:scale-[0.98]'
+            isRecording || !transcript
+              ? 'bg-blue-200 dark:bg-blue-900 text-blue-50 dark:text-blue-200 cursor-not-allowed'
+              : 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 hover:shadow-md active:scale-[0.98]'
           }`}
-          disabled={isRecording || isSaving}
+          disabled={isRecording || !transcript}
         >
           {isSaving ? (
-            <Loader className="w-5 h-5 animate-spin" />
+            <Loader size={18} className="shrink-0 animate-spin" />
           ) : (
             <Save size={18} className="shrink-0" />
           )}
           <span>{isSaving ? 'Saving...' : 'Save'}</span>
         </button>
-        
-        <button 
-          onClick={handleResetTranscripts}
+
+        <button
+          onClick={clearRecording}
           className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
-            isRecording
-              ? 'bg-amber-200 dark:bg-amber-900 text-amber-50 dark:text-amber-200 cursor-not-allowed'
-              : 'bg-amber-600 dark:bg-amber-500 text-white hover:bg-amber-700 dark:hover:bg-amber-600 hover:shadow-md active:scale-[0.98]'
+            'bg-gray-600 dark:bg-gray-500 text-white hover:bg-gray-700 dark:hover:bg-gray-600 hover:shadow-md active:scale-[0.98]'
           }`}
-          disabled={isRecording}
         >
           <RotateCcw size={18} className="shrink-0" />
           <span>Reset</span>

@@ -23,7 +23,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
     [key: string]: string;
   }
 
-  const [selectedGroup, setSelectedGroup] = useState('appearance');
+  const [selectedGroup, setSelectedGroup] = useState('ai');
   const [selectedProvider, setSelectedProvider] = useState<AIConfig>({
     provider: 'gemini',
     apiKey: '',
