@@ -238,26 +238,91 @@ const validateItemType = (req, res, next) => {
 // Create new endpoint for tag creation
 router.post('/tags', async (req, res) => {
   const { name, description } = req.body;
+  const userId = req.user.id;
   
-  if (!name) {
-    return res.status(400).json({ error: 'Tag name is required' });
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return res.status(400).json({ error: 'Tag name is required and must be a non-empty string' });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User authentication required' });
   }
 
   try {
-    const tag = await new Promise((resolve, reject) => {
-      db.run(
-        'INSERT INTO tags (name, description) VALUES (?, ?)',
-        [name, description || null],
-        function(err) {
+    // First check if tag already exists
+    const existingTag = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT t.* FROM tags t WHERE LOWER(t.name) = LOWER(?)',
+        [name.trim()],
+        (err, row) => {
           if (err) {
-            console.error('Tag creation error:', err);
+            console.error('Error checking existing tag:', err);
             reject(err);
           } else {
-            resolve({
-              id: this.lastID,
-              name,
-              description
-            });
+            resolve(row);
+          }
+        }
+      );
+    });
+
+    let tag;
+    
+    if (existingTag) {
+      // Check if user already has this tag
+      const userHasTag = await new Promise((resolve, reject) => {
+        db.get(
+          'SELECT 1 FROM user_tags WHERE user_id = ? AND tag_id = ?',
+          [userId, existingTag.id],
+          (err, row) => {
+            if (err) {
+              console.error('Error checking user tag:', err);
+              reject(err);
+            } else {
+              resolve(!!row);
+            }
+          }
+        );
+      });
+
+      if (userHasTag) {
+        return res.status(400).json({ error: 'You already have this tag' });
+      }
+
+      // Use existing tag
+      tag = existingTag;
+    } else {
+      // Create new tag
+      tag = await new Promise((resolve, reject) => {
+        db.run(
+          'INSERT INTO tags (name, description) VALUES (?, ?)',
+          [name.trim(), description ? description.trim() : null],
+          function(err) {
+            if (err) {
+              console.error('Tag creation error:', err);
+              reject(err);
+            } else {
+              resolve({
+                id: this.lastID,
+                name: name.trim(),
+                description: description ? description.trim() : null
+              });
+            }
+          }
+        );
+      });
+    }
+
+    // Associate tag with user
+    await new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO user_tags (user_id, tag_id) VALUES (?, ?)',
+        [userId, tag.id],
+        function(err) {
+          if (err) {
+            console.error('User tag association error:', err);
+            reject(err);
+          } else {
+            resolve();
           }
         }
       );
@@ -265,7 +330,7 @@ router.post('/tags', async (req, res) => {
 
     res.status(201).json(tag);
   } catch (error) {
-    console.error('Error creating tag:', error);
+    console.error('Error in tag creation:', error);
     res.status(500).json({ error: 'Failed to create tag' });
   }
 });

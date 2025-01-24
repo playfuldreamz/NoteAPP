@@ -225,12 +225,43 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       const newTag = await createTag(tagName);
       if (!newTag?.id) throw new Error('Invalid response from createTag');
       
-      await addUserTag(newTag.id);
+      // Add the tag to the item immediately
+      const normalizedType = normalizeType(type);
+      const response = await addTagToItem(normalizedType, itemId, newTag);
+      
+      if (!response || typeof response.id !== 'number') {
+        throw new Error('Invalid response from addTagToItem');
+      }
+
+      const addedTag: Tag = {
+        id: response.id,
+        name: response.name,
+        description: response.description || ''
+      };
+
+      // Update the UI states
       setTags(prev => [...prev, newTag]);
+      const updatedSelectedTags = [...selectedTags, addedTag];
+      setSelectedTags(updatedSelectedTags);
+      onTagsUpdate?.(updatedSelectedTags);
+
+      toast.success('Tag created and added successfully');
       return newTag;
     } catch (error) {
       console.error('Error creating tag:', error);
-      toast.error('Failed to create tag');
+      if (error instanceof Error) {
+        if (error.message.includes('401')) {
+          toast.error('Please log in to create tags');
+        } else if (error.message.includes('400')) {
+          toast.error('Invalid tag name');
+        } else if (error.message.includes('You already have this tag')) {
+          toast.error('You already have this tag');
+        } else {
+          toast.error('Failed to create tag');
+        }
+      } else {
+        toast.error('Failed to create tag');
+      }
       return null;
     } finally {
       setIsSaving(false);
