@@ -105,8 +105,21 @@ const Modal: React.FC<ModalProps> = ({
               scrollbarColor: 'rgb(156 163 175) transparent'
             }}
           >
-            <div className="prose dark:prose-invert max-w-none">
-              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{content}</p>
+            <div className={`max-w-none ${type === 'transcript' ? 'font-mono text-sm' : 'prose dark:prose-invert'}`}>
+              {type === 'transcript' ? (
+                <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed bg-transparent p-0 m-0 border-0">
+                  {content}
+                </pre>
+              ) : (
+                <div 
+                  className="text-gray-700 dark:text-gray-300 leading-relaxed"
+                  dangerouslySetInnerHTML={{ 
+                    __html: content.split('\n').map(line => 
+                      line.trim() ? `<p>${line}</p>` : '<br/>'
+                    ).join('')
+                  }} 
+                />
+              )}
             </div>
           </div>
 
