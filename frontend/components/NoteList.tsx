@@ -5,7 +5,7 @@ import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Sparkles, Download } from 'lucide-react';
 import TranscriptActions from './TranscriptActions';
 import { generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
-import useDownloadNote, { DownloadOptions } from '../hooks/useDownloadNote';
+import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 
 interface Tag {
@@ -39,12 +39,8 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
   const [isRegeneratingTitle, setIsRegeneratingTitle] = useState(false);
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
-  const { downloadNote, isDownloading } = useDownloadNote();
-  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>({
-    format: 'txt',
-    includeTranscript: true,
-    includeMetadata: true
-  });
+  const { downloadDocument, isDownloading } = useDownloadDocument();
+  const [downloadOptions, setDownloadOptions] = useState<Record<number, DownloadOptions>>({});
   const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({});
 
   const toggleTagsExpansion = useCallback((noteId: number) => {
@@ -67,12 +63,20 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     setVisibleNotes(prev => prev.map(updateNote));
   }, [selectedNoteId]);
 
-  const handleDownloadOptionsChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+  const getDownloadOptions = (noteId: number): DownloadOptions => ({
+    format: downloadOptions[noteId]?.format || 'txt',
+    includeMetadata: true
+  });
+
+  const handleDownloadOptionsChange = (noteId: number, e: React.ChangeEvent<HTMLSelectElement>) => {
     setDownloadOptions(prev => ({
       ...prev,
-      format: e.target.value as 'txt' | 'json' | 'pdf'
+      [noteId]: {
+        ...getDownloadOptions(noteId),
+        format: e.target.value as 'txt' | 'json' | 'pdf'
+      }
     }));
-  }, []);
+  };
 
   const renderNoteTags = useCallback((note: Note) => {
     const tags = note.tags || [];
@@ -398,7 +402,11 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                     <Trash2 size={16} />
                   </button>
                   <button
-                    onClick={() => downloadNote(note, downloadOptions)}
+                    onClick={() => downloadDocument({
+                      ...note,
+                      type: 'note',
+                      content: note.content
+                    }, getDownloadOptions(note.id))}
                     disabled={isDownloading}
                     className="text-blue-500 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
                     title="Download note"
@@ -424,8 +432,8 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
               <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
                 <span>{new Date(note.timestamp).toLocaleString()}</span>
                 <select
-                  value={downloadOptions.format}
-                  onChange={handleDownloadOptionsChange}
+                  value={getDownloadOptions(note.id).format}
+                  onChange={(e) => handleDownloadOptionsChange(note.id, e)}
                   className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5"
                 >
                   <option value="txt">TXT</option>

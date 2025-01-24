@@ -3,7 +3,7 @@ import TaggingModule from './TaggingModule';
 import ActionItemsModule from './ActionItemsModule';
 import { Tag } from '../services/ai';
 import { RotateCw, X, TagIcon, CheckSquare, Download } from 'lucide-react';
-import useDownloadNote, { DownloadOptions } from '../hooks/useDownloadNote';
+import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 
 interface ModalProps {
   isOpen: boolean;
@@ -37,10 +37,13 @@ const Modal: React.FC<ModalProps> = ({
   const [isScrolled, setIsScrolled] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>({
     format: 'txt',
-    includeTranscript: true,
     includeMetadata: true
   });
-  const { downloadNote, isDownloading } = useDownloadNote();
+  const [perItemDownloadOptions, setPerItemDownloadOptions] = useState<DownloadOptions>({
+    format: 'txt',
+    includeMetadata: true
+  });
+  const { downloadDocument, isDownloading } = useDownloadDocument();
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setIsScrolled(e.currentTarget.scrollTop > 0);
@@ -48,6 +51,13 @@ const Modal: React.FC<ModalProps> = ({
 
   const handleDownloadOptionsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setDownloadOptions(prev => ({
+      ...prev,
+      format: e.target.value as 'txt' | 'json' | 'pdf'
+    }));
+  };
+
+  const handlePerItemDownloadOptionsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setPerItemDownloadOptions(prev => ({
       ...prev,
       format: e.target.value as 'txt' | 'json' | 'pdf'
     }));
@@ -99,8 +109,8 @@ const Modal: React.FC<ModalProps> = ({
           
           <div className="flex items-center gap-2">
             <select
-              value={downloadOptions.format}
-              onChange={handleDownloadOptionsChange}
+              value={perItemDownloadOptions.format}
+              onChange={handlePerItemDownloadOptionsChange}
               className="text-sm text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors p-2 border border-gray-200 dark:border-gray-700"
             >
               <option value="txt">TXT</option>
@@ -109,14 +119,15 @@ const Modal: React.FC<ModalProps> = ({
             </select>
             
             <button
-              onClick={() => downloadNote({
+              onClick={() => downloadDocument({
                 id: itemId,
+                type: type === 'note' ? 'note' : 'transcript',
                 content,
-                transcript: type === 'transcript' ? content : '',
                 timestamp: new Date().toISOString(),
                 title: title || 'Untitled',
-                tags
-              }, downloadOptions)}
+                tags,
+                ...(type === 'note' ? { transcript: '' } : {})
+              }, perItemDownloadOptions)}
               disabled={isDownloading}
               className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Download content"

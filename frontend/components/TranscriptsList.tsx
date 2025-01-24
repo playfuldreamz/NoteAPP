@@ -4,7 +4,7 @@ import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
 import TranscriptActions, { TranscriptFilters } from './TranscriptActions';
 import { generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
-import useDownloadNote, { DownloadOptions } from '../hooks/useDownloadNote';
+import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 
 interface Tag {
@@ -34,18 +34,24 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const { downloadNote, isDownloading } = useDownloadNote();
-  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>({
-    format: 'txt',
+  const { downloadDocument, isDownloading } = useDownloadDocument();
+  const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
+  const [downloadOptions, setDownloadOptions] = useState<Record<number, DownloadOptions>>({});
+
+  const getDownloadOptions = (transcriptId: number): DownloadOptions => ({
+    format: downloadOptions[transcriptId]?.format || 'txt',
     includeMetadata: true
   });
 
-  const handleDownloadOptionsChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleDownloadOptionsChange = (transcriptId: number, e: React.ChangeEvent<HTMLSelectElement>) => {
     setDownloadOptions(prev => ({
       ...prev,
-      format: e.target.value as 'txt' | 'json' | 'pdf'
+      [transcriptId]: {
+        ...getDownloadOptions(transcriptId),
+        format: e.target.value as 'txt' | 'json' | 'pdf'
+      }
     }));
-  }, []);
+  };
 
   const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({});
 
@@ -99,8 +105,6 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   }, [selectedTranscriptId]);
 
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
-  const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
-
   const applyFilters = (transcripts: Transcript[], filters: TranscriptFilters) => {
     let filtered = [...transcripts];
 
@@ -378,14 +382,14 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                         <Trash2 size={16} />
                       </button>
                       <button
-                        onClick={() => downloadNote({
+                        onClick={() => downloadDocument({
                           id: transcript.id,
+                          type: 'transcript',
                           content: transcript.text,
-                          transcript: '',
                           timestamp: transcript.date,
                           title: transcript.title || `Transcript-${transcript.id}`,
                           tags: transcript.tags || []
-                        }, downloadOptions)}
+                        }, getDownloadOptions(transcript.id))}
                         disabled={isDownloading}
                         className="text-blue-500 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
                         title="Download transcript"
@@ -411,8 +415,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                   <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
                     <span>{new Date(transcript.date).toLocaleString()}</span>
                     <select
-                      value={downloadOptions.format}
-                      onChange={handleDownloadOptionsChange}
+                      value={getDownloadOptions(transcript.id).format}
+                      onChange={(e) => handleDownloadOptionsChange(transcript.id, e)}
                       className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5"
                     >
                       <option value="txt">TXT</option>
