@@ -158,20 +158,9 @@ const Modal: React.FC<ModalProps> = ({
             }}
           >
             <div className={`max-w-none ${type === 'transcript' ? 'font-mono text-sm' : 'prose dark:prose-invert'}`}>
-              {type === 'transcript' ? (
-                <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed bg-transparent p-0 m-0 border-0">
-                  {content}
-                </pre>
-              ) : (
-                <div 
-                  className="text-gray-700 dark:text-gray-300 leading-relaxed"
-                  dangerouslySetInnerHTML={{ 
-                    __html: content.split('\n').map(line => 
-                      line.trim() ? `<p>${line}</p>` : '<br/>'
-                    ).join('')
-                  }} 
-                />
-              )}
+              <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed bg-transparent p-0 m-0 border-0">
+                {content}
+              </pre>
             </div>
           </div>
 

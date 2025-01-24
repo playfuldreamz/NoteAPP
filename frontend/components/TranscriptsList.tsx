@@ -375,12 +375,15 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => handleDeleteTranscript(transcript.id)}
-                        className="text-red-500 hover:text-red-700 transition-colors duration-200"
+                      <select
+                        value={getDownloadOptions(transcript.id).format}
+                        onChange={(e) => handleDownloadOptionsChange(transcript.id, e)}
+                        className="text-xs text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors px-1.5 py-1 border border-gray-200 dark:border-gray-700"
                       >
-                        <Trash2 size={16} />
-                      </button>
+                        <option value="txt">TXT</option>
+                        <option value="json">JSON</option>
+                        <option value="pdf">PDF</option>
+                      </select>
                       <button
                         onClick={() => downloadDocument({
                           id: transcript.id,
@@ -391,10 +394,17 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                           tags: transcript.tags || []
                         }, getDownloadOptions(transcript.id))}
                         disabled={isDownloading}
-                        className="text-blue-500 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Download transcript"
                       >
-                        <Download size={16} />
+                        <Download size={16} className={isDownloading ? 'opacity-50' : ''} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTranscript(transcript.id)}
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        title="Delete transcript"
+                      >
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
@@ -414,15 +424,6 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                   {renderTranscriptTags(transcript)}
                   <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
                     <span>{new Date(transcript.date).toLocaleString()}</span>
-                    <select
-                      value={getDownloadOptions(transcript.id).format}
-                      onChange={(e) => handleDownloadOptionsChange(transcript.id, e)}
-                      className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5"
-                    >
-                      <option value="txt">TXT</option>
-                      <option value="json">JSON</option>
-                      <option value="pdf">PDF</option>
-                    </select>
                   </div>
                 </div>
               </li>
