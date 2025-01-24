@@ -20,6 +20,7 @@ const app = express();
 
 // Import routes
 const aiRoutes = require('./routes/ai');
+const actionItemsRoutes = require('./routes/actionItems');
 const PORT = process.env.PORT || 5000;
 
 // JWT secret key - in production, use an environment variable
@@ -60,6 +61,7 @@ const authenticateToken = (req, res, next) => {
 
 // Mount routes
 app.use('/api/ai', authenticateToken, aiRoutes);
+app.use('/api/action-items', authenticateToken, actionItemsRoutes);
 
 // Database setup
 const path = require('path');
@@ -151,6 +153,23 @@ db.serialize(() => {
     PRIMARY KEY (user_id, tag_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+  )`);
+
+  // Create action_items table
+  db.run(`CREATE TABLE IF NOT EXISTS action_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT NOT NULL,
+    source_id INTEGER NOT NULL,
+    source_type TEXT CHECK(source_type IN ('note', 'transcript')) NOT NULL,
+    deadline TEXT,
+    priority TEXT CHECK(priority IN ('high', 'medium', 'low')) NOT NULL,
+    status TEXT CHECK(status IN ('pending', 'completed', 'cancelled')) DEFAULT 'pending',
+    confidence REAL NOT NULL,
+    metadata TEXT,
+    user_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
   // Insert default app settings if none exist

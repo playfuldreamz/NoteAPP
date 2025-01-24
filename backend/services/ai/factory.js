@@ -1,6 +1,7 @@
 const GeminiProvider = require('./providers/gemini');
 const OpenAIProvider = require('./providers/openai');
 const DeepSeekProvider = require('./providers/deepseek');
+const AIConfigManager = require('./config');
 
 class AIProviderFactory {
   static async createProvider(type, config) {
@@ -22,6 +23,19 @@ class AIProviderFactory {
 
     await provider.initialize();
     return provider;
+  }
+
+  static async getProvider(userId) {
+    try {
+      const config = await AIConfigManager.getUserConfig(userId);
+      if (!config || !config.provider || !config.apiKey) {
+        throw new Error('AI provider configuration not found');
+      }
+      return await this.createProvider(config.provider, config);
+    } catch (error) {
+      console.error('Error getting AI provider:', error);
+      throw error;
+    }
   }
 }
 
