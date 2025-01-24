@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import TaggingModule from './TaggingModule';
 import ActionItemsModule from './ActionItemsModule';
 import { Tag } from '../services/ai';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, X, TagIcon, CheckSquare } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -33,6 +33,7 @@ const Modal: React.FC<ModalProps> = ({
 }) => {
   const [tags, setTags] = useState<Tag[]>(initialTags);
   const [activeTab, setActiveTab] = useState('tags');
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -45,88 +46,112 @@ const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen]);
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setIsScrolled(e.currentTarget.scrollTop > 0);
+  };
+
   if (!isOpen) return null;
 
   // Validate and normalize type
   const normalizedType = type === 'note' ? 'note' : 'transcript';
-  
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-      <div className="fixed inset-x-0 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white dark:bg-gray-900 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-          <div className="flex-1 flex items-center justify-center gap-2">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-4 lg:inset-8 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col max-h-[calc(100vh-2rem)] lg:max-h-[calc(100vh-4rem)]">
+        {/* Header */}
+        <div className={`sticky top-0 z-10 px-6 py-4 flex items-center gap-4 transition-shadow ${isScrolled ? 'shadow-md dark:shadow-gray-800' : ''}`}>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate">
               {title || 'Content'}
             </h3>
+          </div>
+          
+          <div className="flex items-center gap-2">
             {onRegenerateTitle && (
               <button
                 onClick={onRegenerateTitle}
                 disabled={isRegeneratingTitle}
-                className={`p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
                   isRegeneratingTitle ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
                 title="Regenerate title"
               >
                 <RotateCw 
-                  size={18} 
+                  size={20} 
                   className={`text-gray-500 dark:text-gray-400 ${isRegeneratingTitle ? 'animate-spin' : ''}`}
                 />
               </button>
             )}
+            
+            <button 
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              aria-label="Close modal"
+            >
+              <X size={20} />
+            </button>
           </div>
-          <button 
-            onClick={onClose} 
-            className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
-          >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
-        <div className="p-6 space-y-6 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-          {/* Content section */}
-          <div className="prose dark:prose-invert max-w-none">
-            <p>{content}</p>
+
+        {/* Content area with custom scrollbar */}
+        <div 
+          className="flex-1 overflow-hidden flex flex-col lg:flex-row"
+          onScroll={handleScroll}
+        >
+          {/* Left panel - Content */}
+          <div className="flex-1 min-w-0 overflow-y-auto px-6 py-6 lg:border-r border-gray-200 dark:border-gray-700"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgb(156 163 175) transparent'
+            }}
+          >
+            <div className="prose dark:prose-invert max-w-none">
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{content}</p>
+            </div>
           </div>
 
-          {/* Tabs for different modules */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            <div className="border-b border-gray-200 dark:border-gray-700">
-              <nav className="-mb-px flex space-x-8">
-                <button
-                  onClick={() => setActiveTab('tags')}
-                  className={`pb-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'tags'
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  Tags
-                </button>
-                <button
-                  onClick={() => setActiveTab('actions')}
-                  className={`pb-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'actions'
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  Action Items
-                </button>
-              </nav>
+          {/* Right panel - Tabs and modules */}
+          <div className="flex-1 min-w-0 lg:max-w-[40%] xl:max-w-[35%] overflow-hidden flex flex-col border-t border-gray-200 dark:border-gray-700 lg:border-t-0">
+            {/* Tabs navigation */}
+            <div className="flex items-center px-6 py-2 gap-1 border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setActiveTab('tags')}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  activeTab === 'tags'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                <TagIcon size={16} />
+                Tags
+              </button>
+              <button
+                onClick={() => setActiveTab('actions')}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  activeTab === 'actions'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                <CheckSquare size={16} />
+                Action Items
+              </button>
             </div>
 
-            <div className="mt-6">
+            {/* Tab panels with separate scroll */}
+            <div className="flex-1 overflow-y-auto px-6 py-4"
+              style={{
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'rgb(156 163 175) transparent'
+              }}
+            >
               {activeTab === 'tags' && (
                 <TaggingModule
                   type={normalizedType}
                   itemId={itemId}
                   content={content}
                   initialTags={tags}
-                  onTagsUpdate={(newTags) => {
-                    setTags(newTags);
-                    onTagsUpdate?.(newTags);
-                  }}
+                  onTagsUpdate={onTagsUpdate}
                 />
               )}
               {activeTab === 'actions' && (
