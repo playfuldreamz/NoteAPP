@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import TaggingModule from './TaggingModule';
 import ActionItemsModule from './ActionItemsModule';
 import { Tag } from '../services/ai';
-import { RotateCw, X, TagIcon, CheckSquare } from 'lucide-react';
+import { RotateCw, X, TagIcon, CheckSquare, Download } from 'lucide-react';
+import useDownloadNote, { DownloadOptions } from '../hooks/useDownloadNote';
 
 interface ModalProps {
   isOpen: boolean;
@@ -34,6 +35,23 @@ const Modal: React.FC<ModalProps> = ({
   const [tags, setTags] = useState<Tag[]>(initialTags);
   const [activeTab, setActiveTab] = useState('tags');
   const [isScrolled, setIsScrolled] = useState(false);
+  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>({
+    format: 'txt',
+    includeTranscript: true,
+    includeMetadata: true
+  });
+  const { downloadNote, isDownloading } = useDownloadNote();
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setIsScrolled(e.currentTarget.scrollTop > 0);
+  };
+
+  const handleDownloadOptionsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setDownloadOptions(prev => ({
+      ...prev,
+      format: e.target.value as 'txt' | 'json' | 'pdf'
+    }));
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -46,10 +64,6 @@ const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen]);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    setIsScrolled(e.currentTarget.scrollTop > 0);
-  };
-
   if (!isOpen) return null;
 
   // Validate and normalize type
@@ -61,27 +75,54 @@ const Modal: React.FC<ModalProps> = ({
         {/* Header */}
         <div className={`sticky top-0 z-10 px-4 sm:px-6 py-4 flex items-center gap-4 transition-shadow ${isScrolled ? 'shadow-md dark:shadow-gray-800' : ''}`}>
           <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate">
-              {title || 'Content'}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate">
+                {title || 'Content'}
+              </h3>
+              {onRegenerateTitle && (
+                <button
+                  onClick={onRegenerateTitle}
+                  disabled={isRegeneratingTitle}
+                  className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                    isRegeneratingTitle ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  title="Regenerate title"
+                >
+                  <RotateCw 
+                    size={20} 
+                    className={`text-gray-500 dark:text-gray-400 ${isRegeneratingTitle ? 'animate-spin' : ''}`}
+                  />
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center gap-2">
-            {onRegenerateTitle && (
-              <button
-                onClick={onRegenerateTitle}
-                disabled={isRegeneratingTitle}
-                className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                  isRegeneratingTitle ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-                title="Regenerate title"
-              >
-                <RotateCw 
-                  size={20} 
-                  className={`text-gray-500 dark:text-gray-400 ${isRegeneratingTitle ? 'animate-spin' : ''}`}
-                />
-              </button>
-            )}
+            <select
+              value={downloadOptions.format}
+              onChange={handleDownloadOptionsChange}
+              className="text-sm text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors p-2 border border-gray-200 dark:border-gray-700"
+            >
+              <option value="txt">TXT</option>
+              <option value="json">JSON</option>
+              <option value="pdf">PDF</option>
+            </select>
+            
+            <button
+              onClick={() => downloadNote({
+                id: itemId,
+                content,
+                transcript: type === 'transcript' ? content : '',
+                timestamp: new Date().toISOString(),
+                title: title || 'Untitled',
+                tags
+              }, downloadOptions)}
+              disabled={isDownloading}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Download content"
+            >
+              <Download size={20} className={isDownloading ? 'opacity-50' : ''} />
+            </button>
             
             <button 
               onClick={onClose}

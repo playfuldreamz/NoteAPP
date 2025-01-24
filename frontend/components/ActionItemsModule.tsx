@@ -204,51 +204,60 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
     <div className="space-y-4">
       {/* Action buttons and filters */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <button
-          onClick={extractActionItems}
-          disabled={loading}
-          className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0
-            ${loading 
-              ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-              : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50'
-            }`}
-        >
-          {loading ? (
-            <>
-              <RotateCw className="h-4 w-4 animate-spin" />
-              Extracting...
-            </>
-          ) : (
-            <>
-              <ListTodo className="h-4 w-4" />
-              Extract Action Items
-            </>
-          )}
-        </button>
-
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <select
-            value={filter.status || ''}
-            onChange={(e) => setFilter(f => ({ ...f, status: e.target.value || undefined }))}
-            className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        {actionItems.length > 0 ? (
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+            <Info size={16} />
+            Action items already extracted
+          </div>
+        ) : (
+          <button
+            onClick={extractActionItems}
+            disabled={loading}
+            className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0
+              ${loading 
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+              }`}
           >
-            <option value="">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+            {loading ? (
+              <>
+                <RotateCw className="h-4 w-4 animate-spin" />
+                Extracting...
+              </>
+            ) : (
+              <>
+                <ListTodo className="h-4 w-4" />
+                Extract Action Items
+              </>
+            )}
+          </button>
+        )}
 
-          <select
-            value={filter.priority || ''}
-            onChange={(e) => setFilter(f => ({ ...f, priority: e.target.value || undefined }))}
-            className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          >
-            <option value="">All Priority</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
+        {actionItems.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <select
+              value={filter.status || ''}
+              onChange={(e) => setFilter(f => ({ ...f, status: e.target.value || undefined }))}
+              className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+
+            <select
+              value={filter.priority || ''}
+              onChange={(e) => setFilter(f => ({ ...f, priority: e.target.value || undefined }))}
+              className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="">All Priority</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Error message */}
