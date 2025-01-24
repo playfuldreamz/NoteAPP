@@ -59,7 +59,7 @@ const Modal: React.FC<ModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-sm">
       <div className="fixed inset-4 lg:inset-8 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col max-h-[calc(100vh-2rem)] lg:max-h-[calc(100vh-4rem)]">
         {/* Header */}
-        <div className={`sticky top-0 z-10 px-6 py-4 flex items-center gap-4 transition-shadow ${isScrolled ? 'shadow-md dark:shadow-gray-800' : ''}`}>
+        <div className={`sticky top-0 z-10 px-4 sm:px-6 py-4 flex items-center gap-4 transition-shadow ${isScrolled ? 'shadow-md dark:shadow-gray-800' : ''}`}>
           <div className="flex-1 min-w-0">
             <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate">
               {title || 'Content'}
@@ -99,7 +99,7 @@ const Modal: React.FC<ModalProps> = ({
           onScroll={handleScroll}
         >
           {/* Left panel - Content */}
-          <div className="flex-1 min-w-0 overflow-y-auto px-6 py-6 lg:border-r border-gray-200 dark:border-gray-700"
+          <div className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 py-4 lg:border-r border-gray-200 dark:border-gray-700"
             style={{
               scrollbarWidth: 'thin',
               scrollbarColor: 'rgb(156 163 175) transparent'
@@ -124,12 +124,12 @@ const Modal: React.FC<ModalProps> = ({
           </div>
 
           {/* Right panel - Tabs and modules */}
-          <div className="flex-1 min-w-0 lg:max-w-[40%] xl:max-w-[35%] overflow-hidden flex flex-col border-t border-gray-200 dark:border-gray-700 lg:border-t-0">
+          <div className="flex-1 min-w-0 lg:max-w-[45%] xl:max-w-[40%] overflow-hidden flex flex-col border-t border-gray-200 dark:border-gray-700 lg:border-t-0">
             {/* Tabs navigation */}
-            <div className="flex items-center px-6 py-2 gap-1 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center px-4 sm:px-6 py-2 gap-1 border-b border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => setActiveTab('tags')}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
                   activeTab === 'tags'
                     ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                     : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -140,7 +140,7 @@ const Modal: React.FC<ModalProps> = ({
               </button>
               <button
                 onClick={() => setActiveTab('actions')}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
                   activeTab === 'actions'
                     ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                     : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -152,7 +152,7 @@ const Modal: React.FC<ModalProps> = ({
             </div>
 
             {/* Tab panels with separate scroll */}
-            <div className="flex-1 overflow-y-auto px-6 py-4"
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4"
               style={{
                 scrollbarWidth: 'thin',
                 scrollbarColor: 'rgb(156 163 175) transparent'

@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { format, isValid, parseISO } from 'date-fns';
-import { Calendar, Clock, CheckCircle2, Circle, XCircle, AlertTriangle } from 'lucide-react';
+import { 
+  Calendar, 
+  Clock, 
+  CheckCircle2, 
+  Circle, 
+  XCircle, 
+  AlertTriangle, 
+  RotateCw, 
+  ListTodo, 
+  Info, 
+  ClipboardList 
+} from 'lucide-react';
 
 interface ActionItem {
   id: number;
@@ -57,20 +68,28 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
   // Fetch action items
   const fetchActionItems = async () => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/action-items?sourceId=${itemId}&sourceType=${type}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${getAuthToken()}`,
-          },
-        }
-      );
-      if (!response.ok) throw new Error('Failed to fetch action items');
+      const token = getAuthToken();
+      if (!token) {
+        setError('Authentication required');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/action-items?sourceId=${itemId}&sourceType=${type}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch action items');
+      }
+
       const data = await response.json();
       setActionItems(data);
+      setError(null);
     } catch (err) {
-      setError('Failed to load action items');
-      console.error(err);
+      console.error('Fetch error:', err);
+      setError('Failed to fetch action items');
     }
   };
 
@@ -78,12 +97,18 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
   const extractActionItems = async () => {
     setLoading(true);
     setError(null);
+    
     try {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/action-items/extract`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`,
         },
         body: JSON.stringify({
           content,
@@ -93,16 +118,16 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to extract action items');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to extract action items');
       }
-      
-      const data = await response.json();
+
+      // Fetch the updated list of action items instead of appending
       await fetchActionItems();
-      if (onUpdate) onUpdate();
+      
     } catch (err) {
+      console.error('Extract error:', err);
       setError(err instanceof Error ? err.message : 'Failed to extract action items');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -150,7 +175,7 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
 
   useEffect(() => {
     fetchActionItems();
-  }, [itemId, type]);
+  }, [itemId]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -177,98 +202,132 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Action Items</h3>
+      {/* Action buttons and filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <button
           onClick={extractActionItems}
           disabled={loading}
-          className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-700 disabled:opacity-50"
+          className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0
+            ${loading 
+              ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+              : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+            }`}
         >
-          {loading ? 'Extracting...' : 'Extract Action Items'}
+          {loading ? (
+            <>
+              <RotateCw className="h-4 w-4 animate-spin" />
+              Extracting...
+            </>
+          ) : (
+            <>
+              <ListTodo className="h-4 w-4" />
+              Extract Action Items
+            </>
+          )}
         </button>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <select
+            value={filter.status || ''}
+            onChange={(e) => setFilter(f => ({ ...f, status: e.target.value || undefined }))}
+            className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          >
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          <select
+            value={filter.priority || ''}
+            onChange={(e) => setFilter(f => ({ ...f, priority: e.target.value || undefined }))}
+            className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          >
+            <option value="">All Priority</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
       </div>
 
+      {/* Error message */}
       {error && (
-        <div className="flex items-center gap-2 text-red-500 dark:text-red-400">
-          <AlertTriangle size={16} />
-          <span>{error}</span>
+        <div className="rounded-lg bg-red-50 dark:bg-red-900/30 p-3 text-red-600 dark:text-red-400 text-sm">
+          {error}
         </div>
       )}
 
-      <div className="flex gap-4 mb-4">
-        <select
-          value={filter.status || ''}
-          onChange={(e) => setFilter(f => ({ ...f, status: e.target.value || undefined }))}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded px-2 py-1"
-        >
-          <option value="">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-
-        <select
-          value={filter.priority || ''}
-          onChange={(e) => setFilter(f => ({ ...f, priority: e.target.value || undefined }))}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded px-2 py-1"
-        >
-          <option value="">All Priority</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-      </div>
-
+      {/* Action items list */}
       <div className="space-y-2">
-        {filteredItems.map((item) => (
-          <div
-            key={item.id}
-            className="border border-gray-200 dark:border-gray-700 rounded p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-2 flex-grow">
+        {filteredItems.length > 0 ? (
+          filteredItems.map((item) => (
+            <div
+              key={item.id}
+              className="group relative rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+            >
+              <div className="flex items-start gap-3">
                 <button
                   onClick={() => updateActionItem(item.id, {
                     status: item.status === 'completed' ? 'pending' : 'completed'
                   })}
-                  className="mt-1"
+                  className="mt-0.5 flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg p-1 -m-1"
                 >
                   {getStatusIcon(item.status)}
                 </button>
-                <div className="flex-grow">
-                  <p className={`${item.status === 'completed' ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>
+
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm ${
+                    item.status === 'completed' 
+                      ? 'line-through text-gray-500 dark:text-gray-400' 
+                      : 'text-gray-900 dark:text-gray-100'
+                  }`}>
                     {item.content}
                   </p>
-                  <div className="flex gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    <span className="flex items-center gap-1">
-                      <Calendar size={14} />
+
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                      <Calendar size={12} />
                       {formatDate(item.deadline)}
                     </span>
-                    <span className={`flex items-center gap-1 ${getPriorityColor(item.priority)}`}>
-                      <Clock size={14} />
+
+                    <span className={`inline-flex items-center gap-1.5 ${getPriorityColor(item.priority)}`}>
+                      <Clock size={12} />
                       {item.priority} priority
                     </span>
+
+                    {item.metadata?.contextualClues?.length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                        <Info size={12} />
+                        {item.metadata.contextualClues.join(', ')}
+                      </span>
+                    )}
                   </div>
                 </div>
+
+                <button
+                  onClick={() => deleteActionItem(item.id)}
+                  className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 -m-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-red-500 rounded-lg transition-opacity"
+                >
+                  <XCircle size={16} />
+                </button>
               </div>
-              <button
-                onClick={() => deleteActionItem(item.id)}
-                className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-500"
-              >
-                <XCircle size={16} />
-              </button>
             </div>
+          ))
+        ) : (
+          <div className="text-center py-6">
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 mb-3">
+              <ClipboardList className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No action items found. Click "Extract Action Items" to analyze the content.
+            </p>
           </div>
-        ))}
-        
-        {filteredItems.length === 0 && (
-          <p className="text-center text-gray-500 dark:text-gray-400 py-4">
-            No action items found
-          </p>
         )}
       </div>
     </div>
   );
+
 };
 
 export default ActionItemsModule;
