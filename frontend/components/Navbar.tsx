@@ -19,10 +19,10 @@ export default function Navbar({
 }: NavbarProps) {
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
         <div className="flex justify-between items-center h-16">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Notes</h1>
-          <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="flex items-center space-x-3 sm:space-x-4 md:space-x-6">
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800">
               <Sparkles className="w-3.5 h-3.5" />
               <span>AI: {currentModel}</span>
