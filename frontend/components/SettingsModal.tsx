@@ -10,9 +10,11 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   setUsername: (username: string) => void;
+  currentModel: string;
+  modelSource: string;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsername }: SettingsModalProps) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsername, currentModel, modelSource }: SettingsModalProps) => {
   interface AIConfig {
     provider: AIProvider;
     apiKey: string;
