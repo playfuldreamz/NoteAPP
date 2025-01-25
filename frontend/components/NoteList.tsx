@@ -7,6 +7,8 @@ import TranscriptActions from './TranscriptActions';
 import { generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import useTitleGeneration from '../hooks/useTitleGeneration';
+import { deleteResource, bulkDeleteResources } from '../services/deleteService';
+import { useTagsContext } from '../context/TagsContext';
 
 interface Tag {
   id: number;
@@ -44,6 +46,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({});
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<number>>(new Set());
+  const { updateItemTags } = useTagsContext();
 
   const toggleTagsExpansion = useCallback((noteId: number) => {
     setExpandedTags(prev => ({
@@ -177,6 +180,14 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     }
   }, [searchQuery, notes]);
 
+  useEffect(() => {
+    notes.forEach(note => {
+      if (note.tags) {
+        updateItemTags(note.id, 'note', note.tags);
+      }
+    });
+  }, [notes, updateItemTags]);
+
   const handleDelete = async (id: number) => {
     try {
       const token = localStorage.getItem('token');
@@ -185,39 +196,12 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
         return;
       }
 
-      // First delete associated tags
-      const deleteTagsResponse = await fetch(`http://localhost:5000/notes/${id}/tags`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-      });
-
-      if (!deleteTagsResponse.ok) {
-        const data = await deleteTagsResponse.json();
-        throw new Error(data.message || 'Failed to delete note tags');
-      }
-
-      // Then delete the note
-      const deleteResponse = await fetch(`http://localhost:5000/notes/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-      });
-
-      if (deleteResponse.ok) {
-        onDelete(id);
-        toast.success('Note and associated tags deleted!');
-      } else {
-        const data = await deleteResponse.json().catch(() => ({}));
-        toast.error(data.message || 'Failed to delete note');
-      }
+      await deleteResource('note', id, token);
+      onDelete(id);
+      toast.success('Note deleted successfully!');
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error('Failed to delete note');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete note');
     }
   };
 
@@ -282,44 +266,13 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
         return;
       }
 
-      // Delete notes one by one
-      for (const id of ids) {
-        // First delete associated tags
-        const deleteTagsResponse = await fetch(`http://localhost:5000/notes/${id}/tags`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-        });
-
-        if (!deleteTagsResponse.ok) {
-          const data = await deleteTagsResponse.json();
-          throw new Error(data.message || 'Failed to delete note tags');
-        }
-
-        // Then delete the note
-        const deleteResponse = await fetch(`http://localhost:5000/notes/${id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-        });
-
-        if (!deleteResponse.ok) {
-          const data = await deleteResponse.json().catch(() => ({}));
-          throw new Error(data.message || 'Failed to delete note');
-        }
-
-        onDelete(id);
-      }
-
-      toast.success(`${ids.length} note${ids.length > 1 ? 's' : ''} deleted!`);
+      await bulkDeleteResources('note', ids, token);
+      ids.forEach(id => onDelete(id));
+      toast.success('Notes deleted successfully!');
       setSelectedNoteIds(new Set());
     } catch (error) {
       console.error('Bulk delete error:', error);
-      toast.error('Failed to delete some notes');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete notes');
     }
   };
 

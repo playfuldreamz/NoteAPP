@@ -2,10 +2,13 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
-import TranscriptActions, { TranscriptFilters } from './TranscriptActions';
+import TranscriptActions from './TranscriptActions';
+import type { TranscriptFilters } from './TranscriptActions';
 import { generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import useTitleGeneration from '../hooks/useTitleGeneration';
+import { deleteResource, bulkDeleteResources } from '../services/deleteService';
+import { useTagsContext } from '../context/TagsContext';
 
 interface Tag {
   id: number;
@@ -39,6 +42,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [downloadOptions, setDownloadOptions] = useState<Record<number, DownloadOptions>>({});
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedTranscriptIds, setSelectedTranscriptIds] = useState<Set<number>>(new Set());
+  const { updateItemTags } = useTagsContext();
 
   const getDownloadOptions = (transcriptId: number): DownloadOptions => ({
     format: downloadOptions[transcriptId]?.format || 'txt',
@@ -149,7 +153,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
       filtered = filtered.filter(t => {
         const itemTags = (t.tags || []).map(tag => tag.name);
         console.log(`Checking item ${t.id} with tags:`, itemTags);
-        const matchesAll = filters.tags.every(selectedTag => {
+        const matchesAll = filters.tags.every((selectedTag: string) => {
           const match = itemTags.includes(selectedTag);
           console.log(`Checking tag ${selectedTag}: ${match}`);
           return match;
@@ -192,6 +196,14 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     }
   }, [searchQuery, initialTranscripts]);
 
+  useEffect(() => {
+    initialTranscripts.forEach(transcript => {
+      if (transcript.tags) {
+        updateItemTags(transcript.id, 'transcript', transcript.tags);
+      }
+    });
+  }, [initialTranscripts, updateItemTags]);
+
   const handleDeleteTranscript = async (id: number) => {
     try {
       const token = localStorage.getItem('token');
@@ -200,39 +212,12 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         return;
       }
 
-      // First delete associated tags
-      const deleteTagsResponse = await fetch(`http://localhost:5000/transcripts/${id}/tags`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-      });
-
-      if (!deleteTagsResponse.ok) {
-        const data = await deleteTagsResponse.json();
-        throw new Error(data.message || 'Failed to delete transcript tags');
-      }
-
-      // Then delete the transcript
-      const response = await fetch(`http://localhost:5000/transcripts/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-      });
-
-      if (response.ok) {
-        toast.success('Transcript deleted!');
-        updateTranscripts();
-      } else {
-        const data = await response.json();
-        toast.error(data.error || 'Failed to delete transcript');
-      }
+      await deleteResource('transcript', id, token);
+      updateTranscripts();
+      toast.success('Transcript deleted successfully!');
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error('Failed to delete transcript');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete transcript');
     }
   };
 
@@ -314,43 +299,13 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
         return;
       }
 
-      // Delete transcripts one by one
-      for (const id of ids) {
-        // First delete associated tags
-        const deleteTagsResponse = await fetch(`http://localhost:5000/transcripts/${id}/tags`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-        });
-
-        if (!deleteTagsResponse.ok) {
-          const data = await deleteTagsResponse.json();
-          throw new Error(data.message || 'Failed to delete transcript tags');
-        }
-
-        // Then delete the transcript
-        const response = await fetch(`http://localhost:5000/transcripts/${id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to delete transcript');
-        }
-      }
-
-      toast.success(`${ids.length} transcript${ids.length > 1 ? 's' : ''} deleted!`);
+      await bulkDeleteResources('transcript', ids, token);
       updateTranscripts();
+      toast.success('Transcripts deleted successfully!');
       setSelectedTranscriptIds(new Set());
     } catch (error) {
       console.error('Bulk delete error:', error);
-      toast.error('Failed to delete some transcripts');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete transcripts');
     }
   };
 

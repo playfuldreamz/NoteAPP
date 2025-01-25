@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import {
   analyzeContentForTags,
@@ -15,6 +17,7 @@ import TagChip from '@components/TagChip';
 import TagCreator from '@components/TagCreator';
 import { Settings } from 'lucide-react';
 import Link from 'next/link';
+import { useTagsContext } from '../context/TagsContext';
 
 interface TaggingModuleProps {
   type?: string;
@@ -47,6 +50,9 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   initialTags = [],
   onTagsUpdate
 }) => {
+  const { updateItemTags } = useTagsContext();
+  const normalizedType = normalizeType(type);
+
   // State management
   const [tags, setTags] = useState<Tag[]>([]);
   const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
@@ -67,22 +73,22 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   useEffect(() => {
     const loadTags = async () => {
       try {
-        const normalizedType = normalizeType(type);
         const [allTags, itemTags] = await Promise.all([
           getAllTags(),
           getTagsForItem(normalizedType, itemId)
         ]);
         setTags(allTags);
-        setSelectedTags(prevTags => {
-          // Merge initial tags with item tags, avoiding duplicates
-          const mergedTags = [...itemTags];
-          initialTags.forEach(tag => {
-            if (!mergedTags.some(t => t.id === tag.id)) {
-              mergedTags.push(tag);
-            }
-          });
-          return mergedTags;
+        const mergedTags = [...itemTags];
+        initialTags.forEach(tag => {
+          if (!mergedTags.some(t => t.id === tag.id)) {
+            mergedTags.push(tag);
+          }
         });
+        setSelectedTags(mergedTags);
+        updateItemTags(itemId, normalizedType, mergedTags);
+        if (onTagsUpdate) {
+          onTagsUpdate(mergedTags);
+        }
       } catch (error) {
         console.error('Error loading tags:', error);
         toast.error('Failed to load tags');
@@ -92,7 +98,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     };
 
     loadTags();
-  }, [type, itemId, initialTags]);
+  }, [type, itemId, initialTags, updateItemTags, onTagsUpdate, normalizedType]);
 
   // Analyze content for suggested tags
   useEffect(() => {
@@ -144,64 +150,93 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     return () => clearTimeout(debounceTimer);
   }, [content, selectedTags]);
 
-  // Handle tag selection with improved error handling
-  const handleTagSelection = async (tag: Tag, retryCount = 0) => {
-    if (isSaving) return;
+  const handleAddTag = async (tagName: string) => {
     setIsSaving(true);
-    
     try {
-      const normalizedType = normalizeType(type);
-      const isSelected = selectedTags.some(t => t.id === tag.id);
-
-      if (isSelected) {
-        await removeTagFromItem(normalizedType, itemId, tag.id);
-        const updatedTags = selectedTags.filter(t => t.id !== tag.id);
-        setSelectedTags(updatedTags);
-        
-        // Check if created_at exists using optional chaining
-        if ('created_at' in tag && tag.created_at) {
-          try {
-            await deleteUserTag(tag.id);
-          } catch (error) {
-            console.error('Error deleting user tag:', error);
-          }
-        }
-        
-        onTagsUpdate?.(updatedTags);
-      } else {
-        const response = await addTagToItem(normalizedType, itemId, tag);
-        if (!response || typeof response.id !== 'number') {
-          throw new Error('Invalid response from addTagToItem');
-        }
-
-        const addedTag: Tag = {
-          id: response.id,
-          name: response.name,
-          description: response.description || ''
-        };
-
-        const updatedTags = [...selectedTags, addedTag];
-        setSelectedTags(updatedTags);
-        onTagsUpdate?.(updatedTags);
-      }
-    } catch (error) {
-      console.error('Error updating tag:', {
-        error,
-        itemId,
-        tag,
-        type,
-        retryCount
+      const newTag = await createTag(tagName);
+      await addTagToItem(normalizedType, itemId, {
+        id: newTag.id,
+        name: newTag.name,
+        description: newTag.description
       });
+      
+      const updatedTags = [...selectedTags, newTag];
+      setSelectedTags(updatedTags);
+      updateItemTags(itemId, normalizedType, updatedTags);
+      if (onTagsUpdate) {
+        onTagsUpdate(updatedTags);
+      }
+      
+      // Only show one success message
+      toast.success('Tag added successfully');
+    } catch (error) {
+      console.error('Error adding tag:', error);
+      if (error instanceof Error && error.message.includes('already exists')) {
+        toast.error('This tag already exists');
+      } else {
+        toast.error('Failed to add tag');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-      // Retry logic for network errors
-      if (retryCount < 2 && error instanceof Error && 
-          (error.message.includes('500') || error.message.includes('Network Error'))) {
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-        setIsSaving(false);
-        return handleTagSelection(tag, retryCount + 1);
+  const handleRemoveTag = async (tagId: number) => {
+    setIsSaving(true);
+    try {
+      await removeTagFromItem(normalizedType, itemId, tagId);
+      
+      const updatedTags = selectedTags.filter(tag => tag.id !== tagId);
+      setSelectedTags(updatedTags);
+      updateItemTags(itemId, normalizedType, updatedTags);
+      if (onTagsUpdate) {
+        onTagsUpdate(updatedTags);
+      }
+      
+      toast.success('Tag removed successfully');
+    } catch (error) {
+      console.error('Error removing tag:', error);
+      toast.error('Failed to remove tag');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTagClick = async (tagName: string) => {
+    if (selectedTags.some(tag => tag.name === tagName)) {
+      return; // Tag is already selected
+    }
+
+    setIsSaving(true);
+    try {
+      // First try to add the existing tag
+      const existingTag = tags.find(tag => tag.name === tagName);
+      if (existingTag) {
+        await addTagToItem(normalizedType, itemId, existingTag);
+        const updatedTags = [...selectedTags, existingTag];
+        setSelectedTags(updatedTags);
+        updateItemTags(itemId, normalizedType, updatedTags);
+        if (onTagsUpdate) {
+          onTagsUpdate(updatedTags);
+        }
+        // Don't show toast here since it's just selecting an existing tag
+        return;
       }
 
-      toast.error(getErrorMessage(error));
+      // If tag doesn't exist, create and add it
+      const newTag = await createTag(tagName);
+      await addTagToItem(normalizedType, itemId, newTag);
+      const updatedTags = [...selectedTags, newTag];
+      setSelectedTags(updatedTags);
+      updateItemTags(itemId, normalizedType, updatedTags);
+      if (onTagsUpdate) {
+        onTagsUpdate(updatedTags);
+      }
+      // Only show toast for newly created tags
+      toast.success('Tag created successfully');
+    } catch (error) {
+      console.error('Error handling tag click:', error);
+      toast.error('Failed to add tag');
     } finally {
       setIsSaving(false);
     }
@@ -226,7 +261,6 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       if (!newTag?.id) throw new Error('Invalid response from createTag');
       
       // Add the tag to the item immediately
-      const normalizedType = normalizeType(type);
       const response = await addTagToItem(normalizedType, itemId, newTag);
       
       if (!response || typeof response.id !== 'number') {
@@ -243,7 +277,10 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       setTags(prev => [...prev, newTag]);
       const updatedSelectedTags = [...selectedTags, addedTag];
       setSelectedTags(updatedSelectedTags);
-      onTagsUpdate?.(updatedSelectedTags);
+      updateItemTags(itemId, normalizedType, updatedSelectedTags);
+      if (onTagsUpdate) {
+        onTagsUpdate(updatedSelectedTags);
+      }
 
       toast.success('Tag created and added successfully');
       return newTag;
@@ -265,24 +302,6 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       return null;
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleTagClick = async (existingTag: Tag | null, tagName: string) => {
-    if (isSaving) return;
-    
-    try {
-      if (existingTag) {
-        await handleTagSelection(existingTag);
-      } else {
-        const newTag = await handleCreateTag(tagName);
-        if (newTag) {
-          await handleTagSelection(newTag);
-        }
-      }
-    } catch (error) {
-      console.error('Error handling tag click:', error);
-      toast.error('Failed to process tag');
     }
   };
 
@@ -309,7 +328,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
           <TagChip
             key={`selected-${tag.id}-${tag.name}`}
             tag={tag}
-            onRemove={() => handleTagSelection(tag)}
+            onRemove={() => handleRemoveTag(tag.id)}
             disabled={isSaving}
           />
         ))}
@@ -339,7 +358,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
                 <TagChip
                   key={`suggested-${existingTag?.id || tagName}`}
                   tag={existingTag || { id: -1, name: tagName }}
-                  onClick={() => handleTagClick(existingTag || null, tagName)}
+                  onClick={() => handleTagClick(tagName)}
                   disabled={isSaving}
                 />
               );

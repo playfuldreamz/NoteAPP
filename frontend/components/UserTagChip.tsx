@@ -1,13 +1,10 @@
 import TagChip from './TagChip';
+import { UserTag } from '../services/userTags';
 
 interface UserTagChipProps {
-  tag: {
-    id: number;
-    name: string;
-    is_user_tag?: boolean;
-  };
+  tag: UserTag;
   isSelected: boolean;
-  onToggle: () => void;
+  onToggle: (tag: UserTag) => void;
 }
 
 export default function UserTagChip({ tag, isSelected, onToggle }: UserTagChipProps) {
@@ -15,7 +12,7 @@ export default function UserTagChip({ tag, isSelected, onToggle }: UserTagChipPr
     <TagChip 
       tag={tag}
       isSelected={isSelected}
-      onToggle={onToggle}
+      onToggle={() => onToggle(tag)}
       className={tag.is_user_tag ? 'border-2 border-blue-300' : ''}
     />
   );

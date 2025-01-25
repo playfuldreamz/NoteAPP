@@ -1,5 +1,8 @@
 import ServerLayout from "./ServerLayout";
 import ClientLayout from "./ClientLayout";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { TagsProvider } from '../context/TagsContext';
 
 export default function RootLayout({
   children,
@@ -8,7 +11,12 @@ export default function RootLayout({
 }>) {
   return (
     <ServerLayout>
-      <ClientLayout>{children}</ClientLayout>
+      <ClientLayout>
+        <TagsProvider>
+          {children}
+          <ToastContainer />
+        </TagsProvider>
+      </ClientLayout>
     </ServerLayout>
   );
 }
