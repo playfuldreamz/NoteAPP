@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
-import { Settings, Moon, Sun, Bell, Lock, User, Globe } from 'lucide-react';
+import { Settings, Moon, Sun, Bell, Lock, User, Globe, X } from 'lucide-react';
 import useTheme from '../hooks/useTheme';
 import { getAIProvider, updateAIProvider, AIProvider, API_BASE } from '../services/ai';
 import { toast } from 'react-toastify';
@@ -41,13 +41,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   const [usernamePassword, setUsernamePassword] = useState('');
   const [isChangingUsername, setIsChangingUsername] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernamePasswordError, setUsernamePasswordError] = useState<string | null>(null);
   
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [currentPasswordError, setCurrentPasswordError] = useState<string | null>(null);
   const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
   const [passwordStrength, setPasswordStrength] = useState<number>(0);
@@ -139,16 +140,65 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
     setApiKey(selectedProvider.apiKey || '');
   }, [selectedProvider]);
 
+  const handleUsernameChange = async () => {
+    try {
+      setIsChangingUsername(true);
+      const response = await fetch(`${API_BASE}/change-username`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          newUsername,
+          password: usernamePassword
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        if (data.error.includes('password')) {
+          setUsernamePasswordError(data.error);
+          toast.error('Incorrect password');
+        } else if (data.error.includes('taken')) {
+          setUsernameError(data.error);
+          toast.error('Username is already taken');
+        } else {
+          setUsernameError(data.error);
+          toast.error('Failed to update username');
+        }
+        throw new Error(data.error);
+      }
+
+      // Update username in state and localStorage
+      setUsername(newUsername);
+      
+      // Clear form
+      setNewUsername('');
+      setUsernamePassword('');
+      setUsernameError(null);
+      setUsernamePasswordError(null);
+
+      toast.success(`Username updated to ${newUsername}`);
+    } catch (error) {
+      console.error('Failed to update username:', error);
+    } finally {
+      setIsChangingUsername(false);
+    }
+  };
+
   const handlePasswordChange = async () => {
     // Validate all fields are filled
     if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error('Please fill in all fields');
+      toast.error('Please fill in all password fields');
       return;
     }
 
     // Validate passwords match
     if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
+      setConfirmPasswordError('Passwords do not match');
+      toast.error('New passwords do not match');
       return;
     }
 
@@ -175,168 +225,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update password');
+        if (data.error.includes('current password')) {
+          setCurrentPasswordError(data.error);
+          toast.error('Current password is incorrect');
+        } else {
+          setNewPasswordError(data.error);
+          toast.error('Failed to update password');
+        }
+        throw new Error(data.error);
       }
 
       // Clear form fields
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setPasswordError(null);
+      setCurrentPasswordError(null);
+      setNewPasswordError(null);
       setConfirmPasswordError(null);
       setPasswordStrength(0);
 
-      // Show success message
-      toast.success(
-        <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Password updated successfully!</span>
-        </div>, 
-        {
-          position: "bottom-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-        }
-      );
-    } catch (error: any) {
-      console.error('Password change error:', error);
-      
-      // Handle specific error cases
-      if (error.message.includes('Invalid current password')) {
-        setPasswordError('Invalid current password');
-      } else {
-        setPasswordError(error.message || 'Failed to update password');
-      }
-
-      // Show error toast
-      toast.error(error.message || 'Failed to update password', {
-        position: "bottom-right",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-      });
+      toast.success('Password updated successfully!');
+    } catch (error) {
+      console.error('Failed to update password:', error);
     } finally {
       setIsChangingPassword(false);
-    }
-  };
-
-  const handleUsernameChange = async () => {
-    try {
-      // Validate inputs
-      if (!newUsername || !usernamePassword) {
-        setUsernameError('Please enter a new username');
-        setPasswordError('Please enter your current password');
-        toast.error('Please fill in all fields', {
-          position: "bottom-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-        });
-        return;
-      }
-
-      // Additional validation
-      if (newUsername.length < 3) {
-        throw new Error('Username must be at least 3 characters');
-      }
-      if (newUsername.length > 20) {
-        throw new Error('Username cannot exceed 20 characters');
-      }
-      if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
-        throw new Error('Username can only contain letters, numbers and underscores');
-      }
-
-      setIsChangingUsername(true);
-      
-      const response = await fetch(`${API_BASE}/change-username`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          newUsername,
-          password: usernamePassword
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update username');
-      }
-
-      const data = await response.json();
-      
-      // Update local storage and state
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('username', data.username);
-      setUsername(data.username);
-      
-      // Reset form
-      setNewUsername('');
-      setUsernamePassword('');
-      setIsChangingUsername(false);
-
-      // Show success message
-      toast.success(
-        <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Username updated to <span className="font-semibold">{data.username}</span></span>
-        </div>, 
-        {
-          position: "bottom-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-        }
-      );
-
-    } catch (error: any) {
-      console.error('Username change error:', error);
-      setIsChangingUsername(false);
-      
-      // Clear previous errors
-      setUsernameError(null);
-      setPasswordError(null);
-
-      // Handle specific error cases
-      if (error.message.includes('already taken')) {
-        setUsernameError('Username is already taken');
-      } else if (error.message.includes('Invalid password')) {
-        setPasswordError('Invalid password');
-      } else {
-        // Generic error handling
-        const errorMessage = error.message || 'Failed to update username';
-        setUsernameError(errorMessage);
-      }
-
-      // Show error toast
-      toast.error(error.message || 'Failed to update username', {
-        position: "bottom-right",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-      });
     }
   };
 
@@ -389,11 +301,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   useEffect(() => {
     const handleAPIError = (error: InvalidAPIKeyError) => {
       setApiKeyError('Your AI provider API key appears to be invalid or expired. Please update your key in settings.');
-      toast.error('AI Provider API Key Invalid', {
-        onClick: () => setSelectedGroup('ai'),
-        autoClose: false,
-        closeOnClick: false,
-      });
+      toast.error('AI Provider API Key Invalid');
     };
 
     const handleWindowError = (event: ErrorEvent) => {
@@ -432,6 +340,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
       document.getElementById('apiKey')?.focus();
     }, 0);
   };
+
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setIsScrolled(e.currentTarget.scrollTop > 0);
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -605,146 +530,146 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
               Account Security
             </h3>
             
-            {/* Account Credentials Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Account Credentials Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
               {/* Username Section */}
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+              <div className="flex flex-col bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
                 <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
                   <User className="w-5 h-5 text-blue-500" />
                   Username Settings
                 </h4>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              handleUsernameChange();
-            }} className="space-y-4">
-              <div className="relative">
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  New Username
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    id="username"
-                    type="text"
-                    value={newUsername}
-                    onChange={(e) => {
-                      const value = e.target.value.slice(0, 20); // Enforce max length
-                      setNewUsername(value);
-                      setUsernameError(null);
-                      
-                      // Basic validation
-                      if (value.length < 3) {
-                        setUsernameError('Username must be at least 3 characters');
-                      } else if (!/^[a-zA-Z0-9_]+$/.test(value)) {
-                        setUsernameError('Only letters, numbers and underscores allowed');
-                      } else {
-                        setUsernameError(null);
-                      }
-                    }}
-                    className={`block w-full px-3 py-2 border ${
-                      usernameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                    } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 transition-all duration-200 pr-10 input-animation`}
-                    required
-                    aria-invalid={!!usernameError}
-                    aria-describedby="username-error"
-                    onFocus={(e) => {
-                      e.target.placeholder = '';
-                    }}
-                    onBlur={(e) => {
-                      if (!e.target.value) {
-                        e.target.placeholder = 'New Username';
-                      }
-                    }}
-                  />
-                  {newUsername.length > 0 && !usernameError && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <svg className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  handleUsernameChange();
+                }} className="flex flex-col flex-1 space-y-4">
+                  <div className="relative">
+                    <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      New Username
+                    </label>
+                    <div className="mt-1 relative">
+                      <input
+                        id="username"
+                        type="text"
+                        value={newUsername}
+                        onChange={(e) => {
+                          const value = e.target.value.slice(0, 20); // Enforce max length
+                          setNewUsername(value);
+                          setUsernameError(null);
+                          
+                          // Basic validation
+                          if (value.length < 3) {
+                            setUsernameError('Username must be at least 3 characters');
+                          } else if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+                            setUsernameError('Only letters, numbers and underscores allowed');
+                          } else {
+                            setUsernameError(null);
+                          }
+                        }}
+                        className={`block w-full px-3 py-2 border ${
+                          usernameError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                        } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 transition-all duration-200 pr-10 input-animation`}
+                        required
+                        aria-invalid={!!usernameError}
+                        aria-describedby="username-error"
+                        onFocus={(e) => {
+                          e.target.placeholder = '';
+                        }}
+                        onBlur={(e) => {
+                          if (!e.target.value) {
+                            e.target.placeholder = 'New Username';
+                          }
+                        }}
+                      />
+                      {newUsername.length > 0 && !usernameError && (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                          <svg className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="mt-2 space-y-1">
-                  {usernameError ? (
-                    <p id="username-error" className="text-sm text-red-600 dark:text-red-400">
-                      {usernameError}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {newUsername.length > 0 && `Available characters: ${Math.max(0, 20 - newUsername.length)}`}
-                    </p>
-                  )}
-                  <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                    <li className={`flex items-center ${newUsername.length >= 3 ? 'text-green-500' : ''}`}>
-                      <svg className={`w-3 h-3 mr-1 ${newUsername.length >= 3 ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      At least 3 characters
-                    </li>
-                    <li className={`flex items-center ${/^[a-zA-Z0-9_]+$/.test(newUsername) ? 'text-green-500' : 'text-gray-400'}`}>
-                      <svg className={`w-3 h-3 mr-1 ${/^[a-zA-Z0-9_]+$/.test(newUsername) ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Only letters, numbers and underscores
-                    </li>
-                  </ul>
-                </div>
-              </div>
+                    <div className="mt-2 space-y-1">
+                      {usernameError ? (
+                        <p id="username-error" className="text-sm text-red-600 dark:text-red-400">
+                          {usernameError}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {newUsername.length > 0 && `Available characters: ${Math.max(0, 20 - newUsername.length)}`}
+                        </p>
+                      )}
+                      <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                        <li className={`flex items-center ${newUsername.length >= 3 ? 'text-green-500' : ''}`}>
+                          <svg className={`w-3 h-3 mr-1 ${newUsername.length >= 3 ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          At least 3 characters
+                        </li>
+                        <li className={`flex items-center ${/^[a-zA-Z0-9_]+$/.test(newUsername) ? 'text-green-500' : 'text-gray-400'}`}>
+                          <svg className={`w-3 h-3 mr-1 ${/^[a-zA-Z0-9_]+$/.test(newUsername) ? 'text-green-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Only letters, numbers and underscores
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
 
-              <div>
-                <label htmlFor="usernamePassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Current Password
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    id="usernamePassword"
-                    type="password"
-                    placeholder="Enter current password"
-                    value={usernamePassword}
-                    onChange={(e) => {
-                      setUsernamePassword(e.target.value);
-                      setPasswordError(null); // Clear error when typing
-                    }}
-                    className={`block w-full px-3 py-2 border ${
-                      passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                    } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 input-animation`}
-                    required
-                    aria-invalid={!!passwordError}
-                    aria-describedby="password-error"
-                    onFocus={(e) => {
-                      e.target.placeholder = '';
-                    }}
-                    onBlur={(e) => {
-                      if (!e.target.value) {
-                        e.target.placeholder = 'Enter current password';
-                      }
-                    }}
-                  />
-                  {passwordError && (
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
+                  <div>
+                    <label htmlFor="usernamePassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Current Password
+                    </label>
+                    <div className="mt-1 relative">
+                      <input
+                        id="usernamePassword"
+                        type="password"
+                        placeholder="Enter current password"
+                        value={usernamePassword}
+                        onChange={(e) => {
+                          setUsernamePassword(e.target.value);
+                          setUsernamePasswordError(null); // Clear error when typing
+                        }}
+                        className={`block w-full px-3 py-2 border ${
+                          usernamePasswordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                        } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 input-animation`}
+                        required
+                        aria-invalid={!!usernamePasswordError}
+                        aria-describedby="password-error"
+                        onFocus={(e) => {
+                          e.target.placeholder = '';
+                        }}
+                        onBlur={(e) => {
+                          if (!e.target.value) {
+                            e.target.placeholder = 'Enter current password';
+                          }
+                        }}
+                      />
+                      {usernamePasswordError && (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                          <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                {passwordError && (
-                  <p id="password-error" className="mt-2 text-sm text-red-600 dark:text-red-400">
-                    {passwordError}
-                  </p>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={isChangingUsername || !newUsername || !usernamePassword}
-                className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                {isChangingUsername ? 'Updating...' : 'Update Username'}
-              </button>
-            </form>
+                    {usernamePasswordError && (
+                      <p id="password-error" className="mt-2 text-sm text-red-600 dark:text-red-400">
+                        {usernamePasswordError}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isChangingUsername || !newUsername || !usernamePassword}
+                    className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  >
+                    {isChangingUsername ? 'Updating...' : 'Update Username'}
+                  </button>
+                </form>
               </div>
 
               {/* Password Section */}
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
+              <div className="flex flex-col bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
                 <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
                   <Lock className="w-5 h-5 text-blue-500" />
                   Password Settings
@@ -752,7 +677,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   handlePasswordChange();
-                }} className="space-y-4">
+                }} className="flex flex-col flex-1 space-y-4">
                   <div>
                     <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Current Password
@@ -794,11 +719,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                         }}
                         placeholder="Enter new password"
                         className={`w-full px-3 py-2 border ${
-                          passwordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                          newPasswordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                         } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 cursor-text input-animation text-transparent selection:bg-blue-500 selection:text-transparent`}
                         autoComplete="new-password"
                         required
-                        aria-invalid={!!passwordError}
+                        aria-invalid={!!newPasswordError}
                         aria-describedby="password-error"
                         onFocus={(e) => {
                           e.target.placeholder = '';
@@ -809,7 +734,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                           }
                         }}
                       />
-                      {passwordError && (
+                      {newPasswordError && (
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                           <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -836,9 +761,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
                            'Strong'}
                         </span>
                       </div>
-                      {passwordError && (
+                      {newPasswordError && (
                         <p id="password-error" className="text-sm text-red-600 dark:text-red-400">
-                          {passwordError}
+                          {newPasswordError}
                         </p>
                       )}
                       <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
@@ -930,51 +855,53 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   const selectedContent = settingGroups.find(group => group.id === selectedGroup)?.content;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg w-full max-w-5xl h-[85vh] flex flex-col">
-          {/* Header */}
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                Settings
-              </h2>
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+    <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-4 lg:inset-8 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col max-h-[calc(100vh-2rem)] lg:max-h-[calc(100vh-4rem)]">
+        {/* Header */}
+        <div className={`sticky top-0 z-10 px-6 py-4 flex items-center gap-4 transition-shadow ${isScrolled ? 'shadow-md dark:shadow-gray-800' : ''}`}>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <Settings className="w-6 h-6" />
+              Settings
+            </h3>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            aria-label="Close settings"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar Navigation */}
+          <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+            <nav className="p-4 space-y-1">
+              {settingGroups.map(group => (
+                <button
+                  key={group.id}
+                  onClick={() => setSelectedGroup(group.id)}
+                  className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center gap-3 transition-colors ${
+                    selectedGroup === group.id
+                      ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200 font-medium'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  {group.icon}
+                  <span>{group.name}</span>
+                </button>
+              ))}
+            </nav>
           </div>
 
-          {/* Main Content */}
-          <div className="flex flex-1 overflow-hidden">
-            <div className="w-[30%] border-r border-gray-200 dark:border-gray-700">
-              <div className="p-6">
-                <div className="space-y-1">
-                  {settingGroups.map(group => (
-                    <button
-                      key={group.id}
-                      onClick={() => setSelectedGroup(group.id)}
-                      className={`w-full text-left px-4 py-2 rounded-md text-sm flex items-center gap-2 ${
-                        selectedGroup === group.id
-                          ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                      }`}
-                    >
-                      {group.icon}
-                      <span>{group.name}</span>
-                    </button>
-                  ))}
-                </div>
+          {/* Main Content Area */}
+          <div className="flex-1 overflow-y-auto" onScroll={handleScroll}>
+            <div className="p-6">
+              <div className="max-w-2xl mx-auto">
+                {selectedContent}
               </div>
-            </div>
-            <div className="w-[70%] p-6 overflow-y-auto">
-              {selectedContent}
             </div>
           </div>
         </div>

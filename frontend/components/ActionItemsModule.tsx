@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { format, isValid, parseISO } from 'date-fns';
+import { toast } from 'react-toastify';
 import { 
   Calendar, 
   Clock, 
@@ -122,12 +123,21 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
         throw new Error(data.error || 'Failed to extract action items');
       }
 
-      // Fetch the updated list of action items instead of appending
+      const data = await response.json();
+      
+      if (!data.actionItems || data.actionItems.length === 0) {
+        toast.info('No action items found in the text');
+        return;
+      }
+
+      // Fetch the updated list of action items after extraction
       await fetchActionItems();
       
-    } catch (err) {
-      console.error('Extract error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to extract action items');
+      toast.success(`Found ${data.actionItems.length} action item${data.actionItems.length === 1 ? '' : 's'}`);
+    } catch (error) {
+      console.error('Extract error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to extract action items');
+      toast.error(error instanceof Error ? error.message : 'Failed to extract action items');
     } finally {
       setLoading(false);
     }

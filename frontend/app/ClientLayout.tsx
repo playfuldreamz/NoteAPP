@@ -10,7 +10,7 @@ import NoteSaver from "../components/NoteSaver";
 import NoteList from "../components/NoteList";
 import { Notebook, Mic, FileText, NotebookPen } from 'lucide-react';
 import SettingsModal from '../components/SettingsModal';
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { getAIProvider } from '../services/ai';
 import Navbar from '../components/Navbar';
@@ -223,19 +223,6 @@ export default function ClientLayout({
     return (
       <TagsProvider>
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-          <ToastContainer
-            position="bottom-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="colored"
-            style={{ zIndex: 9999 }}
-          />
           <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
             {children}
           </div>
@@ -249,19 +236,6 @@ export default function ClientLayout({
   return (
     <TagsProvider>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <ToastContainer
-          position="bottom-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="colored"
-          style={{ zIndex: 9999 }}
-        />
         <Navbar
           username={username}
           currentModel={currentModel}

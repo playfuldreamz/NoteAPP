@@ -14,7 +14,18 @@ export default function RootLayout({
       <ClientLayout>
         <TagsProvider>
           {children}
-          <ToastContainer />
+          <ToastContainer 
+            position="bottom-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="dark"
+          />
         </TagsProvider>
       </ClientLayout>
     </ServerLayout>
