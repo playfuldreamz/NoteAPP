@@ -4,26 +4,9 @@ import 'react-toastify/dist/ReactToastify.css';
 import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { generateTranscriptTitle, enhanceTranscript, InvalidAPIKeyError } from '../services/ai';
 import Link from 'next/link';
-
-interface Window {
-  SpeechRecognition: new () => SpeechRecognition;
-  webkitSpeechRecognition: new () => SpeechRecognition;
-}
-
-interface SpeechRecognition extends EventTarget {
-  start(): void;
-  stop(): void;
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: (event: SpeechRecognitionEvent) => void;
-  onend: () => void;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
+import { useTranscription } from '../context/TranscriptionContext';
+import type { TranscriptionProvider, TranscriptionResult } from '../services/transcription/types';
+import { TranscriptionProviderFactory } from '../services/transcription/providerFactory';
 
 interface AudioRecorderProps {
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
@@ -32,6 +15,7 @@ interface AudioRecorderProps {
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTranscripts, transcript }) => {
+  const { provider: selectedProvider, setProvider, availableProviders, getProviderSettings, updateProviderSettings } = useTranscription();
   const [isRecording, setIsRecording] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [enhancedTranscript, setEnhancedTranscript] = useState('');
@@ -46,49 +30,57 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [isSaving, setIsSaving] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const providerRef = useRef<TranscriptionProvider | null>(null);
   const originalTranscriptRef = useRef<HTMLDivElement>(null);
   const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
 
+  // Initialize transcription provider
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.error('Speech Recognition not supported in this browser.');
-      return;
-    }
-
-    const recognitionInstance = new SpeechRecognition();
-    recognitionInstance.continuous = true;
-    recognitionInstance.interimResults = true;
-    recognitionInstance.lang = 'en-US';
-
-    recognitionInstance.onresult = (event: SpeechRecognitionEvent) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript;
-        } else {
-          interimTranscript += result[0].transcript;
+    const initProvider = async () => {
+      try {
+        // Cleanup existing provider
+        if (providerRef.current) {
+          providerRef.current.cleanup();
         }
-      }
 
-      if (finalTranscript) {
-        setTranscript(prev => prev + finalTranscript);
+        // Get new provider instance
+        const provider = await TranscriptionProviderFactory.getProvider({
+          type: selectedProvider,
+          apiKey: getProviderSettings(selectedProvider)?.apiKey
+        });
+
+        // Set up result handler
+        provider.onResult((result: TranscriptionResult) => {
+          if (result.isFinal) {
+            setTranscript(prev => prev + result.transcript);
+          } else {
+            setInterimTranscript(result.transcript);
+          }
+        });
+
+        // Set up error handler
+        provider.onError((error: Error) => {
+          console.error('Transcription error:', error);
+          toast.error(`Transcription error: ${error.message}`);
+          stopRecording();
+        });
+
+        providerRef.current = provider;
+      } catch (error) {
+        console.error('Failed to initialize provider:', error);
+        toast.error('Failed to initialize speech recognition');
       }
-      setInterimTranscript(interimTranscript);
     };
 
-    recognitionInstance.onend = () => {
-      if (isRecording) {
-        recognitionInstance.start();
+    initProvider();
+
+    // Cleanup on unmount or provider change
+    return () => {
+      if (providerRef.current) {
+        providerRef.current.cleanup();
       }
     };
-
-    recognitionRef.current = recognitionInstance;
-  }, [setTranscript]);
+  }, [selectedProvider, setTranscript, getProviderSettings]);
 
   // Auto-scroll original transcript
   const [isManualScroll, setIsManualScroll] = useState(false);
@@ -130,19 +122,28 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     }
   }, [enhancedTranscript]);
 
-  const startRecording = () => {
-    if (recognitionRef.current && !isRecording) {
-      recognitionRef.current.start();
-      setIsRecording(true);
-      timerIntervalRef.current = setInterval(() => {
-        setElapsedTime(prev => prev + 1);
-      }, 1000);
+  const startRecording = async () => {
+    if (providerRef.current && !isRecording) {
+      try {
+        await providerRef.current.start();
+        setIsRecording(true);
+        timerIntervalRef.current = setInterval(() => {
+          setElapsedTime(prev => prev + 1);
+        }, 1000);
+      } catch (error) {
+        console.error('Failed to start recording:', error);
+        toast.error('Failed to start recording');
+      }
     }
   };
 
-  const stopRecording = () => {
-    if (recognitionRef.current && isRecording) {
-      recognitionRef.current.stop();
+  const stopRecording = async () => {
+    if (providerRef.current && isRecording) {
+      try {
+        await providerRef.current.stop();
+      } catch (error) {
+        console.error('Failed to stop recording:', error);
+      }
       setIsRecording(false);
       setInterimTranscript('');
       if (timerIntervalRef.current) {
@@ -329,32 +330,91 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
 
       {showSettings && (
         <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-          <div className="flex items-center mb-2">
-            <input
-              type="checkbox"
-              id="enhance-toggle"
-              checked={enhanceEnabled}
-              onChange={(e) => setEnhanceEnabled(e.target.checked)}
-              className="mr-2"
-            />
-            <label htmlFor="enhance-toggle" className="text-sm dark:text-gray-200">
-              Enable AI Enhancement
-            </label>
-          </div>
-          <div className="flex items-center">
-            <label htmlFor="confidence" className="text-sm dark:text-gray-200 mr-2">
-              Confidence Threshold:
-            </label>
-            <input
-              type="range"
-              id="confidence"
-              min="0"
-              max="100"
-              value={confidenceThreshold}
-              onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
-              className="w-32"
-            />
-            <span className="ml-2 text-sm dark:text-gray-200">{confidenceThreshold}%</span>
+          <div className="flex flex-col space-y-4">
+            {/* Provider Selection */}
+            <div className="flex flex-col space-y-2">
+              <label htmlFor="provider-select" className="text-sm font-medium dark:text-gray-200">
+                Transcription Provider
+              </label>
+              <select
+                id="provider-select"
+                value={selectedProvider}
+                onChange={(e) => setProvider(e.target.value as any)}
+                className="p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              >
+                {availableProviders.map((p) => (
+                  <option key={p} value={p}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Provider Settings */}
+            {selectedProvider !== 'webspeech' && (
+              <div className="flex flex-col space-y-2 border-t pt-4 dark:border-gray-600">
+                <label htmlFor="api-key" className="text-sm font-medium dark:text-gray-200">
+                  API Key
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="password"
+                    id="api-key"
+                    value={getProviderSettings(selectedProvider)?.apiKey || ''}
+                    onChange={(e) => updateProviderSettings(selectedProvider, {
+                      ...getProviderSettings(selectedProvider),
+                      apiKey: e.target.value
+                    })}
+                    className="flex-1 p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                    placeholder={`Enter ${selectedProvider} API Key`}
+                  />
+                  <Link 
+                    href={selectedProvider === 'assemblyai' ? 'https://www.assemblyai.com/dashboard/signup' : '#'}
+                    target="_blank"
+                    className="p-2 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+                    title="Get API Key"
+                  >
+                    <Settings size={20} />
+                  </Link>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {selectedProvider === 'assemblyai' 
+                    ? 'Get your API key from AssemblyAI dashboard'
+                    : `API key required for ${selectedProvider}`}
+                </p>
+              </div>
+            )}
+
+            {/* Existing Settings */}
+            <div className="border-t pt-4 dark:border-gray-600">
+              <div className="flex items-center mb-4">
+                <input
+                  type="checkbox"
+                  id="enhance-toggle"
+                  checked={enhanceEnabled}
+                  onChange={(e) => setEnhanceEnabled(e.target.checked)}
+                  className="mr-2"
+                />
+                <label htmlFor="enhance-toggle" className="text-sm dark:text-gray-200">
+                  Enable AI Enhancement
+                </label>
+              </div>
+              <div className="flex items-center">
+                <label htmlFor="confidence" className="text-sm dark:text-gray-200 mr-2">
+                  Confidence Threshold:
+                </label>
+                <input
+                  type="range"
+                  id="confidence"
+                  min="0"
+                  max="100"
+                  value={confidenceThreshold}
+                  onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
+                  className="w-32"
+                />
+                <span className="ml-2 text-sm dark:text-gray-200">{confidenceThreshold}%</span>
+              </div>
+            </div>
           </div>
         </div>
       )}

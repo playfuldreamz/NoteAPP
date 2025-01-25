@@ -15,6 +15,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { getAIProvider } from '../services/ai';
 import Navbar from '../components/Navbar';
 import { TagsProvider } from '../context/TagsContext';
+import { TranscriptionProviderContext } from '../context/TranscriptionContext';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -235,57 +236,61 @@ export default function ClientLayout({
   // For authenticated routes, render the full layout
   return (
     <TagsProvider>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <Navbar
-          username={username}
-          currentModel={currentModel}
-          modelSource={modelSource}
-          isAuthenticated={isAuthenticated}
-          onLogout={handleLogout}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-        />
-        <main className="pt-16">
-          <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
-            <DarkModeToggle />
-            {children}
-            {isAuthenticated && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8">
-                <div>
-                  <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                    <Mic className="w-6 h-6" />
-                    Voice Recording
-                  </h2>
-                  <AudioRecorder updateTranscripts={handleRefresh} setTranscript={setTranscript} transcript={transcript} />
-                  <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                    <FileText className="w-6 h-6" />
-                    Transcripts
-                  </h2>
-                  <TranscriptsList transcripts={transcripts} updateTranscripts={handleRefresh} />
+      <TranscriptionProviderContext>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+          <Navbar
+            username={username}
+            currentModel={currentModel}
+            modelSource={modelSource}
+            isAuthenticated={isAuthenticated}
+            onLogout={handleLogout}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
+          <main className="pt-16 relative">
+            <div className="fixed top-4 right-4 z-50">
+              <DarkModeToggle />
+            </div>
+            <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 pb-8 overflow-y-auto">
+              {children}
+              {isAuthenticated && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                      <Mic className="w-6 h-6" />
+                      Voice Recording
+                    </h2>
+                    <AudioRecorder updateTranscripts={handleRefresh} setTranscript={setTranscript} transcript={transcript} />
+                    <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                      <FileText className="w-6 h-6" />
+                      Transcripts
+                    </h2>
+                    <TranscriptsList transcripts={transcripts} updateTranscripts={handleRefresh} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                      <NotebookPen className="w-6 h-6" />
+                      Create Note
+                    </h2>
+                    <NoteSaver transcript={transcript} onSave={handleSaveNote} />
+                    <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                      <Notebook className="w-6 h-6" />
+                      Notes
+                    </h2>
+                    <NoteList notes={notes} onDelete={handleDeleteNote} />
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                    <NotebookPen className="w-6 h-6" />
-                    Create Note
-                  </h2>
-                  <NoteSaver transcript={transcript} onSave={handleSaveNote} />
-                  <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                    <Notebook className="w-6 h-6" />
-                    Notes
-                  </h2>
-                  <NoteList notes={notes} onDelete={handleDeleteNote} />
-                </div>
-              </div>
-            )}
-          </div>
-        </main>
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          setUsername={setUsername}
-          currentModel={currentModel}
-          modelSource={modelSource}
-        />
-      </div>
+              )}
+            </div>
+          </main>
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            setUsername={setUsername}
+            currentModel={currentModel}
+            modelSource={modelSource}
+          />
+        </div>
+      </TranscriptionProviderContext>
     </TagsProvider>
   );
 }

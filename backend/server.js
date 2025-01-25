@@ -172,6 +172,20 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
+  // Create transcription_settings table for user provider preferences
+  db.run(`CREATE TABLE IF NOT EXISTS transcription_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'webspeech',
+    api_key TEXT,
+    options TEXT,  -- JSON string of provider-specific options
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, provider)
+  )`);
+
   // Insert default app settings if none exist
   db.get('SELECT COUNT(*) as count FROM app_settings', (err, row) => {
     if (err) {
