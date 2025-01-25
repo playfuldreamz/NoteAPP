@@ -42,6 +42,8 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
   const { downloadDocument, isDownloading } = useDownloadDocument();
   const [downloadOptions, setDownloadOptions] = useState<Record<number, DownloadOptions>>({});
   const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({});
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<Set<number>>(new Set());
 
   const toggleTagsExpansion = useCallback((noteId: number) => {
     setExpandedTags(prev => ({
@@ -132,6 +134,23 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
       </div>
     );
   };
+
+  const toggleSelection = (noteId: number) => {
+    setSelectedNoteIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(noteId)) {
+        newSet.delete(noteId);
+      } else {
+        newSet.add(noteId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectionMode = useCallback(() => {
+    setIsSelectionMode(prev => !prev);
+    setSelectedNoteIds(new Set());
+  }, []);
 
   useEffect(() => {
     const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -255,6 +274,79 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     setShowLoadMore(filteredNotes.length > 5);
   };
 
+  const handleBulkDelete = async (ids: number[]) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      // Delete notes one by one
+      for (const id of ids) {
+        // First delete associated tags
+        const deleteTagsResponse = await fetch(`http://localhost:5000/notes/${id}/tags`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+        });
+
+        if (!deleteTagsResponse.ok) {
+          const data = await deleteTagsResponse.json();
+          throw new Error(data.message || 'Failed to delete note tags');
+        }
+
+        // Then delete the note
+        const deleteResponse = await fetch(`http://localhost:5000/notes/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+        });
+
+        if (!deleteResponse.ok) {
+          const data = await deleteResponse.json().catch(() => ({}));
+          throw new Error(data.message || 'Failed to delete note');
+        }
+
+        onDelete(id);
+      }
+
+      toast.success(`${ids.length} note${ids.length > 1 ? 's' : ''} deleted!`);
+      setSelectedNoteIds(new Set());
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      toast.error('Failed to delete some notes');
+    }
+  };
+
+  const handleBulkDownload = (ids: number[]) => {
+    const selectedNotes = visibleNotes.filter(n => ids.includes(n.id));
+    const exportData = selectedNotes.map(n => ({
+      id: n.id,
+      title: n.title,
+      content: n.content,
+      transcript: n.transcript,
+      timestamp: n.timestamp,
+      tags: n.tags || []
+    }));
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const date = new Date();
+    const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}-${String(date.getSeconds()).padStart(2, '0')}`;
+    a.download = `selected_notes_${formattedDate}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
       <div className="relative mb-6">
@@ -277,7 +369,8 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
       </div>
       
       <TranscriptActions 
-        count={notes.length}
+        count={filteredNotes.length}
+        visibleCount={visibleNotes.length}
         itemType="note"
         onFilter={(filters) => {
           const filtered = notes.filter(note => {
@@ -365,13 +458,44 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           URL.revokeObjectURL(url);
         }}
         onRefresh={() => onDelete(-1)}
+        onToggleSelection={toggleSelectionMode}
+        isSelectionMode={isSelectionMode}
+        selectedIds={selectedNoteIds}
+        onBulkDelete={handleBulkDelete}
+        onBulkDownload={handleBulkDownload}
       />
-      {visibleNotes.length === 0 ? (
-        <p className="dark:text-gray-200">No notes available.</p>
-      ) : (
-        <ul>
-          {visibleNotes.map((note) => (
-          <li key={note.id} className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-md">
+      <div className="space-y-4">
+        {visibleNotes.map((note) => (
+          <div
+            key={note.id}
+            className={`p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 relative transition-all duration-200 ${
+              isSelectionMode ? 'cursor-pointer pr-10' : ''
+            }`}
+            onClick={isSelectionMode ? () => toggleSelection(note.id) : undefined}
+          >
+            <div className={`absolute top-4 right-4 transition-all duration-200 ${isSelectionMode ? 'opacity-100' : 'opacity-0'}`}>
+              <div className={`w-4 h-4 border rounded transition-colors duration-200 flex items-center justify-center ${
+                selectedNoteIds.has(note.id)
+                  ? 'border-blue-500 bg-blue-500'
+                  : 'border-gray-300 dark:border-gray-600'
+              }`}>
+                {selectedNoteIds.has(note.id) && (
+                  <svg
+                    className="w-3 h-3 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                )}
+              </div>
+            </div>
             <div className="flex flex-col">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2">
@@ -443,10 +567,9 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                 <span>{new Date(note.timestamp).toLocaleString()}</span>
               </div>
             </div>
-          </li>
+          </div>
         ))}
-        </ul>
-      )}
+      </div>
       <div className="flex justify-end mt-4">
         {showLoadMore && (
           <button onClick={handleLoadMore} className="text-blue-500 hover:underline text-sm mr-2">

@@ -1,4 +1,4 @@
-import { Filter, ArrowUpDown, DownloadCloud, ChevronDown, RefreshCw, Search } from 'lucide-react';
+import { Filter, ArrowUpDown, DownloadCloud, ChevronDown, RefreshCw, Search, CheckSquare, Trash2, MoreVertical } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import UserTagChip from './UserTagChip';
 import { getUserTags, API_BASE } from '../services/userTags';
@@ -28,22 +28,35 @@ interface Filters {
 
 interface TranscriptActionsProps {
   count: number;
+  visibleCount?: number;
   onFilter: (filters: TranscriptFilters) => void;
   onSort: () => void;
   onExport: () => void;
   onRefresh: () => void;
   itemType?: 'note' | 'transcript';
+  onToggleSelection?: () => void;
+  isSelectionMode?: boolean;
+  selectedIds?: Set<number>;
+  onBulkDelete?: (ids: number[]) => void;
+  onBulkDownload?: (ids: number[]) => void;
 }
 
 export default function TranscriptActions({ 
   count, 
+  visibleCount,
   onFilter, 
   onSort, 
   onExport, 
   onRefresh,
-  itemType = 'transcript'
+  itemType = 'transcript',
+  onToggleSelection,
+  isSelectionMode = false,
+  selectedIds = new Set(),
+  onBulkDelete,
+  onBulkDownload
 }: TranscriptActionsProps) {
   const [showFilters, setShowFilters] = useState(false);
+  const [showSelectionMenu, setShowSelectionMenu] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     dateRange: { start: '', end: '' },
     keyword: '',
@@ -75,6 +88,16 @@ export default function TranscriptActions({
     loadTags();
   }, [itemType]);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showSelectionMenu) {
+        setShowSelectionMenu(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showSelectionMenu]);
+
   const handleApplyFilters = () => {
     onFilter({
       dateRange: filters.dateRange.start || filters.dateRange.end ? filters.dateRange : undefined,
@@ -91,10 +114,73 @@ export default function TranscriptActions({
       <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {count} Transcript{count !== 1 ? 's' : ''}
+            {count} {itemType === 'transcript' ? 'Transcript' : 'Note'}{count !== 1 ? 's' : ''}
+            {visibleCount !== undefined && visibleCount < count && (
+              <span className="text-gray-500 dark:text-gray-400 ml-2">
+                ({visibleCount} visible)
+              </span>
+            )}
+            {isSelectionMode && selectedIds.size > 0 && (
+              <span className="ml-2 text-blue-500">({selectedIds.size} selected)</span>
+            )}
           </span>
         </div>
         <div className="flex gap-4">
+          {onToggleSelection && (
+            <button
+              onClick={onToggleSelection}
+              className={`p-2 ${isSelectionMode ? 'text-blue-500 bg-blue-100 dark:bg-blue-900' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'} rounded-lg transition-colors`}
+              title={isSelectionMode ? 'Exit Selection Mode' : 'Enter Selection Mode'}
+            >
+              <CheckSquare size={18} />
+            </button>
+          )}
+          {isSelectionMode && selectedIds.size > 0 && (
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowSelectionMenu(!showSelectionMenu);
+                }}
+                className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                title="Selection Actions"
+              >
+                <MoreVertical size={18} />
+              </button>
+              {showSelectionMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+                  <div className="py-1">
+                    {onBulkDelete && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onBulkDelete(Array.from(selectedIds));
+                          setShowSelectionMenu(false);
+                        }}
+                        className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 size={16} className="mr-2" />
+                        Delete Selected
+                      </button>
+                    )}
+                    {onBulkDownload && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onBulkDownload(Array.from(selectedIds));
+                          setShowSelectionMenu(false);
+                        }}
+                        className="flex items-center w-full px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      >
+                        <DownloadCloud size={16} className="mr-2" />
+                        Download Selected
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"

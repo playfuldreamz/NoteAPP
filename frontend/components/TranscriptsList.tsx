@@ -37,6 +37,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const { downloadDocument, isDownloading } = useDownloadDocument();
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
   const [downloadOptions, setDownloadOptions] = useState<Record<number, DownloadOptions>>({});
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedTranscriptIds, setSelectedTranscriptIds] = useState<Set<number>>(new Set());
 
   const getDownloadOptions = (transcriptId: number): DownloadOptions => ({
     format: downloadOptions[transcriptId]?.format || 'txt',
@@ -287,6 +289,94 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     }
   };
 
+  const toggleSelection = (transcriptId: number) => {
+    setSelectedTranscriptIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(transcriptId)) {
+        newSet.delete(transcriptId);
+      } else {
+        newSet.add(transcriptId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectionMode = useCallback(() => {
+    setIsSelectionMode(prev => !prev);
+    setSelectedTranscriptIds(new Set());
+  }, []);
+
+  const handleBulkDelete = async (ids: number[]) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      // Delete transcripts one by one
+      for (const id of ids) {
+        // First delete associated tags
+        const deleteTagsResponse = await fetch(`http://localhost:5000/transcripts/${id}/tags`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+        });
+
+        if (!deleteTagsResponse.ok) {
+          const data = await deleteTagsResponse.json();
+          throw new Error(data.message || 'Failed to delete transcript tags');
+        }
+
+        // Then delete the transcript
+        const response = await fetch(`http://localhost:5000/transcripts/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to delete transcript');
+        }
+      }
+
+      toast.success(`${ids.length} transcript${ids.length > 1 ? 's' : ''} deleted!`);
+      updateTranscripts();
+      setSelectedTranscriptIds(new Set());
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      toast.error('Failed to delete some transcripts');
+    }
+  };
+
+  const handleBulkDownload = (ids: number[]) => {
+    const selectedTranscripts = visibleTranscripts.filter(t => ids.includes(t.id));
+    const exportData = selectedTranscripts.map(t => ({
+      id: t.id,
+      title: t.title,
+      text: t.text,
+      date: t.date,
+      tags: t.tags || []
+    }));
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const date = new Date();
+    const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}-${String(date.getSeconds()).padStart(2, '0')}`;
+    a.download = `selected_transcripts_${formattedDate}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
       <div className="relative mb-6">
@@ -309,7 +399,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
       </div>
       
       <TranscriptActions 
-        count={initialTranscripts.length}
+        count={filteredTranscripts.length}
+        visibleCount={visibleTranscripts.length}
         itemType="transcript"
         onFilter={handleFilter}
         onSort={() => {
@@ -338,98 +429,126 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           URL.revokeObjectURL(url);
         }}
         onRefresh={updateTranscripts}
+        onToggleSelection={toggleSelectionMode}
+        isSelectionMode={isSelectionMode}
+        selectedIds={selectedTranscriptIds}
+        onBulkDelete={handleBulkDelete}
+        onBulkDownload={handleBulkDownload}
       />
       
       {visibleTranscripts.length === 0 ? (
         <p className="dark:text-gray-200">No transcripts available.</p>
       ) : (
-        <ul>
-          {visibleTranscripts.map((transcript) => {
-            const truncatedText = truncateText(transcript.text);
-            return (
-              <li 
-                key={transcript.id} 
-                className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-md hover:shadow-lg transition-shadow duration-200"
-              >
-                <div className="flex flex-col">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                        {transcript.title || 'Untitled Transcript'}
-                      </h3>
-                      {(!transcript.title || transcript.title === 'Untitled Transcript') && (
-                        <button
-                          onClick={() => handleGenerateTitle(transcript.id, transcript.text, (id, title) => {
-                            setVisibleTranscripts(prev => prev.map(t => 
-                              t.id === id ? { ...t, title } : t
-                            ));
-                            setFilteredTranscripts(prev => prev.map(t =>
-                              t.id === id ? { ...t, title } : t
-                            ));
-                          })}
-                          className="text-xs text-blue-500 hover:text-blue-700"
-                          disabled={loadingTitles[transcript.id]}
-                        >
-                          {loadingTitles[transcript.id] ? 'Generating...' : 'Generate Title'}
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <select
-                        value={getDownloadOptions(transcript.id).format}
-                        onChange={(e) => handleDownloadOptionsChange(transcript.id, e)}
-                        className="text-xs text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors px-1.5 py-1 border border-gray-200 dark:border-gray-700"
-                      >
-                        <option value="txt">TXT</option>
-                        <option value="json">JSON</option>
-                        <option value="pdf">PDF</option>
-                      </select>
+        <div className="space-y-4">
+          {visibleTranscripts.map((transcript) => (
+            <div
+              key={transcript.id}
+              className={`p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 relative transition-all duration-200 ${
+                isSelectionMode ? 'cursor-pointer pr-10' : ''
+              }`}
+              onClick={isSelectionMode ? () => toggleSelection(transcript.id) : undefined}
+            >
+              <div className={`absolute top-4 right-4 transition-all duration-200 ${isSelectionMode ? 'opacity-100' : 'opacity-0'}`}>
+                <div className={`w-4 h-4 border rounded transition-colors duration-200 flex items-center justify-center ${
+                  selectedTranscriptIds.has(transcript.id)
+                    ? 'border-blue-500 bg-blue-500'
+                    : 'border-gray-300 dark:border-gray-600'
+                }`}>
+                  {selectedTranscriptIds.has(transcript.id) && (
+                    <svg
+                      className="w-3 h-3 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                      {transcript.title || 'Untitled Transcript'}
+                    </h3>
+                    {(!transcript.title || transcript.title === 'Untitled Transcript') && (
                       <button
-                        onClick={() => downloadDocument({
-                          id: transcript.id,
-                          type: 'transcript',
-                          content: transcript.text,
-                          timestamp: transcript.date,
-                          title: transcript.title || `Transcript-${transcript.id}`,
-                          tags: transcript.tags || []
-                        }, getDownloadOptions(transcript.id))}
-                        disabled={isDownloading}
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Download transcript"
+                        onClick={() => handleGenerateTitle(transcript.id, transcript.text, (id, title) => {
+                          setVisibleTranscripts(prev => prev.map(t => 
+                            t.id === id ? { ...t, title } : t
+                          ));
+                          setFilteredTranscripts(prev => prev.map(t =>
+                            t.id === id ? { ...t, title } : t
+                          ));
+                        })}
+                        className="text-xs text-blue-500 hover:text-blue-700"
+                        disabled={loadingTitles[transcript.id]}
                       >
-                        <Download size={16} className={isDownloading ? 'opacity-50' : ''} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTranscript(transcript.id)}
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                        title="Delete transcript"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="text-gray-600 dark:text-gray-300">
-                    <p className="text-sm inline">
-                      {truncatedText}
-                    </p>
-                    {transcript.text.split(' ').length > 5 && (
-                      <button
-                        onClick={() => handleSeeMore(transcript.text, transcript.title || 'Untitled Transcript', transcript.id)}
-                        className="text-blue-500 hover:underline text-xs ml-2"
-                      >
-                        <Eye size={16} />
+                        {loadingTitles[transcript.id] ? 'Generating...' : 'Generate Title'}
                       </button>
                     )}
                   </div>
-                  {renderTranscriptTags(transcript)}
-                  <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
-                    <span>{new Date(transcript.date).toLocaleString()}</span>
+                  <div className="flex gap-2">
+                    <select
+                      value={getDownloadOptions(transcript.id).format}
+                      onChange={(e) => handleDownloadOptionsChange(transcript.id, e)}
+                      className="text-xs text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors px-1.5 py-1 border border-gray-200 dark:border-gray-700"
+                    >
+                      <option value="txt">TXT</option>
+                      <option value="json">JSON</option>
+                      <option value="pdf">PDF</option>
+                    </select>
+                    <button
+                      onClick={() => downloadDocument({
+                        id: transcript.id,
+                        type: 'transcript',
+                        content: transcript.text,
+                        timestamp: transcript.date,
+                        title: transcript.title || `Transcript-${transcript.id}`,
+                        tags: transcript.tags || []
+                      }, getDownloadOptions(transcript.id))}
+                      disabled={isDownloading}
+                      className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Download transcript"
+                    >
+                      <Download size={16} className={isDownloading ? 'opacity-50' : ''} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTranscript(transcript.id)}
+                      className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                      title="Delete transcript"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
-              </li>
-            );
-          })}
-        </ul>
+                <div className="text-gray-600 dark:text-gray-300">
+                  <p className="text-sm inline">
+                    {truncateText(transcript.text)}
+                  </p>
+                  {transcript.text.split(' ').length > 5 && (
+                    <button
+                      onClick={() => handleSeeMore(transcript.text, transcript.title || 'Untitled Transcript', transcript.id)}
+                      className="text-blue-500 hover:underline text-xs ml-2"
+                    >
+                      <Eye size={16} />
+                    </button>
+                  )}
+                </div>
+                {renderTranscriptTags(transcript)}
+                <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
+                  <span>{new Date(transcript.date).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
       <div className="flex justify-end mt-4">
         {showLoadMore && (
