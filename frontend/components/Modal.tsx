@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import TaggingModule from './TaggingModule';
 import ActionItemsModule from './ActionItemsModule';
 import { Tag } from '../services/ai';
-import { RotateCw, X, TagIcon, CheckSquare, Download } from 'lucide-react';
+import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check } from 'lucide-react';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
+import { toast } from 'react-toastify';
 
 interface ModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ const Modal: React.FC<ModalProps> = ({
     format: 'txt',
     includeMetadata: true
   });
+  const [isCopied, setIsCopied] = useState(false);
   const { downloadDocument, isDownloading } = useDownloadDocument();
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -61,6 +63,18 @@ const Modal: React.FC<ModalProps> = ({
       ...prev,
       format: e.target.value as 'txt' | 'json' | 'pdf'
     }));
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setIsCopied(true);
+      toast.success('Content copied to clipboard');
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy content:', error);
+      toast.error('Failed to copy content');
+    }
   };
 
   useEffect(() => {
@@ -157,10 +171,23 @@ const Modal: React.FC<ModalProps> = ({
               scrollbarColor: 'rgb(156 163 175) transparent'
             }}
           >
-            <div className={`max-w-none ${type === 'transcript' ? 'font-mono text-sm' : 'prose dark:prose-invert'}`}>
-              <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed bg-transparent p-0 m-0 border-0">
-                {content}
-              </pre>
+            <div className="relative">
+              <button
+                onClick={handleCopy}
+                className="absolute top-0 right-0 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                title="Copy content"
+              >
+                {isCopied ? (
+                  <Check size={16} className="text-green-500" />
+                ) : (
+                  <Copy size={16} />
+                )}
+              </button>
+              <div className={`max-w-none pt-10 ${type === 'transcript' ? 'font-mono text-sm' : 'prose dark:prose-invert'}`}>
+                <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed bg-transparent p-0 m-0 border-0">
+                  {content}
+                </pre>
+              </div>
             </div>
           </div>
 
