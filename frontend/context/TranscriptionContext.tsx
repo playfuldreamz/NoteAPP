@@ -12,7 +12,8 @@ interface ProviderSettings {
 
 interface TranscriptionContextType {
   provider: ProviderType;
-  setProvider: (provider: ProviderType) => Promise<void>;
+  setProvider: (provider: ProviderType) => void;
+  initializeProvider: (type: ProviderType) => Promise<void>;
   availableProviders: ProviderType[];
   isInitialized: boolean;
   error: Error | null;
@@ -53,6 +54,11 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
       // Get settings for the provider
       const settings = providerSettings[type];
 
+      // For non-WebSpeech providers, verify API key exists
+      if (type !== 'webspeech' && !settings?.apiKey) {
+        throw new Error(`${type} API key is required`);
+      }
+
       // Initialize new provider
       const config: ProviderConfig = {
         type,
@@ -68,7 +74,6 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
         throw new Error(`Provider ${type} is not available`);
       }
 
-      setCurrentProvider(type);
       setIsInitialized(true);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to initialize provider');
@@ -88,20 +93,17 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
       ...prev,
       [type]: settings
     }));
-
-    // If this is the current provider, reinitialize it with new settings
-    if (type === currentProvider) {
-      await initializeProvider(type);
-    }
-  }, [currentProvider, initializeProvider]);
+  }, []);
 
   const getProviderSettings = useCallback((type: ProviderType) => {
     return providerSettings[type];
   }, [providerSettings]);
 
-  // Initialize default provider on mount
+  // Initialize WebSpeech provider on mount
   useEffect(() => {
-    initializeProvider('webspeech');
+    if (currentProvider === 'webspeech') {
+      initializeProvider('webspeech');
+    }
     return () => {
       TranscriptionProviderFactory.cleanup();
     };
@@ -109,7 +111,8 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
 
   const value = {
     provider: currentProvider,
-    setProvider: initializeProvider,
+    setProvider: setCurrentProvider,
+    initializeProvider,
     availableProviders,
     isInitialized,
     error,

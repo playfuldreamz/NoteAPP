@@ -1,6 +1,7 @@
 // Load environment variables
 require('dotenv').config();
 
+const fetch = require('node-fetch');
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
@@ -28,8 +29,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ?
-    process.env.FRONTEND_URL : 'http://localhost:3000',
+  origin: ['http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
@@ -842,6 +842,46 @@ app.delete('/tags/:id', authenticateToken, (req, res) => {
   });
 });
 
+// AssemblyAI token endpoint - no authentication required for this endpoint
+app.post('/transcripts/assemblyai-token', async (req, res) => {
+  try {
+    const apiKey = req.body.apiKey;
+    if (!apiKey) {
+      return res.status(400).json({ error: 'API key is required' });
+    }
+
+    const response = await fetch('https://api.assemblyai.com/v2/realtime/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expires_in: 3600 }) // Token valid for 1 hour
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      // Check for specific error types
+      if (data.error && data.error.includes('paid-only')) {
+        return res.status(402).json({ 
+          error: 'AssemblyAI requires a credit card for real-time transcription',
+          type: 'PAYMENT_REQUIRED',
+          link: 'https://app.assemblyai.com/'
+        });
+      }
+      throw new Error(data.error || 'AssemblyAI API error');
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error generating AssemblyAI token:', error);
+    res.status(500).json({ 
+      error: error.message,
+      type: 'API_ERROR'
+    });
+  }
+});
 
 // Password change endpoint
 app.put('/change-password', authenticateToken, async (req, res) => {

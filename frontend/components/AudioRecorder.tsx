@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader, ChevronDown, ChevronUp, Trash2, ExternalLink, Check, AlertCircle } from 'lucide-react';
 import { generateTranscriptTitle, enhanceTranscript, InvalidAPIKeyError } from '../services/ai';
 import Link from 'next/link';
 import { useTranscription } from '../context/TranscriptionContext';
@@ -15,7 +15,16 @@ interface AudioRecorderProps {
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTranscripts, transcript }) => {
-  const { provider: selectedProvider, setProvider, availableProviders, getProviderSettings, updateProviderSettings } = useTranscription();
+  const { 
+    provider: selectedProvider, 
+    setProvider, 
+    initializeProvider,
+    availableProviders, 
+    getProviderSettings, 
+    updateProviderSettings,
+    isInitialized,
+    error 
+  } = useTranscription();
   const [isRecording, setIsRecording] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [enhancedTranscript, setEnhancedTranscript] = useState('');
@@ -29,10 +38,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [isOriginalCollapsed, setIsOriginalCollapsed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const providerRef = useRef<TranscriptionProvider | null>(null);
   const originalTranscriptRef = useRef<HTMLDivElement>(null);
   const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
+  const [isKeyValid, setIsKeyValid] = useState<boolean | null>(null);
 
   // Initialize transcription provider
   useEffect(() => {
@@ -43,29 +55,30 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
           providerRef.current.cleanup();
         }
 
-        // Get new provider instance
-        const provider = await TranscriptionProviderFactory.getProvider({
-          type: selectedProvider,
-          apiKey: getProviderSettings(selectedProvider)?.apiKey
-        });
+        // For WebSpeech, initialize immediately. For others, wait for explicit initialization
+        if (selectedProvider === 'webspeech') {
+          const provider = await TranscriptionProviderFactory.getProvider({
+            type: selectedProvider
+          });
 
-        // Set up result handler
-        provider.onResult((result: TranscriptionResult) => {
-          if (result.isFinal) {
-            setTranscript(prev => prev + result.transcript);
-          } else {
-            setInterimTranscript(result.transcript);
-          }
-        });
+          // Set up result handler
+          provider.onResult((result: TranscriptionResult) => {
+            if (result.isFinal) {
+              setTranscript(prev => prev + result.transcript);
+            } else {
+              setInterimTranscript(result.transcript);
+            }
+          });
 
-        // Set up error handler
-        provider.onError((error: Error) => {
-          console.error('Transcription error:', error);
-          toast.error(`Transcription error: ${error.message}`);
-          stopRecording();
-        });
+          // Set up error handler
+          provider.onError((error: Error) => {
+            console.error('Transcription error:', error);
+            toast.error(`Transcription error: ${error.message}`);
+            stopRecording();
+          });
 
-        providerRef.current = provider;
+          providerRef.current = provider;
+        }
       } catch (error) {
         console.error('Failed to initialize provider:', error);
         toast.error('Failed to initialize speech recognition');
@@ -80,7 +93,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         providerRef.current.cleanup();
       }
     };
-  }, [selectedProvider, setTranscript, getProviderSettings]);
+  }, [selectedProvider, setTranscript]);
 
   // Auto-scroll original transcript
   const [isManualScroll, setIsManualScroll] = useState(false);
@@ -123,34 +136,62 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   }, [enhancedTranscript]);
 
   const startRecording = async () => {
-    if (providerRef.current && !isRecording) {
-      try {
-        await providerRef.current.start();
-        setIsRecording(true);
-        timerIntervalRef.current = setInterval(() => {
-          setElapsedTime(prev => prev + 1);
-        }, 1000);
-      } catch (error) {
-        console.error('Failed to start recording:', error);
-        toast.error('Failed to start recording');
+    try {
+      if (!isInitialized) {
+        await initializeProvider(selectedProvider);
+      }
+
+      // Get new provider instance
+      const provider = await TranscriptionProviderFactory.getProvider({
+        type: selectedProvider,
+        apiKey: getProviderSettings(selectedProvider)?.apiKey
+      });
+
+      // Set up result handler
+      provider.onResult((result: TranscriptionResult) => {
+        if (!result.isFinal) {
+          setInterimTranscript(result.transcript);
+        } else {
+          setTranscript(prev => prev + ' ' + result.transcript);
+          setInterimTranscript('');
+        }
+      });
+
+      // Start recording
+      await provider.start();
+      providerRef.current = provider;
+      setIsRecording(true);
+      setStartTime(Date.now());
+      setElapsedTime(0);
+
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      toast.error('Failed to start recording. Please check your settings and try again.');
+      if (providerRef.current) {
+        providerRef.current.cleanup();
+        providerRef.current = null;
       }
     }
   };
 
   const stopRecording = async () => {
-    if (providerRef.current && isRecording) {
-      try {
-        await providerRef.current.stop();
-      } catch (error) {
-        console.error('Failed to stop recording:', error);
-      }
-      setIsRecording(false);
-      setInterimTranscript('');
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
+    if (providerRef.current) {
+      await providerRef.current.stop();
+      providerRef.current.cleanup();
+      providerRef.current = null;
     }
+    setIsRecording(false);
+    setInterimTranscript('');
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setStartTime(null);
   };
 
   const clearRecording = () => {
@@ -164,8 +205,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, []);
@@ -302,19 +344,22 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div className="flex gap-2">
           <button 
             onClick={isRecording ? stopRecording : startRecording}
-            className={`px-4 py-2 rounded-md transition-colors ${
-              isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'
-            } text-white`}
+            className={`p-2 rounded-lg ${
+              isRecording
+                ? 'bg-red-500 hover:bg-red-600 text-white'
+                : 'bg-blue-500 hover:bg-blue-600 text-white'
+            }`}
+            title={isRecording ? 'Stop Recording' : 'Start Recording'}
           >
-            {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
+            {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
           {isRecording && (
-            <div className="ml-2 flex items-center text-sm font-medium text-gray-600">
+            <div className="flex items-center gap-2 text-gray-500">
               <span className="animate-pulse mr-2">●</span>
               {formatTime(elapsedTime)}
             </div>
@@ -322,86 +367,187 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         </div>
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+          className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          title="Settings"
         >
-          <Settings size={24} />
+          <Settings className="w-5 h-5" />
         </button>
       </div>
 
+      {/* Settings Panel */}
       {showSettings && (
-        <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-          <div className="flex flex-col space-y-4">
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="space-y-4">
             {/* Provider Selection */}
-            <div className="flex flex-col space-y-2">
-              <label htmlFor="provider-select" className="text-sm font-medium dark:text-gray-200">
+            <div>
+              <label htmlFor="provider-select" className="block text-sm font-medium mb-1 dark:text-gray-200">
                 Transcription Provider
               </label>
-              <select
-                id="provider-select"
-                value={selectedProvider}
-                onChange={(e) => setProvider(e.target.value as any)}
-                className="p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-              >
-                {availableProviders.map((p) => (
-                  <option key={p} value={p}>
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-col space-y-2">
+                <select
+                  id="provider-select"
+                  value={selectedProvider}
+                  onChange={(e) => {
+                    const newProvider = e.target.value as any;
+                    setProvider(newProvider);
+                    setIsKeyValid(null);
+                    if (newProvider !== 'webspeech') {
+                      toast.info(`Please enter your ${newProvider} API key and click Apply to start using it.`);
+                    }
+                  }}
+                  className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+                >
+                  {availableProviders.map((p) => (
+                    <option key={p} value={p}>
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center text-sm">
+                  <span className="mr-2">Current Status:</span>
+                  {selectedProvider === 'webspeech' ? (
+                    <span className="flex items-center text-green-500">
+                      <Check className="w-4 h-4 mr-1" />
+                      Ready
+                    </span>
+                  ) : isValidatingKey ? (
+                    <span className="flex items-center text-blue-500">
+                      <Loader className="w-4 h-4 mr-1 animate-spin" />
+                      Validating API Key
+                    </span>
+                  ) : isKeyValid ? (
+                    <span className="flex items-center text-green-500">
+                      <Check className="w-4 h-4 mr-1" />
+                      API Key Valid
+                    </span>
+                  ) : isKeyValid === false ? (
+                    <span className="flex items-center text-red-500">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      Invalid API Key
+                    </span>
+                  ) : (
+                    <span className="flex items-center text-gray-500">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      API Key Required
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Provider Settings */}
+            {/* Provider-specific Settings */}
             {selectedProvider !== 'webspeech' && (
-              <div className="flex flex-col space-y-2 border-t pt-4 dark:border-gray-600">
-                <label htmlFor="api-key" className="text-sm font-medium dark:text-gray-200">
+              <div>
+                <label htmlFor="api-key" className="block text-sm font-medium mb-1 dark:text-gray-200">
                   API Key
                 </label>
-                <div className="flex space-x-2">
+                <div className="flex gap-2">
                   <input
                     type="password"
                     id="api-key"
                     value={getProviderSettings(selectedProvider)?.apiKey || ''}
-                    onChange={(e) => updateProviderSettings(selectedProvider, {
-                      ...getProviderSettings(selectedProvider),
-                      apiKey: e.target.value
-                    })}
-                    className="flex-1 p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                    onChange={(e) => {
+                      updateProviderSettings(selectedProvider, {
+                        ...getProviderSettings(selectedProvider),
+                        apiKey: e.target.value
+                      });
+                      setIsKeyValid(null);
+                    }}
+                    className="flex-1 p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
                     placeholder={`Enter ${selectedProvider} API Key`}
                   />
-                  <Link 
-                    href={selectedProvider === 'assemblyai' ? 'https://www.assemblyai.com/dashboard/signup' : '#'}
-                    target="_blank"
-                    className="p-2 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
-                    title="Get API Key"
+                  <button
+                    onClick={async () => {
+                      setIsValidatingKey(true);
+                      try {
+                        await initializeProvider(selectedProvider);
+                        setIsKeyValid(true);
+                        toast.success('API key validated successfully!');
+                      } catch (error: any) {
+                        setIsKeyValid(false);
+                        if (error.type === 'PAYMENT_REQUIRED') {
+                          toast.error(
+                            <div>
+                              <p>{error.message}</p>
+                              <a 
+                                href={error.link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-500 hover:text-blue-600 underline mt-2 block"
+                              >
+                                Add payment method →
+                              </a>
+                            </div>,
+                            { autoClose: false }
+                          );
+                        } else {
+                          toast.error('Failed to validate API key. Please check your key and try again.');
+                        }
+                      } finally {
+                        setIsValidatingKey(false);
+                      }
+                    }}
+                    disabled={isValidatingKey}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isValidatingKey
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    }`}
+                    title="Apply API Key"
                   >
-                    <Settings size={20} />
-                  </Link>
+                    {isValidatingKey ? (
+                      <span className="flex items-center">
+                        <Loader className="w-4 h-4 mr-1 animate-spin" />
+                        Validating
+                      </span>
+                    ) : (
+                      'Apply'
+                    )}
+                  </button>
+                  {selectedProvider === 'assemblyai' && (
+                    <Link
+                      href="https://www.assemblyai.com/dashboard/signup"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+                      title="Get AssemblyAI API Key"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                    </Link>
+                  )}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {selectedProvider === 'assemblyai' 
-                    ? 'Get your API key from AssemblyAI dashboard'
-                    : `API key required for ${selectedProvider}`}
-                </p>
+                <div className="mt-1 text-xs">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    {selectedProvider === 'assemblyai' 
+                      ? 'Get your API key from AssemblyAI dashboard'
+                      : `API key required for ${selectedProvider}`}
+                  </p>
+                  {error && (
+                    <p className="text-red-500 mt-1">
+                      {error.message}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Existing Settings */}
-            <div className="border-t pt-4 dark:border-gray-600">
-              <div className="flex items-center mb-4">
+            {/* Transcription Settings */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
                 <input
                   type="checkbox"
                   id="enhance-toggle"
                   checked={enhanceEnabled}
                   onChange={(e) => setEnhanceEnabled(e.target.checked)}
-                  className="mr-2"
+                  className="rounded border-gray-300 dark:border-gray-600"
                 />
                 <label htmlFor="enhance-toggle" className="text-sm dark:text-gray-200">
                   Enable AI Enhancement
                 </label>
               </div>
-              <div className="flex items-center">
-                <label htmlFor="confidence" className="text-sm dark:text-gray-200 mr-2">
-                  Confidence Threshold:
+              <div className="space-y-2">
+                <label htmlFor="confidence" className="block text-sm dark:text-gray-200">
+                  Confidence Threshold: {confidenceThreshold}%
                 </label>
                 <input
                   type="range"
@@ -410,70 +556,67 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
                   max="100"
                   value={confidenceThreshold}
                   onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
-                  className="w-32"
+                  className="w-full"
                 />
-                <span className="ml-2 text-sm dark:text-gray-200">{confidenceThreshold}%</span>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      <div className="mb-4">
-        <div className="grid grid-cols-1 gap-6">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center cursor-pointer" onClick={() => setIsOriginalCollapsed(!isOriginalCollapsed)}>
-                <h3 className="text-sm font-medium dark:text-gray-200 mr-2">Original Transcript</h3>
-                {isOriginalCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-              </div>
-            </div>
-            <div className={`transition-all duration-500 ${isOriginalCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[200px]'}`}>
-              <div
-                ref={originalTranscriptRef}
-                className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-y-auto scroll-smooth h-[200px]"
-              >
-                <p className="text-sm dark:text-gray-200">{transcript} {interimTranscript}</p>
-              </div>
+      <div className="grid grid-cols-1 gap-6">
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center cursor-pointer" onClick={() => setIsOriginalCollapsed(!isOriginalCollapsed)}>
+              <h3 className="text-sm font-medium dark:text-gray-200 mr-2">Original Transcript</h3>
+              {isOriginalCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
             </div>
           </div>
-          
-          {showEnhanced && (
-            <div className={`transition-all duration-500 ${showEnhanced ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center cursor-pointer" onClick={() => setIsEnhancedCollapsed(!isEnhancedCollapsed)}>
-                  <h3 className="text-sm font-medium dark:text-gray-200 mr-2">Enhanced Transcript</h3>
-                  {isEnhancedCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                </div>
-                {isEnhancing && (
-                  <div className="flex items-center space-x-2">
-                    <Loader className="w-4 h-4 animate-spin" />
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      Enhancing... {enhancementProgress}%
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className={`transition-all duration-500 ${isEnhancedCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[300px]'}`}>
-                <div
-                  ref={enhancedTranscriptRef}
-                  className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-y-auto scroll-smooth h-[200px]"
-                >
-                {isEnhancing ? (
-                  <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
-                    <div
-                      className="bg-blue-600 h-2.5 rounded-full"
-                      style={{ width: `${enhancementProgress}%` }}
-                    ></div>
-                  </div>
-                ) : (
-                  <p className="text-sm dark:text-gray-200">{enhancedTranscript}</p>
-                )}
-              </div>
+          <div className={`transition-all duration-500 ${isOriginalCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[200px]'}`}>
+            <div
+              ref={originalTranscriptRef}
+              className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-y-auto scroll-smooth h-[200px]"
+            >
+              <p className="text-sm dark:text-gray-200">{transcript} {interimTranscript}</p>
             </div>
-            </div>
-          )}
+          </div>
         </div>
+        
+        {showEnhanced && (
+          <div className={`transition-all duration-500 ${showEnhanced ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center cursor-pointer" onClick={() => setIsEnhancedCollapsed(!isEnhancedCollapsed)}>
+                <h3 className="text-sm font-medium dark:text-gray-200 mr-2">Enhanced Transcript</h3>
+                {isEnhancedCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              </div>
+              {isEnhancing && (
+                <div className="flex items-center space-x-2">
+                  <Loader className="w-4 h-4 animate-spin" />
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Enhancing... {enhancementProgress}%
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className={`transition-all duration-500 ${isEnhancedCollapsed ? 'max-h-0 overflow-hidden' : 'max-h-[300px]'}`}>
+              <div
+                ref={enhancedTranscriptRef}
+                className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-y-auto scroll-smooth h-[200px]"
+              >
+              {isEnhancing ? (
+                <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                  <div
+                    className="bg-blue-600 h-2.5 rounded-full"
+                    style={{ width: `${enhancementProgress}%` }}
+                  ></div>
+                </div>
+              ) : (
+                <p className="text-sm dark:text-gray-200">{enhancedTranscript}</p>
+              )}
+            </div>
+          </div>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-4">
