@@ -1,6 +1,7 @@
 import { TranscriptionProvider, ProviderType, ProviderConfig } from './types';
 import { WebSpeechProvider } from './providers/WebSpeechProvider';
 import { AssemblyAIProvider } from './providers/AssemblyAIProvider';
+import { DeepgramProvider } from './providers/DeepgramProvider';
 
 export class TranscriptionProviderFactory {
   private static providers: Map<ProviderType, TranscriptionProvider> = new Map();
@@ -28,7 +29,16 @@ export class TranscriptionProviderFactory {
         provider = new WebSpeechProvider();
         break;
       case 'assemblyai':
+        if (!config.apiKey) {
+          throw new Error('API key is required for AssemblyAI provider');
+        }
         provider = new AssemblyAIProvider(config.apiKey);
+        break;
+      case 'deepgram':
+        if (!config.apiKey) {
+          throw new Error('API key is required for Deepgram provider');
+        }
+        provider = new DeepgramProvider(config.apiKey);
         break;
       default:
         throw new Error(`Unsupported provider type: ${config.type}`);

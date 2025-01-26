@@ -36,7 +36,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
   });
   
   // For now, we have WebSpeech and AssemblyAI implemented
-  const availableProviders: ProviderType[] = ['webspeech', 'assemblyai'];
+  const availableProviders: ProviderType[] = ['webspeech', 'assemblyai', 'deepgram'];
 
   // Save settings to localStorage whenever they change
   useEffect(() => {

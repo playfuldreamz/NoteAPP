@@ -22,6 +22,7 @@ const app = express();
 // Import routes
 const aiRoutes = require('./routes/ai');
 const actionItemsRoutes = require('./routes/actionItems');
+const transcriptsRoutes = require('./routes/transcripts');
 const PORT = process.env.PORT || 5000;
 
 // JWT secret key - in production, use an environment variable
@@ -62,6 +63,7 @@ const authenticateToken = (req, res, next) => {
 // Mount routes
 app.use('/api/ai', authenticateToken, aiRoutes);
 app.use('/api/action-items', authenticateToken, actionItemsRoutes);
+app.use('/api/transcripts', transcriptsRoutes);  // No auth required for token validation
 
 // Database setup
 const path = require('path');
