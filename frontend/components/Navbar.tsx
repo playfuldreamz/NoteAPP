@@ -25,7 +25,7 @@ export default function Navbar({
           <div className="flex items-center space-x-3 sm:space-x-4 md:space-x-6">
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>AI: {currentModel}</span>
+              <span>AI: {currentModel || 'Not Configured'}</span>
               <span className="hidden sm:inline">({modelSource})</span>
             </div>
             {isAuthenticated && (

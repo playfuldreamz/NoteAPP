@@ -27,9 +27,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
 
   const [selectedGroup, setSelectedGroup] = useState('ai');
   const [selectedProvider, setSelectedProvider] = useState<AIConfig>({
-    provider: 'gemini',
+    provider: (currentModel || 'gemini') as AIProvider,
     apiKey: '',
-    source: ''
+    source: modelSource || 'env'
   });
   const [savedApiKeys, setSavedApiKeys] = useState<SavedAPIKeys>({});
   const [apiKey, setApiKey] = useState<string>('');
@@ -37,6 +37,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   const [isKeyValid, setIsKeyValid] = useState(false);
   const [tempProvider, setTempProvider] = useState<AIProvider>(selectedProvider.provider || 'gemini');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isLoadingKey, setIsLoadingKey] = useState(false);
   
   // Username change state
   const [newUsername, setNewUsername] = useState('');
@@ -101,7 +102,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
             provider: config.provider,
             apiKey: config.apiKey,
             source: config.source
-          });
+          } as AIConfig);
           // Initialize saved keys with the current key
           const newSavedKeys = {
             ...savedApiKeys,
@@ -122,6 +123,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
 
     fetchProvider();
   }, []);
+
+  // Update selectedProvider when props change
+  useEffect(() => {
+    setSelectedProvider(prev => ({
+      ...prev,
+      provider: (currentModel || 'gemini') as AIProvider,
+      source: modelSource || 'env'
+    } as AIConfig));
+  }, [currentModel, modelSource]);
 
   const validatePassword = (password: string, setError: React.Dispatch<React.SetStateAction<string | null>>) => {
     if (password.length < 8) {
@@ -307,7 +317,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
         provider: config.provider,
         apiKey: config.apiKey,
         source: config.source
-      });
+      } as AIConfig);
       // Update saved keys when saving
       const newSavedKeys = {
         ...savedApiKeys,
@@ -356,20 +366,59 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
     };
   }, []);
 
+  useEffect(() => {
+    const loadAllProviderSettings = async () => {
+      setIsLoadingKey(true);
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const response = await fetch(`${API_BASE}/api/ai/config/all`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch API keys');
+        }
+        
+        const data = await response.json();
+        
+        // Store both user and env keys
+        const newApiKeys = data.reduce((acc: Record<string, string>, config: any) => {
+          acc[config.provider] = config.apiKey;
+          return acc;
+        }, {});
+        setSavedApiKeys(newApiKeys);
+      } catch (error) {
+        console.error('Error loading saved API keys:', error);
+        toast.error('Failed to load saved API keys');
+      } finally {
+        setIsLoadingKey(false);
+      }
+    };
+
+    loadAllProviderSettings();
+  }, []);
+
+  useEffect(() => {
+    const savedKey = savedApiKeys[tempProvider];
+    if (savedKey) {
+      setApiKey(savedKey);
+      // Only mark as valid if it's not an env key
+      const isEnvKey = selectedProvider.source === 'env' && selectedProvider.provider === tempProvider;
+      setIsKeyValid(!isEnvKey);
+    } else {
+      setApiKey('');
+      setIsKeyValid(false);
+    }
+  }, [tempProvider, savedApiKeys, selectedProvider]);
+
   const handleProviderChange = (provider: { value: string; label: string }) => {
-    const newProvider = provider.value as AIProvider;
-    setTempProvider(newProvider);
-    
-    // Set the API key to the saved value for this provider, or empty if none exists
-    const savedKey = savedApiKeys[newProvider] || '';
-    setApiKey(savedKey);
-    setIsKeyValid(validateApiKey(savedKey, newProvider));
+    setTempProvider(provider.value as AIProvider);
     setIsDropdownOpen(false);
-    
-    // Focus the API key input field
-    setTimeout(() => {
-      document.getElementById('apiKey')?.focus();
-    }, 0);
   };
 
   const [isScrolled, setIsScrolled] = useState(false);
@@ -409,7 +458,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
               <div>
                 <p className="text-gray-700 dark:text-gray-200">Current AI Provider</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {selectedProvider.provider} ({selectedProvider.source || 'env'})
+                  {selectedProvider.provider || 'Not Configured'} ({selectedProvider.source || 'env'})
                 </p>
               </div>
             </div>

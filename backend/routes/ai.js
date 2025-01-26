@@ -46,6 +46,60 @@ router.put('/config', async (req, res) => {
   }
 });
 
+// Get all AI provider settings for a user
+router.get('/config/all', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User authentication required' });
+    }
+
+    // Get all active settings for this user
+    const userSettings = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT provider, api_key FROM user_settings 
+         WHERE user_id = ? AND api_key IS NOT NULL AND api_key != ''`,
+        [userId],
+        (err, rows) => {
+          if (err) return reject(err);
+          resolve(rows.map(row => ({
+            provider: row.provider,
+            apiKey: row.api_key,
+            source: 'user'
+          })));
+        }
+      );
+    });
+
+    // Add environment keys for providers that don't have user settings
+    const settings = [...userSettings];
+    const userProviders = new Set(userSettings.map(s => s.provider));
+
+    // Add Gemini env key if no user setting
+    if (!userProviders.has('gemini') && process.env.GEMINI_API_KEY) {
+      settings.push({
+        provider: 'gemini',
+        apiKey: process.env.GEMINI_API_KEY,
+        source: 'env'
+      });
+    }
+
+    // Add OpenAI env key if no user setting
+    if (!userProviders.has('openai') && process.env.OPENAI_API_KEY) {
+      settings.push({
+        provider: 'openai',
+        apiKey: process.env.OPENAI_API_KEY,
+        source: 'env'
+      });
+    }
+
+    res.json(settings);
+  } catch (error) {
+    console.error('Error fetching AI config:', error);
+    res.status(500).json({ error: 'Failed to fetch AI configuration' });
+  }
+});
+
 // Transcription enhancement endpoint
 router.post('/enhance-transcription', async (req, res) => {
   const { transcript, language = 'en-US' } = req.body;

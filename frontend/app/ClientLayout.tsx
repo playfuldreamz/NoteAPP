@@ -74,7 +74,8 @@ export default function ClientLayout({
         }
       });
       const data = await response.json();
-      setCurrentModel(data.provider || 'default gemini');
+      setCurrentModel(data.provider);
+      setModelSource(data.source);
     } catch (error) {
       console.error('Error fetching current model:', error);
     }
