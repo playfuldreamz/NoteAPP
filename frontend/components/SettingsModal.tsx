@@ -22,7 +22,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   }
 
   interface SavedAPIKeys {
-    [key: string]: string;
+    [key: string]: {
+      key: string;
+      source: string;
+    };
   }
 
   const [selectedGroup, setSelectedGroup] = useState('ai');
@@ -79,7 +82,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
     if (storageKey) {
       const savedKeys = localStorage.getItem(storageKey);
       if (savedKeys) {
-        setSavedApiKeys(JSON.parse(savedKeys));
+        try {
+          const parsedKeys = JSON.parse(savedKeys);
+          // Convert old format to new format if necessary
+          const formattedKeys = Object.entries(parsedKeys).reduce((acc: SavedAPIKeys, [provider, value]) => {
+            acc[provider] = typeof value === 'string' 
+              ? { key: value, source: 'user' }  // Convert old format
+              : value as { key: string, source: string };  // Use new format
+            return acc;
+          }, {});
+          setSavedApiKeys(formattedKeys);
+        } catch (error) {
+          console.error('Error parsing saved API keys:', error);
+        }
       }
     }
   }, []);
@@ -106,7 +121,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
           // Initialize saved keys with the current key
           const newSavedKeys = {
             ...savedApiKeys,
-            [config.provider]: config.apiKey
+            [config.provider]: {
+              key: config.apiKey,
+              source: config.source
+            }
           };
           setSavedApiKeys(newSavedKeys);
           saveApiKeysToStorage(newSavedKeys);
@@ -321,7 +339,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
       // Update saved keys when saving
       const newSavedKeys = {
         ...savedApiKeys,
-        [config.provider]: config.apiKey
+        [config.provider]: {
+          key: config.apiKey,
+          source: config.source
+        }
       };
       setSavedApiKeys(newSavedKeys);
       saveApiKeysToStorage(newSavedKeys);
@@ -386,9 +407,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
         
         const data = await response.json();
         
-        // Store both user and env keys
-        const newApiKeys = data.reduce((acc: Record<string, string>, config: any) => {
-          acc[config.provider] = config.apiKey;
+        // Store both user and env keys with their sources
+        const newApiKeys = data.reduce((acc: SavedAPIKeys, config: any) => {
+          acc[config.provider] = {
+            key: config.apiKey,
+            source: config.source
+          };
           return acc;
         }, {});
         setSavedApiKeys(newApiKeys);
@@ -404,17 +428,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
   }, []);
 
   useEffect(() => {
-    const savedKey = savedApiKeys[tempProvider];
-    if (savedKey) {
-      setApiKey(savedKey);
-      // Only mark as valid if it's not an env key
-      const isEnvKey = selectedProvider.source === 'env' && selectedProvider.provider === tempProvider;
-      setIsKeyValid(!isEnvKey);
+    const savedKeyData = savedApiKeys[tempProvider];
+    if (savedKeyData) {
+      setApiKey(savedKeyData.key);
+      setIsKeyValid(savedKeyData.source !== 'env');
     } else {
       setApiKey('');
       setIsKeyValid(false);
     }
-  }, [tempProvider, savedApiKeys, selectedProvider]);
+  }, [tempProvider, savedApiKeys]);
 
   const handleProviderChange = (provider: { value: string; label: string }) => {
     setTempProvider(provider.value as AIProvider);

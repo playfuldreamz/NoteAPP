@@ -196,7 +196,18 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
       try {
         const token = localStorage.getItem('token');
         const username = localStorage.getItem('username');
-        if (!token || !username) return;
+        
+        // Clear settings if user is logged out
+        if (!token || !username) {
+          setProviderSettings({
+            'webspeech': {},
+            'assemblyai': {},
+            'deepgram': {},
+            'whisper': {},
+            'azure': {}
+          });
+          return;
+        }
 
         const response = await fetch('http://localhost:5000/api/transcription/settings', {
           headers: {
@@ -210,21 +221,27 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
         }
 
         const data = await response.json();
-        // Update settings without showing toast
-        Object.entries(data.settings).forEach(([provider, settings]) => {
-          updateProviderSettings(provider as ProviderType, settings as ProviderSettings, false);
-        });
         
-        // Also save to localStorage
+        // Update settings directly instead of using updateProviderSettings
+        setProviderSettings(prevSettings => ({
+          ...prevSettings,
+          ...data.settings
+        }));
+        
+        // Save to localStorage
         const key = `${PROVIDER_SETTINGS_KEY}_${username}`;
         localStorage.setItem(key, JSON.stringify(data.settings));
       } catch (error) {
         console.error('Failed to load provider settings:', error);
+        // Don't show error toast on logout
+        if (localStorage.getItem('token')) {
+          toast.error('Failed to load provider settings');
+        }
       }
     };
 
     loadSettingsFromDB();
-  }, [updateProviderSettings]);
+  }, []);
 
   // Initialize WebSpeech provider on mount
   useEffect(() => {
