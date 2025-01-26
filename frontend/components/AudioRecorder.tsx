@@ -48,12 +48,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [isSaving, setIsSaving] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
+  const [isKeyValid, setIsKeyValid] = useState<boolean | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const providerRef = useRef<TranscriptionProvider | null>(null);
   const originalTranscriptRef = useRef<HTMLDivElement>(null);
   const enhancedTranscriptRef = useRef<HTMLDivElement>(null);
-  const [isValidatingKey, setIsValidatingKey] = useState(false);
-  const [isKeyValid, setIsKeyValid] = useState<boolean | null>(null);
 
   // Initialize transcription provider
   useEffect(() => {
@@ -103,6 +104,43 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       }
     };
   }, [selectedProvider, setTranscript]);
+
+  // Load saved API key when provider changes
+  useEffect(() => {
+    const settings = getProviderSettings(selectedProvider);
+    if (settings?.apiKey) {
+      setApiKeyInput(settings.apiKey);
+      // Validate the saved key
+      validateSavedKey(settings.apiKey);
+    } else {
+      setApiKeyInput('');
+      setIsKeyValid(null);
+    }
+  }, [selectedProvider]);
+
+  // Validate saved API key
+  const validateSavedKey = async (key: string) => {
+    setIsValidatingKey(true);
+    try {
+      const provider = await TranscriptionProviderFactory.getProvider({
+        type: selectedProvider,
+        apiKey: key
+      });
+      const isAvailable = await provider.isAvailable();
+      setIsKeyValid(isAvailable);
+      if (isAvailable) {
+        toast.success('API key validated successfully!');
+      } else {
+        toast.error('Invalid API key');
+      }
+    } catch (error) {
+      console.error('API key validation error:', error);
+      setIsKeyValid(false);
+      toast.error('Invalid API key');
+    } finally {
+      setIsValidatingKey(false);
+    }
+  };
 
   // Auto-scroll original transcript
   const [isManualScroll, setIsManualScroll] = useState(false);
@@ -410,7 +448,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
                     const newProvider = e.target.value as any;
                     setProvider(newProvider);
                     setIsKeyValid(null);
-                    if (newProvider !== 'webspeech') {
+                    // Only show the enter API key toast if there's no saved key
+                    const settings = getProviderSettings(newProvider);
+                    if (newProvider !== 'webspeech' && !settings?.apiKey) {
                       toast.info(`Please enter your ${newProvider} API key and click Apply to start using it.`);
                     }
                   }}
@@ -464,12 +504,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
                   <input
                     type="password"
                     id="api-key"
-                    value={getProviderSettings(selectedProvider)?.apiKey || ''}
+                    value={apiKeyInput}
                     onChange={(e) => {
-                      updateProviderSettings(selectedProvider, {
-                        ...getProviderSettings(selectedProvider),
-                        apiKey: e.target.value
-                      });
+                      const newKey = e.target.value;
+                      setApiKeyInput(newKey);
                       setIsKeyValid(null);
                     }}
                     className="flex-1 p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
@@ -479,6 +517,24 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
                     onClick={async () => {
                       setIsValidatingKey(true);
                       try {
+                        // First validate the key
+                        const provider = await TranscriptionProviderFactory.getProvider({
+                          type: selectedProvider,
+                          apiKey: apiKeyInput
+                        });
+                        
+                        const isAvailable = await provider.isAvailable();
+                        if (!isAvailable) {
+                          throw new Error('Invalid API key');
+                        }
+
+                        // If validation successful, save settings
+                        await updateProviderSettings(selectedProvider, {
+                          ...getProviderSettings(selectedProvider),
+                          apiKey: apiKeyInput
+                        });
+
+                        // Initialize the provider
                         await initializeProvider(selectedProvider);
                         setIsKeyValid(true);
                         toast.success('API key validated successfully!');
@@ -500,52 +556,28 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
                             { autoClose: false }
                           );
                         } else {
-                          toast.error('Failed to validate API key. Please check your key and try again.');
+                          toast.error('Invalid API key');
                         }
                       } finally {
                         setIsValidatingKey(false);
                       }
                     }}
-                    disabled={isValidatingKey}
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
                       isValidatingKey
                         ? 'bg-gray-400 cursor-not-allowed'
                         : 'bg-blue-500 hover:bg-blue-600 text-white'
                     }`}
-                    title="Apply API Key"
+                    disabled={isValidatingKey}
                   >
                     {isValidatingKey ? (
-                      <span className="flex items-center">
-                        <Loader className="w-4 h-4 mr-1 animate-spin" />
-                        Validating
-                      </span>
+                      <div className="flex items-center">
+                        <Loader className="w-4 h-4 mr-2 animate-spin" />
+                        Validating...
+                      </div>
                     ) : (
                       'Apply'
                     )}
                   </button>
-                  {selectedProvider === 'assemblyai' && (
-                    <Link
-                      href="https://www.assemblyai.com/dashboard/signup"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
-                      title="Get AssemblyAI API Key"
-                    >
-                      <ExternalLink className="w-5 h-5" />
-                    </Link>
-                  )}
-                </div>
-                <div className="mt-1 text-xs">
-                  <p className="text-gray-500 dark:text-gray-400">
-                    {selectedProvider === 'assemblyai' 
-                      ? 'Get your API key from AssemblyAI dashboard'
-                      : `API key required for ${selectedProvider}`}
-                  </p>
-                  {error && (
-                    <p className="text-red-500 mt-1">
-                      {error.message}
-                    </p>
-                  )}
                 </div>
               </div>
             )}

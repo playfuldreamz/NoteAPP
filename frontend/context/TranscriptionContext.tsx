@@ -50,6 +50,31 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
   // Available transcription providers
   const availableProviders: ProviderType[] = ['webspeech', 'assemblyai', 'deepgram'];
 
+  // Reload settings when username changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const username = localStorage.getItem('username');
+      const key = username ? `${PROVIDER_SETTINGS_KEY}_${username}` : PROVIDER_SETTINGS_KEY;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        setProviderSettings(JSON.parse(saved));
+      } else {
+        // Initialize with empty settings for each provider
+        const emptySettings: Record<ProviderType, ProviderSettings> = {
+          'webspeech': {},
+          'assemblyai': {},
+          'deepgram': {},
+          'whisper': {},
+          'azure': {}
+        };
+        setProviderSettings(emptySettings);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   // Save settings to localStorage whenever they change
   useEffect(() => {
     const username = localStorage.getItem('username');
@@ -107,16 +132,99 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
     }
   }, [providerSettings, currentProvider]);
 
-  const updateProviderSettings = useCallback(async (type: ProviderType, settings: ProviderSettings) => {
-    setProviderSettings(prev => ({
-      ...prev,
-      [type]: settings
-    }));
-  }, []);
+  const updateProviderSettings = useCallback(async (type: ProviderType, settings: ProviderSettings, showToast = true) => {
+    try {
+      // Update local state first for immediate feedback
+      setProviderSettings(prev => ({
+        ...prev,
+        [type]: settings
+      }));
+
+      // Save to database
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://localhost:5000/api/transcription/settings', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          provider: type,
+          settings: settings
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to save provider settings');
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error('Failed to save provider settings');
+      }
+
+      // Save to localStorage as backup
+      const username = localStorage.getItem('username');
+      if (username) {
+        const key = `${PROVIDER_SETTINGS_KEY}_${username}`;
+        localStorage.setItem(key, JSON.stringify(providerSettings));
+      }
+
+      if (showToast) {
+        toast.success('Settings saved successfully');
+      }
+    } catch (error) {
+      console.error('Failed to update provider settings:', error);
+      if (showToast) {
+        toast.error('Failed to save settings to server. Your changes may not persist after refresh.');
+      }
+    }
+  }, [providerSettings]);
 
   const getProviderSettings = useCallback((type: ProviderType) => {
     return providerSettings[type];
   }, [providerSettings]);
+
+  // Load settings from database on mount and username change
+  useEffect(() => {
+    const loadSettingsFromDB = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const username = localStorage.getItem('username');
+        if (!token || !username) return;
+
+        const response = await fetch('http://localhost:5000/api/transcription/settings', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to load provider settings');
+        }
+
+        const data = await response.json();
+        // Update settings without showing toast
+        Object.entries(data.settings).forEach(([provider, settings]) => {
+          updateProviderSettings(provider as ProviderType, settings as ProviderSettings, false);
+        });
+        
+        // Also save to localStorage
+        const key = `${PROVIDER_SETTINGS_KEY}_${username}`;
+        localStorage.setItem(key, JSON.stringify(data.settings));
+      } catch (error) {
+        console.error('Failed to load provider settings:', error);
+      }
+    };
+
+    loadSettingsFromDB();
+  }, [updateProviderSettings]);
 
   // Initialize WebSpeech provider on mount
   useEffect(() => {

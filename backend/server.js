@@ -115,6 +115,24 @@ db.serialize(() => {
     FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
   )`);
 
+  // Create transcription_settings table
+  db.run(`CREATE TABLE IF NOT EXISTS transcription_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    provider_id TEXT NOT NULL,
+    api_key TEXT,
+    language TEXT NOT NULL DEFAULT 'en',
+    settings TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, provider_id)
+  )`);
+
+  // Add index for faster lookups
+  db.run(`CREATE INDEX IF NOT EXISTS idx_transcription_settings_user_id 
+    ON transcription_settings(user_id)`);
+
   // Create app_settings table for global AI configuration
   db.run(`CREATE TABLE IF NOT EXISTS app_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -172,20 +190,6 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  )`);
-
-  // Create transcription_settings table for user provider preferences
-  db.run(`CREATE TABLE IF NOT EXISTS transcription_settings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    provider TEXT NOT NULL DEFAULT 'webspeech',
-    api_key TEXT,
-    options TEXT,  -- JSON string of provider-specific options
-    is_active BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE(user_id, provider)
   )`);
 
   // Insert default app settings if none exist
@@ -930,6 +934,88 @@ app.put('/change-password', authenticateToken, async (req, res) => {
     console.error('Password change error:', error);
     res.status(500).json({ error: 'Failed to update password' });
   }
+});
+
+// Transcription settings routes
+app.get('/api/transcription/settings', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  
+  db.all(
+    'SELECT provider_id as provider, api_key, settings as options FROM transcription_settings WHERE user_id = ?',
+    [userId],
+    (err, rows) => {
+      if (err) {
+        console.error('Error fetching transcription settings:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      // Convert rows to the expected format
+      const settings = {};
+      rows.forEach(row => {
+        settings[row.provider] = {
+          apiKey: row.api_key,
+          options: row.options ? JSON.parse(row.options) : {}
+        };
+      });
+
+      res.json({ settings });
+    }
+  );
+});
+
+app.put('/api/transcription/settings', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const { provider, settings } = req.body;
+
+  if (!provider || !settings) {
+    return res.status(400).json({ error: 'Provider and settings are required' });
+  }
+
+  const { apiKey, options } = settings;
+  const settingsJson = options ? JSON.stringify(options) : null;
+
+  // First check if a record exists
+  db.get(
+    'SELECT id FROM transcription_settings WHERE user_id = ? AND provider_id = ?',
+    [userId, provider],
+    (err, row) => {
+      if (err) {
+        console.error('Error checking transcription settings:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (row) {
+        // Update existing record
+        db.run(
+          `UPDATE transcription_settings 
+           SET api_key = ?, settings = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE user_id = ? AND provider_id = ?`,
+          [apiKey, settingsJson, userId, provider],
+          function(err) {
+            if (err) {
+              console.error('Error updating transcription settings:', err);
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+            res.json({ success: true });
+          }
+        );
+      } else {
+        // Insert new record
+        db.run(
+          `INSERT INTO transcription_settings (user_id, provider_id, api_key, settings, language)
+           VALUES (?, ?, ?, ?, 'en')`,
+          [userId, provider, apiKey, settingsJson],
+          function(err) {
+            if (err) {
+              console.error('Error inserting transcription settings:', err);
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+            res.json({ success: true });
+          }
+        );
+      }
+    }
+  );
 });
 
 app.listen(PORT, () => {
