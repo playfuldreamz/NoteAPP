@@ -19,14 +19,24 @@ interface TranscriptionContextType {
   error: Error | null;
   updateProviderSettings: (type: ProviderType, settings: ProviderSettings) => Promise<void>;
   getProviderSettings: (type: ProviderType) => ProviderSettings | undefined;
+  activeProvider: ProviderType;
 }
 
 const TranscriptionContext = createContext<TranscriptionContextType | undefined>(undefined);
 
 const PROVIDER_SETTINGS_KEY = 'transcription_provider_settings';
 
+const PROVIDER_DISPLAY_NAMES: Record<ProviderType, string> = {
+  'webspeech': 'Web Speech',
+  'assemblyai': 'AssemblyAI',
+  'deepgram': 'Deepgram',
+  'whisper': 'Whisper',
+  'azure': 'Azure Speech'
+};
+
 export function TranscriptionProviderContext({ children }: { children: React.ReactNode }) {
   const [currentProvider, setCurrentProvider] = useState<ProviderType>('webspeech');
+  const [activeProvider, setActiveProvider] = useState<ProviderType>('webspeech');
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [providerSettings, setProviderSettings] = useState<Record<ProviderType, ProviderSettings>>(() => {
@@ -35,7 +45,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
     return saved ? JSON.parse(saved) : {};
   });
   
-  // For now, we have WebSpeech and AssemblyAI implemented
+  // Available transcription providers
   const availableProviders: ProviderType[] = ['webspeech', 'assemblyai', 'deepgram'];
 
   // Save settings to localStorage whenever they change
@@ -75,6 +85,11 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
       }
 
       setIsInitialized(true);
+      setActiveProvider(type);
+      // Only show toast when switching from one provider to another (not on initial load)
+      if (currentProvider !== type) {
+        toast.success(`Successfully switched to ${PROVIDER_DISPLAY_NAMES[type]} provider`);
+      }
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to initialize provider');
       setError(error);
@@ -86,7 +101,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
         initializeProvider('webspeech');
       }
     }
-  }, [providerSettings]);
+  }, [providerSettings, currentProvider]);
 
   const updateProviderSettings = useCallback(async (type: ProviderType, settings: ProviderSettings) => {
     setProviderSettings(prev => ({
@@ -117,7 +132,8 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
     isInitialized,
     error,
     updateProviderSettings,
-    getProviderSettings
+    getProviderSettings,
+    activeProvider
   };
 
   return (

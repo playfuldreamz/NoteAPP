@@ -14,6 +14,14 @@ interface AudioRecorderProps {
   transcript: string;
 }
 
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  'webspeech': 'Web Speech',
+  'assemblyai': 'AssemblyAI',
+  'deepgram': 'Deepgram',
+  'whisper': 'Whisper',
+  'azure': 'Azure Speech'
+};
+
 const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTranscripts, transcript }) => {
   const { 
     provider: selectedProvider, 
@@ -23,7 +31,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     getProviderSettings, 
     updateProviderSettings,
     isInitialized,
-    error 
+    error,
+    activeProvider 
   } = useTranscription();
   const [isRecording, setIsRecording] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -365,13 +374,23 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          title="Settings"
-        >
-          <Settings className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+            <span className="text-sm text-green-600 dark:text-green-400" style={{
+              textShadow: '0 0 5px rgba(34, 197, 94, 0.3)'
+            }}>
+              {PROVIDER_DISPLAY_NAMES[activeProvider]}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Settings Panel */}
