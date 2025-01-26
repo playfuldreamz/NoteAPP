@@ -551,34 +551,36 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
             )}
 
             {/* Transcription Settings */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <input
-                  type="checkbox"
-                  id="enhance-toggle"
-                  checked={enhanceEnabled}
-                  onChange={(e) => setEnhanceEnabled(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
-                />
-                <label htmlFor="enhance-toggle" className="text-sm dark:text-gray-200">
-                  Enable AI Enhancement
-                </label>
+            {selectedProvider === 'webspeech' && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <input
+                    type="checkbox"
+                    id="enhance-toggle"
+                    checked={enhanceEnabled}
+                    onChange={(e) => setEnhanceEnabled(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <label htmlFor="enhance-toggle" className="text-sm dark:text-gray-200">
+                    Enable AI Enhancement
+                  </label>
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="confidence" className="block text-sm dark:text-gray-200">
+                    Confidence Threshold: {confidenceThreshold}%
+                  </label>
+                  <input
+                    type="range"
+                    id="confidence"
+                    min="0"
+                    max="100"
+                    value={confidenceThreshold}
+                    onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <label htmlFor="confidence" className="block text-sm dark:text-gray-200">
-                  Confidence Threshold: {confidenceThreshold}%
-                </label>
-                <input
-                  type="range"
-                  id="confidence"
-                  min="0"
-                  max="100"
-                  value={confidenceThreshold}
-                  onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -639,28 +641,30 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       </div>
 
       <div className="flex items-center gap-4">
-        <button 
-          onClick={handleEnhanceTranscript}
-          className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
-            isRecording || !transcript || isEnhancing
-              ? 'bg-green-200 dark:bg-green-900 text-green-50 dark:text-green-200 cursor-not-allowed'
-              : 'bg-green-600 dark:bg-green-500 text-white hover:bg-green-700 dark:hover:bg-green-600 hover:shadow-md active:scale-[0.98]'
-          }`}
-          disabled={isRecording || !transcript || isEnhancing}
-        >
-          {isEnhancing ? (
-            <>
-              <Loader size={18} className="shrink-0 animate-spin" />
-              <span>{Math.round(enhancementProgress * 100)}%</span>
-            </>
-          ) : (
-            <>
-              <RefreshCw size={18} className="shrink-0" />
-              <span>Enhance</span>
-            </>
-          )}
-        </button>
-
+        {activeProvider === 'webspeech' && (
+          <button 
+            onClick={handleEnhanceTranscript}
+            className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
+              !transcript || isEnhancing
+                ? 'bg-green-200 dark:bg-green-900 text-green-50 dark:text-green-200 cursor-not-allowed'
+                : 'bg-green-600 dark:bg-green-500 text-white hover:bg-green-700 dark:hover:bg-green-600 hover:shadow-md active:scale-[0.98]'
+            }`}
+            disabled={!transcript || isEnhancing}
+            title={transcript ? 'Enhance transcript' : 'No transcript to enhance'}
+          >
+            {isEnhancing ? (
+              <>
+                <Loader size={18} className="shrink-0 animate-spin" />
+                <span>{Math.round(enhancementProgress * 100)}%</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw size={18} className="shrink-0" />
+                <span>Enhance</span>
+              </>
+            )}
+          </button>
+        )}
         <button
           onClick={handleSaveTranscript}
           className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
