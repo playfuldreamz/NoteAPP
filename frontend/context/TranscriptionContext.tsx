@@ -40,8 +40,10 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [providerSettings, setProviderSettings] = useState<Record<ProviderType, ProviderSettings>>(() => {
-    // Load saved settings from localStorage
-    const saved = localStorage.getItem(PROVIDER_SETTINGS_KEY);
+    // Load saved settings from localStorage with user-specific scope
+    const username = localStorage.getItem('username');
+    const key = username ? `${PROVIDER_SETTINGS_KEY}_${username}` : PROVIDER_SETTINGS_KEY;
+    const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : {};
   });
   
@@ -50,7 +52,9 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
 
   // Save settings to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem(PROVIDER_SETTINGS_KEY, JSON.stringify(providerSettings));
+    const username = localStorage.getItem('username');
+    const key = username ? `${PROVIDER_SETTINGS_KEY}_${username}` : PROVIDER_SETTINGS_KEY;
+    localStorage.setItem(key, JSON.stringify(providerSettings));
   }, [providerSettings]);
 
   const initializeProvider = useCallback(async (type: ProviderType) => {

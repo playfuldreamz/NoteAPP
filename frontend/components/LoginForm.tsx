@@ -13,6 +13,15 @@ const LoginForm = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Clear any existing provider settings when logging in as a new user
+  const clearExistingProviderSettings = () => {
+    const existingUsername = localStorage.getItem('username');
+    if (existingUsername) {
+      const key = `transcription_provider_settings_${existingUsername}`;
+      localStorage.removeItem(key);
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
@@ -40,6 +49,9 @@ const LoginForm = () => {
         throw new Error(data.error || 'Login failed');
       }
 
+      // Clear existing provider settings before setting new user
+      clearExistingProviderSettings();
+      
       // Store the token and username
       localStorage.setItem('token', data.token);
       localStorage.setItem('username', data.username);

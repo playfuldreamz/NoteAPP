@@ -66,6 +66,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
     { value: 'deepseek', label: 'DeepSeek' }
   ];
 
+  // Get user-specific storage key
+  const getUserStorageKey = () => {
+    const username = localStorage.getItem('username');
+    return username ? `ai_provider_settings_${username}` : null;
+  };
+
+  // Load saved API keys from user-specific storage
+  useEffect(() => {
+    const storageKey = getUserStorageKey();
+    if (storageKey) {
+      const savedKeys = localStorage.getItem(storageKey);
+      if (savedKeys) {
+        setSavedApiKeys(JSON.parse(savedKeys));
+      }
+    }
+  }, []);
+
+  // Save API keys to user-specific storage
+  const saveApiKeysToStorage = (keys: SavedAPIKeys) => {
+    const storageKey = getUserStorageKey();
+    if (storageKey) {
+      localStorage.setItem(storageKey, JSON.stringify(keys));
+    }
+  };
+
   useEffect(() => {
     const fetchProvider = async () => {
       try {
@@ -78,10 +103,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
             source: config.source
           });
           // Initialize saved keys with the current key
-          setSavedApiKeys(prev => ({
-            ...prev,
+          const newSavedKeys = {
+            ...savedApiKeys,
             [config.provider]: config.apiKey
-          }));
+          };
+          setSavedApiKeys(newSavedKeys);
+          saveApiKeysToStorage(newSavedKeys);
           setApiKey(config.apiKey);
           setTempProvider(config.provider);
         }
@@ -282,10 +309,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
         source: config.source
       });
       // Update saved keys when saving
-      setSavedApiKeys(prev => ({
-        ...prev,
+      const newSavedKeys = {
+        ...savedApiKeys,
         [config.provider]: config.apiKey
-      }));
+      };
+      setSavedApiKeys(newSavedKeys);
+      saveApiKeysToStorage(newSavedKeys);
       toast.success('Settings saved successfully');
       onClose();
     } catch (error) {
