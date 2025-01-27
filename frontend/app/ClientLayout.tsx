@@ -84,8 +84,9 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
               onLogout={handleLogout}
               onOpenSettings={() => setIsSettingsOpen(true)}
             />
-            <MainContent isAuthenticated={isAuthenticated} />
-            {children}
+            <MainContent>
+              {children}
+            </MainContent>
           </main>
 
           <SettingsModal
