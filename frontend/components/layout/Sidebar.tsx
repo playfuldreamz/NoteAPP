@@ -26,12 +26,15 @@ export default function Sidebar({ onLogout, onOpenSettings }: SidebarProps) {
           >
             <NotebookPen className="w-5 h-5" />
           </Link>
-          <button
-            className="flex items-center justify-center h-10 w-10 mx-auto rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          <Link
+            href="/home"
+            className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors ${
+              pathname === '/home' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
             title="Home"
           >
             <Home className="w-5 h-5" />
-          </button>
+          </Link>
           <button
             className="flex items-center justify-center h-10 w-10 mx-auto rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             title="Notes"
