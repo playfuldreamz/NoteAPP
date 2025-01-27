@@ -57,7 +57,7 @@ const LoginForm = () => {
       localStorage.setItem('username', data.username);
       
       // Redirect to home page
-      router.push('/');
+      router.push('/home');
     } catch (err: any) {
       setError(err.message);
     } finally {
