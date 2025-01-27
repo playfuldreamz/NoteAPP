@@ -143,131 +143,125 @@ export default function HomePage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">
-        Welcome to Voice Notes
-      </h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Quick Actions */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h2>
-          <div className="space-y-3">
-            <Link href="/notes-hub" className="w-full flex items-center justify-between px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors group">
-              <span className="text-blue-700 dark:text-blue-300 group-hover:text-blue-800 dark:group-hover:text-blue-200">Start Recording</span>
-              <Mic className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-            </Link>
-            <Link href="/notes-hub" className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-              <span className="text-gray-700 dark:text-gray-300">View All Notes</span>
-              <FileText className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-            </Link>
-            <button className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-              <span className="text-gray-700 dark:text-gray-300">Search Content</span>
-              <Search className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-            </button>
-          </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Quick Actions */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h2>
+        <div className="space-y-3">
+          <Link href="/notes-hub" className="w-full flex items-center justify-between px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors group">
+            <span className="text-blue-700 dark:text-blue-300 group-hover:text-blue-800 dark:group-hover:text-blue-200">Start Recording</span>
+            <Mic className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+          </Link>
+          <Link href="/notes-hub" className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <span className="text-gray-700 dark:text-gray-300">View All Notes</span>
+            <FileText className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          </Link>
+          <button className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <span className="text-gray-700 dark:text-gray-300">Search Content</span>
+            <Search className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          </button>
         </div>
+      </div>
 
-        {/* Recent Activity */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h2>
-            <Link 
-              href="/notes-hub" 
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-            >
-              View All
-            </Link>
-          </div>
-          <div className="space-y-3 h-[180px] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-            {recentNotes.length > 0 ? (
-              recentNotes.map(note => (
-                <div 
-                  key={note.id} 
-                  onClick={() => handleItemClick(note, 'note')}
-                  className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
-                >
-                  <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
-                      {note.title || 'Untitled Note'}
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      {new Date(note.timestamp).toLocaleDateString()}
-                    </p>
-                  </div>
+      {/* Recent Activity */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h2>
+          <Link 
+            href="/notes-hub" 
+            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+          >
+            View All
+          </Link>
+        </div>
+        <div className="space-y-3 h-[180px] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+          {recentNotes.length > 0 ? (
+            recentNotes.map(note => (
+              <div 
+                key={note.id} 
+                onClick={() => handleItemClick(note, 'note')}
+                className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
+              >
+                <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
+                    {note.title || 'Untitled Note'}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {new Date(note.timestamp).toLocaleDateString()}
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
-                <Activity className="w-4 h-4" />
-                <span>Start by creating your first note!</span>
               </div>
-            )}
-          </div>
+            ))
+          ) : (
+            <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
+              <Activity className="w-4 h-4" />
+              <span>Start by creating your first note!</span>
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Recent Recordings */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Recordings</h2>
-            <Link 
-              href="/notes-hub" 
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-            >
-              View All
-            </Link>
-          </div>
-          <div className="space-y-3 h-[180px] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-            {recentTranscripts.length > 0 ? (
-              recentTranscripts.map(transcript => (
-                <div 
-                  key={transcript.id} 
-                  onClick={() => handleItemClick(transcript, 'transcript')}
-                  className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
-                >
-                  <Mic className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
-                      {transcript.title || 'Untitled Recording'}
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      {new Date(transcript.timestamp).toLocaleDateString()} • {Math.floor(transcript.duration / 60)}:{(transcript.duration % 60).toString().padStart(2, '0')}
-                    </p>
-                  </div>
+      {/* Recent Recordings */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Recordings</h2>
+          <Link 
+            href="/notes-hub" 
+            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+          >
+            View All
+          </Link>
+        </div>
+        <div className="space-y-3 h-[180px] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+          {recentTranscripts.length > 0 ? (
+            recentTranscripts.map(transcript => (
+              <div 
+                key={transcript.id} 
+                onClick={() => handleItemClick(transcript, 'transcript')}
+                className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
+              >
+                <Mic className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
+                    {transcript.title || 'Untitled Recording'}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {new Date(transcript.timestamp).toLocaleDateString()} • {Math.floor(transcript.duration / 60)}:{(transcript.duration % 60).toString().padStart(2, '0')}
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
-                <Star className="w-4 h-4" />
-                <span>Record your first voice note!</span>
               </div>
-            )}
-          </div>
+            ))
+          ) : (
+            <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
+              <Star className="w-4 h-4" />
+              <span>Record your first voice note!</span>
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Statistics */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Statistics</h2>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Total Notes</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{stats.totalNotes}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Total Recordings</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{stats.totalRecordings}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Unique Tags</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{stats.totalTags}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Recording Time</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {Math.floor(stats.recordingTime / 60)}m {stats.recordingTime % 60}s
-              </span>
-            </div>
+      {/* Statistics */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Statistics</h2>
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Total Notes</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{stats.totalNotes}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Total Recordings</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{stats.totalRecordings}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Unique Tags</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{stats.totalTags}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Recording Time</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {Math.floor(stats.recordingTime / 60)}m {stats.recordingTime % 60}s
+            </span>
           </div>
         </div>
       </div>
