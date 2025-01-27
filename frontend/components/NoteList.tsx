@@ -241,7 +241,8 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
     }
   };
 
-  const truncateText = (text: string) => {
+  const truncateText = (text: string | null) => {
+    if (!text) return '';
     const words = text.split(' ');
     return words.length > 5 ? words.slice(0, 5).join(' ') + '...' : text;
   };
@@ -506,7 +507,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
                 <p className="text-sm inline">
                   {truncateText(note.content)}
                 </p>
-                {note.content.split(' ').length > 5 && (
+                {note.content && note.content.split(' ').length > 5 && (
                   <button
                     onClick={() => handleSeeMore(note.content, note.title || 'Untitled Note', note.id)}
                     className="text-blue-500 hover:underline text-xs ml-2"
