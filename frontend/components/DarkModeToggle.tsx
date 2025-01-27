@@ -8,7 +8,6 @@ const DarkModeToggle = () => {
   const { darkMode, toggleDarkMode } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
 
-  // Ensure component is mounted before rendering
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -16,13 +15,14 @@ const DarkModeToggle = () => {
   return (
     <button
       onClick={toggleDarkMode}
-      className="fixed bottom-4 right-4 p-3 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
       aria-label="Toggle dark mode"
+      title={darkMode ? "Light Mode" : "Dark Mode"}
     >
       {!isMounted ? null : darkMode ? (
-        <Sun className="w-6 h-6 text-yellow-400" />
+        <Sun className="w-5 h-5 text-gray-600 dark:text-gray-300" />
       ) : (
-        <Moon className="w-6 h-6 text-gray-800 dark:text-gray-200" />
+        <Moon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
       )}
     </button>
   );
