@@ -266,6 +266,111 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Voice Insights */}
+      <div className="col-span-full mt-6 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Voice Insights</h2>
+          <div className="flex items-center gap-2">
+            <select className="text-sm bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
+              <option>Last 7 days</option>
+              <option>Last 30 days</option>
+              <option>Last 3 months</option>
+            </select>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Recording Timeline */}
+          <div className="md:col-span-2 h-[200px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Recording Timeline</h3>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 h-full flex items-center justify-center">
+              Timeline visualization will go here
+            </div>
+          </div>
+
+          {/* Popular Topics */}
+          <div className="h-[200px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Tags className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Popular Topics</h3>
+            </div>
+            <div className="space-y-3">
+              {[
+                { topic: 'meetings', percentage: 80 },
+                { topic: 'ideas', percentage: 60 },
+                { topic: 'tasks', percentage: 40 },
+                { topic: 'research', percentage: 20 }
+              ].map(({ topic, percentage }) => (
+                <div key={topic} className="flex items-center gap-3">
+                  <div className="w-16 text-sm text-gray-600 dark:text-gray-300">{topic}</div>
+                  <div className="flex-1">
+                    <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-600">
+                      <div 
+                        className="h-2 rounded-full bg-blue-500 dark:bg-blue-400" 
+                        style={{ width: `${percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="w-10 text-right text-xs text-gray-500 dark:text-gray-400">{percentage}%</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recording Patterns */}
+          <div className="md:col-span-2 h-[200px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Recording Patterns</h3>
+            </div>
+            <div className="grid grid-cols-7 gap-1 mt-4">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
+                <div key={i} className="flex flex-col gap-1">
+                  <div className="text-xs text-center text-gray-500 dark:text-gray-400 mb-1">
+                    {day}
+                  </div>
+                  {Array.from({ length: 4 }).map((_, j) => (
+                    <div
+                      key={j}
+                      className={`h-6 rounded ${
+                        Math.random() > 0.5
+                          ? 'bg-blue-500/20 dark:bg-blue-400/20'
+                          : 'bg-gray-200 dark:bg-gray-600'
+                      }`}
+                    ></div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="h-[200px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Timer className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Quick Stats</h3>
+            </div>
+            <div className="flex flex-col justify-between h-[calc(100%-2rem)]">
+              <div>
+                <div className="text-2xl font-medium text-gray-900 dark:text-gray-100">4.5h</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Avg. weekly recording time</div>
+              </div>
+              <div>
+                <div className="text-2xl font-medium text-gray-900 dark:text-gray-100">8.2min</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Avg. recording length</div>
+              </div>
+              <div>
+                <div className="text-2xl font-medium text-gray-900 dark:text-gray-100">85%</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Notes with tags</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Modal */}
       <Modal
         isOpen={modalState.isOpen}
