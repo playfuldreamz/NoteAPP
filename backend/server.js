@@ -162,6 +162,7 @@ db.serialize(() => {
     title TEXT,
     user_id INTEGER,
     date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    duration INTEGER,
     FOREIGN KEY(user_id) REFERENCES users(id)
   )`);
 
@@ -570,6 +571,7 @@ app.get('/transcripts', authenticateToken, (req, res) => {
       t.text,
       t.title,
       t.date,
+      t.duration,
       json_group_array(json_object('id', tg.id, 'name', tg.name)) AS tags
     FROM transcripts t
     LEFT JOIN item_tags it ON t.id = it.item_id AND it.item_type = 'transcript'
@@ -604,6 +606,7 @@ app.post('/transcripts', authenticateToken, async (req, res) => {
     const text = req.body.text;
     const title = req.body.title;
     const tags = req.body.tags || [];
+    const duration = req.body.duration; // Added duration
     
     if (!text) {
       return res.status(400).json({ error: 'Text is required' });
@@ -617,8 +620,8 @@ app.post('/transcripts', authenticateToken, async (req, res) => {
     const finalTitle = (title === null || title === undefined) ? 'Untitled Transcript' : title;
     
     // Save transcript with provided title
-    const query = 'INSERT INTO transcripts (text, title, user_id) VALUES (?, ?, ?)';
-    const params = [text, finalTitle, req.user.id];
+    const query = 'INSERT INTO transcripts (text, title, user_id, duration) VALUES (?, ?, ?, ?)'; // Updated query
+    const params = [text, finalTitle, req.user.id, duration]; // Added duration to params
 
     db.run(query, params, function(err) {
       if (err) {
@@ -666,6 +669,7 @@ app.post('/transcripts', authenticateToken, async (req, res) => {
           t.text,
           t.title,
           t.date,
+          t.duration,
           json_group_array(json_object('id', tg.id, 'name', tg.name)) AS tags
         FROM transcripts t
         LEFT JOIN item_tags it ON t.id = it.item_id AND it.item_type = 'transcript'

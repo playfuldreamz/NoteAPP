@@ -364,7 +364,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
           },
           body: JSON.stringify({
             text: finalTranscript,
-            title: title
+            title: title,
+            duration: elapsedTime
           })
         });
 
