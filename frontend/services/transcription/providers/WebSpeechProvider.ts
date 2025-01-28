@@ -80,13 +80,16 @@ export class WebSpeechProvider implements TranscriptionProvider {
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
       if (!this.resultCallback) return;
 
+      let interim = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         const result = event.results[i];
-        this.resultCallback({
-          transcript: result[0].transcript,
-          isFinal: result.isFinal,
-          confidence: result[0].confidence
-        });
+        const transcript = result[0].transcript;
+        if (result.isFinal) {
+          this.resultCallback({ transcript, isFinal: true, confidence: result[0].confidence });
+        } else {
+          interim += transcript;
+          this.resultCallback({ transcript: interim, isFinal: false, confidence: result[0].confidence });
+        }
       }
     };
 

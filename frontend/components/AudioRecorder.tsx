@@ -233,6 +233,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       providerRef.current = null;
     }
     setIsRecording(false);
+    if (selectedProvider === 'webspeech') {
+      initializeProvider(selectedProvider);
+    }
     setInterimTranscript('');
     if (timerRef.current) {
       clearInterval(timerRef.current);
