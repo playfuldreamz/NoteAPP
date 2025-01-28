@@ -18,6 +18,7 @@ interface Transcript {
   id: number;
   title: string;
   text: string;
+  date: string; // Added date property
   timestamp: string;
   duration: number;
   tags?: Array<{ id: number; name: string; }>;
@@ -214,30 +215,30 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="space-y-3 h-[180px] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-          {recentTranscripts.length > 0 ? (
-            recentTranscripts.map(transcript => (
-              <div 
-                key={transcript.id} 
-                onClick={() => handleItemClick(transcript, 'transcript')}
-                className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
-              >
-                <Mic className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
-                    {transcript.title || 'Untitled Recording'}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    {new Date(transcript.timestamp).toLocaleDateString()} • {Math.floor(transcript.duration / 60)}:{(transcript.duration % 60).toString().padStart(2, '0')}
-                  </p>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
-              <Star className="w-4 h-4" />
-              <span>Record your first voice note!</span>
-            </div>
-          )}
+{recentTranscripts.length > 0 ? (
+  recentTranscripts.map(transcript => (
+    <div 
+      key={transcript.id} 
+      onClick={() => handleItemClick(transcript, 'transcript')}
+      className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
+    >
+      <Mic className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
+      <div className="flex-1 min-w-0">
+        <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
+          {transcript.title || 'Untitled Recording'}
+        </p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          {new Date(transcript.date).toLocaleString()} • {Math.floor(transcript.duration / 60)}:{(transcript.duration % 60).toString().padStart(2, '0')}
+        </p>
+      </div>
+    </div>
+  ))
+) : (
+  <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
+    <Star className="w-4 h-4" />
+    <span>Record your first voice note!</span>
+  </div>
+)}
         </div>
       </div>
 
