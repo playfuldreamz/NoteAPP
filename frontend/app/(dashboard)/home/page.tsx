@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, Calendar, Activity, Star, Mic, FileText, Tags, Timer, Search } from 'lucide-react';
+import { Clock, Calendar, Activity, Star, Mic, FileText, Tags, Timer, Search, ChartBar } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
 import Modal from '../../../components/Modal';
@@ -147,7 +147,10 @@ export default function HomePage() {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {/* Quick Actions */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h2>
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h2>
+        </div>
         <div className="space-y-3">
           <Link href="/notes-hub" className="w-full flex items-center justify-between px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors group">
             <span className="text-blue-700 dark:text-blue-300 group-hover:text-blue-800 dark:group-hover:text-blue-200">Start Recording</span>
@@ -167,7 +170,10 @@ export default function HomePage() {
       {/* Recent Activity */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Activity className="w-5 h-5 text-blue-500 dark:text-blue-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h2>
+        </div>
           <Link 
             href="/notes-hub" 
             className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
@@ -206,7 +212,10 @@ export default function HomePage() {
       {/* Recent Recordings */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Mic className="w-5 h-5 text-blue-500 dark:text-blue-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Recordings</h2>
+        </div>
           <Link 
             href="/notes-hub" 
             className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
@@ -244,7 +253,10 @@ export default function HomePage() {
 
       {/* Statistics */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Statistics</h2>
+        <div className="flex items-center gap-2 mb-4">
+          <ChartBar className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Statistics</h2>
+        </div>
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600 dark:text-gray-400">Total Notes</span>
@@ -270,7 +282,10 @@ export default function HomePage() {
       {/* Voice Insights */}
       <div className="col-span-full mt-6 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Voice Insights</h2>
+          <div className="flex items-center gap-2">
+            <Mic className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Voice Insights</h2>
+          </div>
           <div className="flex items-center gap-2">
             <select className="text-sm bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
               <option>Last 7 days</option>
