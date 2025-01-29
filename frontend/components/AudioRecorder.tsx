@@ -48,6 +48,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   const [isSaving, setIsSaving] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
+   const [pausedTime, setPausedTime] = useState(0); // New state for paused time
   const [isValidatingKey, setIsValidatingKey] = useState(false);
   const [isKeyValid, setIsKeyValid] = useState<boolean | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -182,7 +183,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     }
   }, [enhancedTranscript]);
 
-  const startRecording = async () => {
+   const startRecording = async () => {
     try {
       if (!isInitialized) {
         await initializeProvider(selectedProvider);
@@ -209,9 +210,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       providerRef.current = provider;
       setIsRecording(true);
       setStartTime(Date.now());
-      setElapsedTime(0);
-
-      // Start timer
+      
+      // Start timer (now using pausedTime as base)
       timerRef.current = setInterval(() => {
         setElapsedTime(prev => prev + 1);
       }, 1000);
@@ -226,22 +226,25 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     }
   };
 
-const stopRecording = async () => {
-  if (providerRef.current) {
-    await providerRef.current.stop();
-    providerRef.current.cleanup();
-    providerRef.current = null;
-  }
-  setIsRecording(false);
-  if (selectedProvider === 'webspeech') {
-    initializeProvider(selectedProvider);
-  }
-  if (timerRef.current) {
-    clearInterval(timerRef.current);
-    timerRef.current = null;
-  }
-  setStartTime(null);
-};
+  const stopRecording = async () => {
+    if (providerRef.current) {
+      await providerRef.current.stop();
+      providerRef.current.cleanup();
+      providerRef.current = null;
+    }
+    setIsRecording(false);
+      if (selectedProvider === 'webspeech') {
+        initializeProvider(selectedProvider);
+      }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+      // Save current time to pausedTime
+       setPausedTime(elapsedTime);
+    }
+    setStartTime(null);
+
+  };
 
   const clearRecording = () => {
     setTranscript('');
@@ -249,6 +252,7 @@ const stopRecording = async () => {
     setInterimTranscript('');
     setEnhancedTranscript('');
     setShowEnhanced(false);
+    setPausedTime(0);
   };
 
   // Cleanup timer on unmount
@@ -408,10 +412,10 @@ const stopRecording = async () => {
           >
             {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
-          {isRecording && (
+          { (isRecording || elapsedTime > 0) && (
             <div className="flex items-center gap-2 text-gray-500">
               <span className="animate-pulse mr-2">●</span>
-              {formatTime(elapsedTime)}
+              {formatTime(isRecording ? elapsedTime : pausedTime)}
             </div>
           )}
         </div>
