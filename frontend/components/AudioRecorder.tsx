@@ -226,23 +226,22 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     }
   };
 
-  const stopRecording = async () => {
-    if (providerRef.current) {
-      await providerRef.current.stop();
-      providerRef.current.cleanup();
-      providerRef.current = null;
-    }
-    setIsRecording(false);
-    if (selectedProvider === 'webspeech') {
-      initializeProvider(selectedProvider);
-    }
-    setInterimTranscript('');
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setStartTime(null);
-  };
+const stopRecording = async () => {
+  if (providerRef.current) {
+    await providerRef.current.stop();
+    providerRef.current.cleanup();
+    providerRef.current = null;
+  }
+  setIsRecording(false);
+  if (selectedProvider === 'webspeech') {
+    initializeProvider(selectedProvider);
+  }
+  if (timerRef.current) {
+    clearInterval(timerRef.current);
+    timerRef.current = null;
+  }
+  setStartTime(null);
+};
 
   const clearRecording = () => {
     setTranscript('');
