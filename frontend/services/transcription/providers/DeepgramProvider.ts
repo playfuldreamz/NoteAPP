@@ -43,27 +43,25 @@ export class DeepgramProvider implements TranscriptionProvider {
     }
   }
 
-  async initialize(options?: TranscriptionOptions): Promise<void> {
-    try {
-      // Request microphone access
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Create MediaRecorder with appropriate settings for Deepgram
-      this.mediaRecorder = new MediaRecorder(this.stream, {
-        mimeType: 'audio/webm',
-      });
-    } catch (error) {
-      if (this.onErrorCallback) {
-        this.onErrorCallback(error as Error);
-      }
-      throw error;
-    }
-  }
+async initialize(options?: TranscriptionOptions): Promise<void> {
+  // No need to request microphone access here
+}
 
-  async start(): Promise<void> {
-    if (!this.mediaRecorder) {
-      throw new Error('Provider not initialized');
+async start(): Promise<void> {
+  try {
+    // Request microphone access
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    // Create MediaRecorder with appropriate settings for Deepgram
+    this.mediaRecorder = new MediaRecorder(this.stream, {
+      mimeType: 'audio/webm',
+    });
+  } catch (error) {
+    if (this.onErrorCallback) {
+      this.onErrorCallback(error as Error);
     }
+    throw error;
+  }
 
     try {
       // Create WebSocket connection to Deepgram with query parameters
