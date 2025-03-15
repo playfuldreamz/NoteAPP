@@ -98,40 +98,40 @@ export const AISettings: React.FC<AISettingsProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {apiKeyError && (
-        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
           <p className="text-sm text-red-600 dark:text-red-400">{apiKeyError}</p>
         </div>
       )}
-      <div className="p-6 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-        <div className="flex items-center gap-4 mb-6">
-          <Globe className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+      <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
+        <div className="flex items-center gap-3 mb-4">
+          <Globe className="w-5 h-5 text-gray-500 dark:text-gray-400" />
           <div>
-            <p className="text-lg font-medium text-gray-700 dark:text-gray-200">Current AI Provider</p>
+            <p className="text-gray-700 dark:text-gray-200">Current AI Provider</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {selectedProvider.provider || 'Not Configured'} ({selectedProvider.source || 'env'})
             </p>
           </div>
         </div>
 
-        <div className="relative mb-6">
+        <div className="relative">
           <button
-            className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 text-base text-gray-700 dark:text-gray-200 flex items-center justify-between"
+            className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-700 dark:text-gray-200 flex items-center justify-between"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             <span>{tempProvider === 'openai' ? 'OpenAI' : tempProvider === 'gemini' ? 'Gemini' : 'DeepSeek'}</span>
-            <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
           
           {isDropdownOpen && (
-            <div className="absolute mt-2 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10">
+            <div className="absolute mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg z-10">
               {providerOptions.map(provider => (
                 <div 
                   key={provider.value}
-                  className="px-4 py-3 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer first:rounded-t-lg last:rounded-b-lg"
+                  className="px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                   onClick={() => handleProviderChange(provider)}
                 >
                   {provider.label}
@@ -142,8 +142,8 @@ export const AISettings: React.FC<AISettingsProps> = ({
         </div>
       </div>
 
-      <div className="p-6 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-        <label htmlFor="apiKey" className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
+      <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
+        <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           {tempProvider === 'gemini' ? 'Gemini API Key' : 'API Key'}
         </label>
         <div className="relative">
@@ -152,9 +152,9 @@ export const AISettings: React.FC<AISettingsProps> = ({
             id="apiKey"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            className={`w-full px-4 py-3 border ${
+            className={`w-full px-3 py-2 border ${
               isKeyValid ? 'border-green-500' : 'border-gray-300 dark:border-gray-600'
-            } rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base bg-white dark:bg-gray-800 text-transparent selection:bg-blue-500 selection:text-transparent caret-gray-900 dark:caret-white font-mono`}
+            } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800 text-transparent selection:bg-blue-500 selection:text-transparent caret-gray-900 dark:caret-white font-mono`}
             style={{ caretColor: 'currentcolor' }}
             placeholder={
               tempProvider === 'gemini' 
@@ -177,7 +177,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
           />
           {apiKey && (
             <div 
-              className="absolute top-0 left-0 px-4 py-3 pointer-events-none text-base font-mono"
+              className="absolute top-0 left-0 px-3 py-2 pointer-events-none text-sm font-mono"
               aria-hidden="true"
             >
               <span className="text-gray-900 dark:text-gray-100">{apiKey.slice(0, 5)}</span>
@@ -186,7 +186,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
           )}
         </div>
         {!isKeyValid && apiKey && apiKey.length > 0 && (
-          <p className="mt-3 text-sm text-red-600">
+          <p className="mt-2 text-sm text-red-600">
             {tempProvider === 'gemini'
               ? 'Gemini API keys start with "AIza" and are 39 characters long'
               : tempProvider === 'openai'
@@ -199,7 +199,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
       <button
         onClick={handleSave}
         disabled={!isKeyValid || isLoading}
-        className="w-full px-6 py-3 text-base font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+        className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
       >
         {isLoading ? 'Saving...' : 'Save Changes'}
       </button>

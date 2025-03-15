@@ -118,121 +118,66 @@ export const PasswordSection: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
-      <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-        <Lock className="w-5 h-5 text-blue-500" />
-        Password Settings
-      </h4>
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        handlePasswordChange();
-      }} className="flex flex-col flex-1 space-y-4">
-        <div>
-          <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Current Password
-          </label>
-          <div className="mt-1 relative">
-            <input
-              id="currentPassword"
-              type="password"
-              value={currentPassword}
-              onChange={(e) => {
-                setCurrentPassword(e.target.value);
-                setCurrentPasswordError(null);
-              }}
-              className={`block w-full px-3 py-2 border ${
-                currentPasswordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800`}
-              required
-            />
-            {currentPasswordError && (
-              <p className="mt-2 text-sm text-red-600">{currentPasswordError}</p>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            New Password
-          </label>
-          <div className="mt-1 relative">
-            <input
-              id="newPassword"
-              type="password"
-              value={newPassword}
-              onChange={(e) => {
-                setNewPassword(e.target.value);
-                setNewPasswordError(null);
-                calculatePasswordStrength(e.target.value);
-              }}
-              className={`block w-full px-3 py-2 border ${
-                newPasswordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800`}
-              required
-            />
-            {newPasswordError && (
-              <p className="mt-2 text-sm text-red-600">{newPasswordError}</p>
-            )}
-          </div>
-          <div className="mt-2">
-            <div className="flex space-x-1">
-              {[...Array(6)].map((_, i) => (
-                <div
-                  key={i}
-                  className={`h-1 w-full rounded-full ${
-                    i < passwordStrength
-                      ? passwordStrength <= 2
-                        ? 'bg-red-500'
-                        : passwordStrength <= 4
-                        ? 'bg-yellow-500'
-                        : 'bg-green-500'
-                      : 'bg-gray-200 dark:bg-gray-700'
-                  }`}
-                />
-              ))}
-            </div>
-            <p className="mt-1 text-xs text-gray-500">
-              Password strength: {
-                passwordStrength <= 2 ? 'Weak' :
-                passwordStrength <= 4 ? 'Medium' :
-                'Strong'
-              }
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Confirm New Password
-          </label>
-          <div className="mt-1 relative">
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                setConfirmPasswordError(null);
-              }}
-              className={`block w-full px-3 py-2 border ${
-                confirmPasswordError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-              } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-gray-800`}
-              required
-            />
-            {confirmPasswordError && (
-              <p className="mt-2 text-sm text-red-600">{confirmPasswordError}</p>
-            )}
-          </div>
-        </div>
-
+    <div className="p-4 rounded-lg bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+      <div className="flex items-center gap-3 mb-4">
+        <Lock className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+        <span className="text-gray-700 dark:text-gray-200">Change Password</span>
+      </div>
+      <div className="space-y-3">
+        <input
+          type="password"
+          value={currentPassword}
+          onChange={(e) => {
+            setCurrentPassword(e.target.value);
+            setCurrentPasswordError(null);
+          }}
+          placeholder="Current password"
+          className={`w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 ${
+            currentPasswordError ? 'border-red-500' : ''
+          }`}
+        />
+        {currentPasswordError && (
+          <p className="text-sm text-red-600 dark:text-red-400">{currentPasswordError}</p>
+        )}
+        <input
+          type="password"
+          value={newPassword}
+          onChange={(e) => {
+            setNewPassword(e.target.value);
+            setNewPasswordError(null);
+            calculatePasswordStrength(e.target.value);
+          }}
+          placeholder="New password"
+          className={`w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 ${
+            newPasswordError ? 'border-red-500' : ''
+          }`}
+        />
+        {newPasswordError && (
+          <p className="text-sm text-red-600 dark:text-red-400">{newPasswordError}</p>
+        )}
+        <input
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => {
+            setConfirmPassword(e.target.value);
+            setConfirmPasswordError(null);
+          }}
+          placeholder="Confirm new password"
+          className={`w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 ${
+            confirmPasswordError ? 'border-red-500' : ''
+          }`}
+        />
+        {confirmPasswordError && (
+          <p className="text-sm text-red-600 dark:text-red-400">{confirmPasswordError}</p>
+        )}
         <button
-          type="submit"
-          disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
-          className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+          onClick={handlePasswordChange}
+          disabled={!currentPassword || !newPassword || !confirmPassword || isChangingPassword}
+          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isChangingPassword ? 'Updating...' : 'Update Password'}
         </button>
-      </form>
+      </div>
     </div>
   );
 };
