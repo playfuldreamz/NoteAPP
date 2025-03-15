@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/layout/Sidebar';
 import MainContent from '../components/layout/MainContent';
-import SettingsModal from '../components/SettingsModal';
+import SettingsModal from '../components/settings/SettingsModal';
 import { TagsProvider } from '../context/TagsContext';
 import { TranscriptionProviderContext } from '../context/TranscriptionContext';
 import { getAIProvider } from '../services/ai';

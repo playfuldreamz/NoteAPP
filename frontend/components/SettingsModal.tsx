@@ -591,7 +591,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, setUsern
               <input
                 type="checkbox"
                 id="dark-mode"
-                checked={darkMode}
+                checked={darkMode ?? false}
                 onChange={toggleDarkMode}
                 className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-2 border-gray-300 appearance-none cursor-pointer transition-transform duration-200 ease-in-out transform translate-x-0 dark:translate-x-4"
               />
