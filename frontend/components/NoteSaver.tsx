@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Save, Settings } from 'lucide-react';
 import { summarizeContent, InvalidAPIKeyError } from '../services/ai';
-import Link from 'next/link';
+import SettingsModal from './settings/SettingsModal';
 
 interface NoteSaverProps {
   transcript: string;
@@ -14,6 +14,7 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
   const [noteContent, setNoteContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const saveNote = async () => {
     if (!noteContent.trim()) {
@@ -43,13 +44,13 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
           toast.error(
             <div className="flex flex-col gap-2">
               <div>AI Provider API key is invalid or expired</div>
-              <Link 
-                href="/settings?tab=ai" 
+              <button
+                onClick={() => setShowSettings(true)}
                 className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
               >
                 <Settings size={14} />
                 Update API Key in Settings
-              </Link>
+              </button>
             </div>,
             { autoClose: false, closeOnClick: false }
           );
@@ -93,7 +94,8 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+    <>
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
       <textarea
         value={noteContent}
         onChange={(e) => setNoteContent(e.target.value)}
@@ -113,7 +115,15 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
         <Save size={20} />
         {isGeneratingTitle ? 'Generating Title...' : isSaving ? 'Saving...' : 'Save Note'}
       </button>
-    </div>
+      </div>
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        setUsername={() => {}}
+        currentModel=""
+        modelSource=""
+      />
+    </>
   );
 };
 

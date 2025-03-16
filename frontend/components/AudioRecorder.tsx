@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { LucideIcon, Mic, MicOff, Save, RotateCcw, Settings, RefreshCw, Loader, ChevronDown, ChevronUp, Trash2, ExternalLink, Check, AlertCircle } from 'lucide-react';
 import { generateTranscriptTitle, enhanceTranscript, InvalidAPIKeyError } from '../services/ai';
+import SettingsModal from './settings/SettingsModal';
 import Link from 'next/link';
 import { useTranscription } from '../context/TranscriptionContext';
 import type { TranscriptionProvider, TranscriptionResult } from '../services/transcription/types';
@@ -297,18 +298,28 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
     } catch (error) {
       console.error('Enhancement error:', error);
       if (error instanceof InvalidAPIKeyError) {
-        toast.error(
+        const toastId = toast.error(
           <div className="flex flex-col gap-2">
             <div>AI Provider API key is invalid or expired</div>
-            <Link 
-              href="/settings?tab=ai" 
+            <button
+              onClick={() => {
+                setShowSettings(true);
+                toast.dismiss(toastId);
+              }}
               className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
             >
               <Settings size={14} />
               Update API Key in Settings
-            </Link>
+            </button>
           </div>,
-          { autoClose: false, closeOnClick: false }
+          {
+            autoClose: false,
+            closeOnClick: false,
+            onClick: () => {
+              setShowSettings(true);
+              toast.dismiss(toastId);
+            }
+          }
         );
       } else {
         toast.error('Failed to enhance transcript');
@@ -340,13 +351,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
           toast.error(
             <div className="flex flex-col gap-2">
               <div>AI Provider API key is invalid or expired</div>
-              <Link 
-                href="/settings?tab=ai" 
+              <button 
+                onClick={() => setShowSettings(true)}
                 className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
               >
                 <Settings size={14} />
                 Update API Key in Settings
-              </Link>
+              </button>
             </div>,
             { autoClose: false, closeOnClick: false }
           );
@@ -398,6 +409,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
   };
 
   return (
+    <>
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
@@ -732,6 +744,14 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
         </button>
       </div>
     </div>
+    <SettingsModal
+      isOpen={showSettings}
+      onClose={() => setShowSettings(false)}
+      setUsername={() => {}}
+      currentModel=""
+      modelSource=""
+    />
+    </>
   );
 };
 

@@ -16,7 +16,7 @@ import { toast } from 'react-toastify';
 import TagChip from '@components/TagChip';
 import TagCreator from '@components/TagCreator';
 import { Settings } from 'lucide-react';
-import Link from 'next/link';
+import SettingsModal from './settings/SettingsModal';
 import { useTagsContext } from '../context/TagsContext';
 
 interface TaggingModuleProps {
@@ -33,12 +33,12 @@ const normalizeType = (type?: string): 'note' | 'transcript' => {
     console.warn('Type not provided, defaulting to "note"');
     return 'note';
   }
-  
+
   const normalized = type.toLowerCase();
   if (['note', 'transcript'].includes(normalized)) {
     return normalized as 'note' | 'transcript';
   }
-  
+
   console.error(`Invalid type: ${type}. Must be 'note' or 'transcript'`);
   return 'note';
 };
@@ -60,6 +60,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isLoadingSuggestedTags, setIsLoadingSuggestedTags] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Reset state when item changes
   useEffect(() => {
@@ -112,30 +113,40 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       try {
         setIsLoadingSuggestedTags(true);
         const suggestions = await analyzeContentForTags(content);
-        
+
         // Filter out tags that are already selected
         const filteredSuggestions = suggestions.filter(
-          suggestion => !selectedTags.some(tag => 
+          suggestion => !selectedTags.some(tag =>
             tag.name.toLowerCase() === suggestion.toLowerCase()
           )
         );
-        
+
         setSuggestedTags(filteredSuggestions);
       } catch (error) {
         console.error('Error analyzing content:', error);
         if (error instanceof InvalidAPIKeyError) {
-          toast.error(
+          const toastId = toast.error(
             <div className="flex flex-col gap-2">
               <div>AI Provider API key is invalid or expired</div>
-              <Link 
-                href="/settings?tab=ai" 
+              <button
+                onClick={() => {
+                  setShowSettings(true);
+                  toast.dismiss(toastId);
+                }}
                 className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
               >
                 <Settings size={14} />
                 Update API Key in Settings
-              </Link>
+              </button>
             </div>,
-            { autoClose: false, closeOnClick: false }
+            {
+              autoClose: false,
+              closeOnClick: false,
+              onClick: () => {
+                setShowSettings(true);
+                toast.dismiss(toastId);
+              }
+            }
           );
         } else {
           toast.error('Failed to analyze content for tags');
@@ -159,14 +170,14 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         name: newTag.name,
         description: newTag.description
       });
-      
+
       const updatedTags = [...selectedTags, newTag];
       setSelectedTags(updatedTags);
       updateItemTags(itemId, normalizedType, updatedTags);
       if (onTagsUpdate) {
         onTagsUpdate(updatedTags);
       }
-      
+
       // Only show one success message
       toast.success('Tag added successfully');
     } catch (error) {
@@ -185,14 +196,14 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     setIsSaving(true);
     try {
       await removeTagFromItem(normalizedType, itemId, tagId);
-      
+
       const updatedTags = selectedTags.filter(tag => tag.id !== tagId);
       setSelectedTags(updatedTags);
       updateItemTags(itemId, normalizedType, updatedTags);
       if (onTagsUpdate) {
         onTagsUpdate(updatedTags);
       }
-      
+
       toast.success('Tag removed successfully');
     } catch (error) {
       console.error('Error removing tag:', error);
@@ -259,10 +270,10 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     try {
       const newTag = await createTag(tagName);
       if (!newTag?.id) throw new Error('Invalid response from createTag');
-      
+
       // Add the tag to the item immediately
       const response = await addTagToItem(normalizedType, itemId, newTag);
-      
+
       if (!response || typeof response.id !== 'number') {
         throw new Error('Invalid response from addTagToItem');
       }
@@ -307,7 +318,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
 
   const parseSuggestedTags = (suggestions: string[]): string[] => {
     if (suggestions.length === 0) return [];
-    
+
     // Handle the case where the first item contains delimiters
     if (typeof suggestions[0] === 'string' && suggestions[0].match(/[,*\n]/)) {
       return suggestions[0]
@@ -316,60 +327,69 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         .map(tag => tag.trim().replace(/^-/, '').trim())
         .filter(tag => tag.length > 0);
     }
-    
+
     return suggestions;
   };
 
   return (
-    <div className="space-y-4">
-      {/* Selected Tags */}
-      <div className="flex flex-wrap gap-2">
-        {selectedTags.map(tag => (
-          <TagChip
-            key={`selected-${tag.id}-${tag.name}`}
-            tag={tag}
-            onRemove={() => handleRemoveTag(tag.id)}
-            disabled={isSaving}
-          />
-        ))}
-      </div>
+    <>
+      <div className="space-y-4">
+        {/* Selected Tags */}
+        <div className="flex flex-wrap gap-2">
+          {selectedTags.map(tag => (
+            <TagChip
+              key={`selected-${tag.id}-${tag.name}`}
+              tag={tag}
+              onRemove={() => handleRemoveTag(tag.id)}
+              disabled={isSaving}
+            />
+          ))}
+        </div>
 
-      {/* Suggested Tags */}
-      {isLoadingSuggestedTags ? (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-gray-600">Loading Suggested Tags...</h4>
-          <div className="animate-pulse flex space-x-4">
-            <div className="flex-1 space-y-4 py-1">
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-              <div className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+        {/* Suggested Tags */}
+        {isLoadingSuggestedTags ? (
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-gray-600">Loading Suggested Tags...</h4>
+            <div className="animate-pulse flex space-x-4">
+              <div className="flex-1 space-y-4 py-1">
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      ) : suggestedTags.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-gray-600">Suggested Tags</h4>
-          <div className="flex flex-wrap gap-2">
-            {parseSuggestedTags(suggestedTags).map(tagName => {
-              const existingTag = tags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
-              return (
-                <TagChip
-                  key={`suggested-${existingTag?.id || tagName}`}
-                  tag={existingTag || { id: -1, name: tagName }}
-                  onClick={() => handleTagClick(tagName)}
-                  disabled={isSaving}
-                />
-              );
-            })}
+        ) : suggestedTags.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-gray-600">Suggested Tags</h4>
+            <div className="flex flex-wrap gap-2">
+              {parseSuggestedTags(suggestedTags).map(tagName => {
+                const existingTag = tags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+                return (
+                  <TagChip
+                    key={`suggested-${existingTag?.id || tagName}`}
+                    tag={existingTag || { id: -1, name: tagName }}
+                    onClick={() => handleTagClick(tagName)}
+                    disabled={isSaving}
+                  />
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tag Creator */}
-      <TagCreator onCreate={handleCreateTag} disabled={isSaving} />
-    </div>
+        {/* Tag Creator */}
+        <TagCreator onCreate={handleCreateTag} disabled={isSaving} />
+      </div>
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        setUsername={() => {}}
+        currentModel=""
+        modelSource=""
+      />
+    </>
   );
 };
 
