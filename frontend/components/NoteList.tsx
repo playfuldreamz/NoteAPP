@@ -413,7 +413,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }}
-        onRefresh={() => onDelete(-1)}
+        onRefresh={() => onTitleUpdate()}
         onToggleSelection={toggleSelectionMode}
         isSelectionMode={isSelectionMode}
         selectedIds={selectedNoteIds}
