@@ -23,6 +23,7 @@ const app = express();
 const aiRoutes = require('./routes/ai');
 const actionItemsRoutes = require('./routes/actionItems');
 const transcriptsRoutes = require('./routes/transcripts');
+const notesRoutes = require('./routes/notes');
 const PORT = process.env.PORT || 5000;
 
 // JWT secret key - in production, use an environment variable
@@ -64,6 +65,7 @@ const authenticateToken = (req, res, next) => {
 app.use('/api/ai', authenticateToken, aiRoutes);
 app.use('/api/action-items', authenticateToken, actionItemsRoutes);
 app.use('/api/transcripts', transcriptsRoutes);  // No auth required for token validation
+app.use('/api/notes', authenticateToken, notesRoutes);
 
 // Database setup
 const path = require('path');
@@ -635,7 +637,7 @@ app.post('/transcripts', authenticateToken, async (req, res) => {
         // Insert tags and create associations
         const insertTag = 'INSERT OR IGNORE INTO tags (name) VALUES (?)';
         const insertItemTag = 'INSERT INTO item_tags (item_id, item_type, tag_id) VALUES (?, ?, ?)';
-        
+
         tags.forEach(tagName => {
           // Insert tag if it doesn't exist
           db.run(insertTag, [tagName], function(err) {

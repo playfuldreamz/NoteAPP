@@ -8,6 +8,20 @@ import TranscriptsList from "../../../components/TranscriptsList";
 import NoteSaver from "../../../components/NoteSaver";
 import NoteList from "../../../components/NoteList";
 
+interface Note {
+  id: number;
+  title: string;
+  content: string;
+  timestamp: string;
+  tags: Array<{ id: number; name: string }>;
+}
+
+interface NoteListProps {
+  notes: Note[];
+  onDelete: (id: number) => Promise<void>;
+  onTitleUpdate: (id: number, newTitle: string) => Promise<void>; // Add this line
+}
+
 export default function NotesHubPage() {
   const [transcript, setTranscript] = useState('');
   const [transcripts, setTranscripts] = useState([]);
@@ -129,6 +143,7 @@ export default function NotesHubPage() {
           <NoteList 
             notes={notes}
             onDelete={handleDeleteNote}
+            onTitleUpdate={fetchNotes}
           />
         </div>
       </div>

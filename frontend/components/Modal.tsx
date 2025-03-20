@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import TaggingModule from './TaggingModule';
 import ActionItemsModule from './ActionItemsModule';
-import { Tag } from '../services/ai';
+import { Tag, updateNoteTitle, updateTranscriptTitle } from '../services/ai';
 import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check } from 'lucide-react';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import { toast } from 'react-toastify';
@@ -18,6 +18,7 @@ interface ModalProps {
   onTagsUpdate?: (tags: Tag[]) => void;
   onRegenerateTitle?: () => void;
   isRegeneratingTitle?: boolean;
+  onTitleUpdate?: () => void;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -31,7 +32,8 @@ const Modal: React.FC<ModalProps> = ({
   initialTags = [],
   onTagsUpdate,
   onRegenerateTitle,
-  isRegeneratingTitle = false
+  isRegeneratingTitle = false,
+  onTitleUpdate
 }) => {
   const [tags, setTags] = useState<Tag[]>(initialTags);
   const [activeTab, setActiveTab] = useState('tags');
@@ -46,6 +48,8 @@ const Modal: React.FC<ModalProps> = ({
   });
   const [isCopied, setIsCopied] = useState(false);
   const { downloadDocument, isDownloading } = useDownloadDocument();
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editableTitle, setEditableTitle] = useState(title || '');
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setIsScrolled(e.currentTarget.scrollTop > 0);
@@ -77,16 +81,34 @@ const Modal: React.FC<ModalProps> = ({
     }
   };
 
+  const handleSaveTitle = async () => {
+    try {
+      // Call the appropriate API to save the title
+      if (type === 'note') {
+        await updateNoteTitle(itemId, editableTitle);
+      } else if (type === 'transcript') {
+        await updateTranscriptTitle(itemId, editableTitle);
+      }
+      toast.success('Title updated successfully');
+      setIsEditingTitle(false);
+      if (onTitleUpdate) onTitleUpdate();
+    } catch (error) {
+      console.error('Failed to update title:', error);
+      toast.error('Failed to update title');
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
+      if (onTitleUpdate) onTitleUpdate(); // Ensure title update callback is called when modal is closed
     }
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, onTitleUpdate]);
 
   if (!isOpen) return null;
 
@@ -100,9 +122,30 @@ const Modal: React.FC<ModalProps> = ({
         <div className={`sticky top-0 z-10 px-4 sm:px-6 py-4 flex items-center gap-4 transition-shadow ${isScrolled ? 'shadow-md dark:shadow-gray-800' : ''}`}>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate">
-                {title || 'Content'}
-              </h3>
+              {isEditingTitle ? (
+                <input
+                  type="text"
+                  value={editableTitle}
+                  onChange={(e) => setEditableTitle(e.target.value)}
+                  className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500"
+                />
+              ) : (
+                <h3
+                  className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate cursor-pointer"
+                  onClick={() => setIsEditingTitle(true)}
+                >
+                  {editableTitle || 'Content'}
+                </h3>
+              )}
+              {isEditingTitle && (
+                <button
+                  onClick={handleSaveTitle}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  title="Save title"
+                >
+                  <Check size={20} />
+                </button>
+              )}
               {onRegenerateTitle && (
                 <button
                   onClick={onRegenerateTitle}

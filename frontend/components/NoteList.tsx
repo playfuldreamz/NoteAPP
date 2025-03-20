@@ -28,9 +28,10 @@ interface Note {
 interface NoteListProps {
   notes: Note[];
   onDelete: (id: number) => void;
+  onTitleUpdate: () => void;
 }
 
-const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
+const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<string>('');
   const [selectedNoteTitle, setSelectedNoteTitle] = useState<string>('');
@@ -233,6 +234,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
       setVisibleNotes(prev => prev.map(updateNote));
       
       toast.success('Title regenerated successfully');
+      onTitleUpdate();
     } catch (error) {
       console.error('Error regenerating title:', error);
       toast.error('Failed to regenerate title');
@@ -547,6 +549,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete }) => {
           onTagsUpdate={handleTagsUpdate}
           onRegenerateTitle={handleRegenerateTitle}
           isRegeneratingTitle={isRegeneratingTitle}
+          onTitleUpdate={onTitleUpdate} // Ensure the callback is passed to the Modal
         >
           <div className="mt-4">
           </div>

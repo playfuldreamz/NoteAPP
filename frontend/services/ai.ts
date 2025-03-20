@@ -116,7 +116,7 @@ export async function updateTranscriptTitle(id: number, title: string): Promise<
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE}/api/ai/transcripts/${id}/title`, {
+  const response = await fetch(`${API_BASE}/api/transcripts/${id}/title`, {
     method: 'PUT',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -128,6 +128,25 @@ export async function updateTranscriptTitle(id: number, title: string): Promise<
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Failed to update transcript title');
+  }
+}
+
+export async function updateNoteTitle(id: number, title: string): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/notes/${id}/title`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to update note title');
   }
 }
 
