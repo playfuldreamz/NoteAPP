@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import TaggingModule from './TaggingModule';
 import ActionItemsModule from './ActionItemsModule';
 import { Tag, updateNoteTitle, updateTranscriptTitle } from '../services/ai';
-import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check } from 'lucide-react';
+import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check, Edit3 } from 'lucide-react';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import { toast } from 'react-toastify';
 
@@ -98,6 +98,11 @@ const Modal: React.FC<ModalProps> = ({
     }
   };
 
+  const handleCancelEdit = () => {
+    setIsEditingTitle(false);
+    setEditableTitle(title || '');
+  };
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -137,16 +142,33 @@ const Modal: React.FC<ModalProps> = ({
                   {editableTitle || 'Content'}
                 </h3>
               )}
-              {isEditingTitle && (
+              {isEditingTitle ? (
+                <>
+                  <button
+                    onClick={handleSaveTitle}
+                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    title="Save title"
+                  >
+                    <Check size={20} className="text-gray-500 dark:text-gray-400" />
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    title="Cancel edit"
+                  >
+                    <X size={20} className="text-gray-500 dark:text-gray-400" />
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={handleSaveTitle}
+                  onClick={() => setIsEditingTitle(true)}
                   className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                  title="Save title"
+                  title="Edit title"
                 >
-                  <Check size={20} />
+                  <Edit3 size={20} className="text-gray-500 dark:text-gray-400" />
                 </button>
               )}
-              {onRegenerateTitle && (
+              {onRegenerateTitle && !isEditingTitle && (
                 <button
                   onClick={onRegenerateTitle}
                   disabled={isRegeneratingTitle}

@@ -26,9 +26,10 @@ interface Transcript {
 interface TranscriptsListProps {
   transcripts: Transcript[];
   updateTranscripts: () => void;
+  onTitleUpdate?: () => void; // Add this line
 }
 
-const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialTranscripts, updateTranscripts }) => {
+const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialTranscripts, updateTranscripts, onTitleUpdate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
   const [selectedTranscriptTitle, setSelectedTranscriptTitle] = useState<string>('');
@@ -332,6 +333,10 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     URL.revokeObjectURL(url);
   };
 
+  useEffect(() => {
+    if (onTitleUpdate) onTitleUpdate();
+  }, [isModalOpen, onTitleUpdate]);
+
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
       <div className="relative mb-6">
@@ -528,6 +533,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           onTagsUpdate={handleTagsUpdate}
           onRegenerateTitle={handleRegenerateTitle}
           isRegeneratingTitle={isRegeneratingTitle}
+          onTitleUpdate={updateTranscripts} // Pass updateTranscripts as onTitleUpdate
         >
           <div className="mt-4">
             <h4 className="text-lg font-semibold mb-4 dark:text-gray-200">Modules</h4>
