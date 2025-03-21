@@ -10,6 +10,7 @@ import SettingsModal from '../components/settings/SettingsModal';
 import { TagsProvider } from '../context/TagsContext';
 import { TranscriptionProviderContext } from '../context/TranscriptionContext';
 import { getAIProvider } from '../services/ai';
+import { ThemeProvider } from '../context/ThemeContext';
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -67,37 +68,39 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   }
 
   return (
-    <TagsProvider>
-      <TranscriptionProviderContext>
-        <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-          <Navbar
-            username={username}
-            currentModel={currentModel}
-            modelSource={modelSource}
-            isAuthenticated={isAuthenticated}
-            onLogout={handleLogout}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-          />
-          
-          <main className="flex-1 mt-16">
-            <Sidebar 
+    <ThemeProvider>
+      <TagsProvider>
+        <TranscriptionProviderContext>
+          <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+            <Navbar
+              username={username}
+              currentModel={currentModel}
+              modelSource={modelSource}
+              isAuthenticated={isAuthenticated}
               onLogout={handleLogout}
               onOpenSettings={() => setIsSettingsOpen(true)}
             />
-            <MainContent>
-              {children}
-            </MainContent>
-          </main>
+            
+            <main className="flex-1 mt-16">
+              <Sidebar 
+                onLogout={handleLogout}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+              />
+              <MainContent>
+                {children}
+              </MainContent>
+            </main>
 
-          <SettingsModal
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-            setUsername={setUsername}
-            currentModel={currentModel}
-            modelSource={modelSource}
-          />
-        </div>
-      </TranscriptionProviderContext>
-    </TagsProvider>
+            <SettingsModal
+              isOpen={isSettingsOpen}
+              onClose={() => setIsSettingsOpen(false)}
+              setUsername={setUsername}
+              currentModel={currentModel}
+              modelSource={modelSource}
+            />
+          </div>
+        </TranscriptionProviderContext>
+      </TagsProvider>
+    </ThemeProvider>
   );
 }
