@@ -151,7 +151,7 @@ export default function HomePage() {
           <Activity className="w-5 h-5 text-blue-500 dark:text-blue-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h2>
         </div>
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex-1">
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1">
           <div className="space-y-3">
             <Link href="/notes-hub" className="w-full flex items-center justify-between px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors group">
               <span className="text-blue-700 dark:text-blue-300 group-hover:text-blue-800 dark:group-hover:text-blue-200">Start Recording</span>
@@ -183,7 +183,7 @@ export default function HomePage() {
             View All
           </Link>
         </div>
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex-1">
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1">
           <div className="space-y-3 h-[180px] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
             {recentNotes.length > 0 ? (
               recentNotes.map(note => (
@@ -227,7 +227,7 @@ export default function HomePage() {
             View All
           </Link>
         </div>
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex-1">
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1">
           <div className="space-y-3 h-[180px] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
             {recentTranscripts.length > 0 ? (
               recentTranscripts.map(transcript => (
@@ -263,7 +263,7 @@ export default function HomePage() {
           <ChartBar className="w-5 h-5 text-blue-500 dark:text-blue-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Statistics</h2>
         </div>
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex-1">
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1">
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">Total Notes</span>
@@ -302,7 +302,7 @@ export default function HomePage() {
             </select>
           </div>
         </div>
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Recording Timeline */}
             <div className="md:col-span-2 h-[200px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
