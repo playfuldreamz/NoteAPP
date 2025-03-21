@@ -92,9 +92,31 @@ export const AISettings: React.FC<AISettingsProps> = ({
     setIsKeyValid(validateApiKey(apiKey, tempProvider));
   }, [apiKey, tempProvider]);
 
+  useEffect(() => {
+    // Initialize savedApiKeys with the initial selectedProvider values
+    setSavedApiKeys({
+      [selectedProvider.provider]: {
+        key: selectedProvider.apiKey,
+        source: selectedProvider.source
+      }
+    });
+  }, [selectedProvider]);
+
   const handleProviderChange = (provider: { value: string; label: string }) => {
     setTempProvider(provider.value as AIProvider);
     setIsDropdownOpen(false);
+
+    // Check if a saved API key exists for the new provider
+    if (savedApiKeys[provider.value]) {
+      setApiKey(savedApiKeys[provider.value].key || '');
+    } else if (provider.value === selectedProvider.provider) {
+      setApiKey(selectedProvider.apiKey || '');
+    } else {
+      setApiKey(''); // Set API key input to blank if no saved key
+    }
+
+    // Reset API key validation status when provider changes
+    setIsKeyValid(false);
   };
 
   return (
