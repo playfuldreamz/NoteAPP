@@ -148,8 +148,8 @@ export default function HomePage() {
       {/* Quick Actions */}
       <div className="h-full flex flex-col">
         <div className="flex items-center gap-2 mb-4">
-          <Activity className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h2>
+          <Activity className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h2>
         </div>
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1">
           <div className="space-y-3">
@@ -173,8 +173,8 @@ export default function HomePage() {
       <div className="h-full flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h2>
+            <Activity className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h2>
           </div>
           <Link 
             href="/notes-hub" 
@@ -217,8 +217,8 @@ export default function HomePage() {
       <div className="h-full flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Mic className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Recordings</h2>
+            <Mic className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Recent Recordings</h2>
           </div>
           <Link 
             href="/notes-hub" 
@@ -260,8 +260,8 @@ export default function HomePage() {
       {/* Statistics */}
       <div className="h-full flex flex-col">
         <div className="flex items-center gap-2 mb-4">
-          <ChartBar className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Statistics</h2>
+          <ChartBar className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Statistics</h2>
         </div>
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1">
           <div className="space-y-3">
@@ -291,8 +291,8 @@ export default function HomePage() {
       <div className="col-span-full mt-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <Mic className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Voice Insights</h2>
+            <Mic className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Insights</h2>
           </div>
           <div className="flex items-center gap-2">
             <select className="text-sm bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
