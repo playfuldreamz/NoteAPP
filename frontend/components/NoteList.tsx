@@ -476,6 +476,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
                 </div>
                 <div className="flex gap-2">
                   <select
+                    aria-label="Select download format"
                     value={getDownloadOptions(note.id).format}
                     onChange={(e) => handleDownloadOptionsChange(note.id, e)}
                     className="text-xs text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors px-1.5 py-1 border border-gray-200 dark:border-gray-700"
@@ -511,6 +512,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
                 </p>
                 {note.content && note.content.split(' ').length > 5 && (
                   <button
+                    aria-label="View full note"
                     onClick={() => handleSeeMore(note.content, note.title || 'Untitled Note', note.id)}
                     className="text-blue-500 hover:underline text-xs ml-2"
                   >
@@ -533,7 +535,12 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
           </button>
         )}
         {visibleNotes.length > 5 && (
-          <button onClick={handleShowLess} className="text-blue-500 hover:underline text-sm">
+          <button
+            aria-label="Show less"
+            title="Show less"
+            onClick={handleShowLess}
+            className="text-blue-500 hover:underline text-sm"
+          >
             <ChevronUp size={16} />
           </button>
         )}
