@@ -56,17 +56,7 @@ app.use('/api/notes', authenticateToken, notesRoutes);
 // Initialize database
 createTables();
 
-// Helper function to check if a tag is still referenced
-function isTagReferenced(db, tagId, callback) {
-  db.get(
-    'SELECT COUNT(*) as count FROM item_tags WHERE tag_id = ?',
-    [tagId],
-    (err, row) => {
-      if (err) return callback(err);
-      callback(null, row.count > 0);
-    }
-  );
-}
+const { isTagReferenced } = require('./utils/dbUtils');
 
 
 // Protected routes - Add authenticateToken middleware
