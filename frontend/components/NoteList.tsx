@@ -198,7 +198,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
       }
 
       await deleteResource('note', id, token);
-      onDelete(id);
+      // Remove the callback to prevent double deletion
       toast.success('Note deleted successfully!');
     } catch (error) {
       console.error('Delete error:', error);
