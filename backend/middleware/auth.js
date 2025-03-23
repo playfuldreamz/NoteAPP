@@ -3,6 +3,11 @@ const jwt = require('jsonwebtoken');
 // JWT secret key - in production, use an environment variable
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+// Generate JWT token
+const generateToken = (payload) => {
+  return jwt.sign(payload, JWT_SECRET);
+};
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -20,4 +25,4 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-module.exports = { authenticateToken };
+module.exports = { authenticateToken, generateToken };

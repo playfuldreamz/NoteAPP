@@ -5,7 +5,7 @@ const fetch = require('node-fetch');
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const { authenticateToken, generateToken } = require('./middleware/auth');
 const { OpenAI } = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const db = require('./database/connection');
@@ -44,23 +44,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Authentication middleware
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access denied. No token provided.' });
-  }
-
-  try {
-    const verified = jwt.verify(token, JWT_SECRET);
-    req.user = verified;
-    next();
-  } catch (err) {
-    res.status(400).json({ error: 'Invalid token' });
-  }
-};
 
 // Mount routes
 app.use('/api/ai', authenticateToken, aiRoutes);
@@ -108,7 +91,7 @@ app.post('/register', async (req, res) => {
         }
 
         // Create token
-        const token = jwt.sign({ id: this.lastID, username }, JWT_SECRET);
+        const token = generateToken({ id: this.lastID, username });
         res.status(201).json({ token, username });
     });
   } catch (err) {
@@ -208,7 +191,7 @@ app.put('/change-username', authenticateToken, async (req, res) => {
     });
 
     // Generate new token with updated username
-    const token = jwt.sign({ id: user.id, username: newUsername }, JWT_SECRET);
+    const token = generateToken({ id: user.id, username: newUsername });
     
     res.json({ 
       token,
@@ -244,7 +227,7 @@ app.post('/login', async (req, res) => {
     }
 
     // Create token
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET);
+    const token = generateToken({ id: user.id, username: user.username });
     res.json({ token, username: user.username });
   });
 });
