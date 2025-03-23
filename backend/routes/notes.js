@@ -7,20 +7,6 @@ const path = require('path');
 const dbPath = path.join(__dirname, '../database.sqlite');
 const db = new sqlite3.Database(dbPath);
 
-// Delete a single note
-router.delete('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
-
-    await deleteResource('note', parseInt(id), userId);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting note:', error);
-    res.status(error.message === 'Resource not found or unauthorized' ? 404 : 500)
-      .json({ error: error.message || 'Failed to delete note' });
-  }
-});
 
 // Bulk delete notes
 router.post('/bulk-delete', async (req, res) => {
