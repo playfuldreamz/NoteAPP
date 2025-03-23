@@ -17,7 +17,7 @@ export const UsernameSection: React.FC<UsernameSectionProps> = ({ setUsername })
   const handleUsernameChange = async () => {
     try {
       setIsChangingUsername(true);
-      const response = await fetch(`${API_BASE}/change-username`, {
+      const response = await fetch(`${API_BASE}/api/auth/change-username`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -75,7 +75,7 @@ export const PasswordSection: React.FC = () => {
 
     try {
       setIsChangingPassword(true);
-      const response = await fetch(`${API_BASE}/change-password`, {
+      const response = await fetch(`${API_BASE}/api/auth/change-password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
