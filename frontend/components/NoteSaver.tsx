@@ -60,7 +60,7 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
       }
       
       // Save note with generated or default title
-      const response = await fetch('http://localhost:5000/notes', {
+      const response = await fetch('http://localhost:5000/api/notes', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

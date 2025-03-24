@@ -362,7 +362,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ setTranscript, updateTran
       }
 
       try {
-        const saveResponse = await fetch('http://localhost:5000/transcripts', {
+        const saveResponse = await fetch('http://localhost:5000/api/transcripts', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

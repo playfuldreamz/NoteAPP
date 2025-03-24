@@ -1,9 +1,5 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-
-// Database connection
-const dbPath = path.join(__dirname, '../database.sqlite');
-const db = new sqlite3.Database(dbPath);
+const db = require('../database/connection');
+const { isTagReferencedAsync } = require('../utils/dbUtils');
 
 // Promisify db.run
 const run = (query, params) => new Promise((resolve, reject) => {
@@ -21,14 +17,80 @@ const get = (query, params) => new Promise((resolve, reject) => {
   });
 });
 
+// Promisify db.all
+const all = (query, params) => new Promise((resolve, reject) => {
+  db.all(query, params, (err, rows) => {
+    if (err) reject(err);
+    else resolve(rows);
+  });
+});
+
+let transactionDepth = 0;
+let transactionError = null;
+
 // Begin transaction
-const beginTransaction = () => run('BEGIN TRANSACTION');
+const beginTransaction = async () => {
+  if (transactionDepth === 0) {
+    try {
+      await run('BEGIN TRANSACTION');
+    } catch (err) {
+      if (err.code !== 'SQLITE_ERROR') {
+        throw err;
+      }
+    }
+  }
+  transactionDepth++;
+};
 
 // Commit transaction
-const commit = () => run('COMMIT');
+const commit = async () => {
+  if (transactionDepth === 0) return;
+  
+  transactionDepth--;
+  if (transactionDepth === 0 && !transactionError) {
+    try {
+      await run('COMMIT');
+    } catch (err) {
+      if (err.code !== 'SQLITE_ERROR') {
+        throw err;
+      }
+    }
+  }
+};
 
 // Rollback transaction
-const rollback = () => run('ROLLBACK');
+const rollback = async () => {
+  if (transactionDepth === 0) return;
+  
+  transactionDepth--;
+  if (transactionDepth === 0) {
+    try {
+      await run('ROLLBACK');
+    } catch (err) {
+      if (err.code !== 'SQLITE_ERROR') {
+        throw err;
+      }
+    }
+  }
+};
+
+// Transaction wrapper
+const withTransaction = async (fn) => {
+  try {
+    await beginTransaction();
+    const result = await fn();
+    await commit();
+    return result;
+  } catch (err) {
+    transactionError = err;
+    await rollback();
+    throw err;
+  } finally {
+    if (transactionDepth === 0) {
+      transactionError = null;
+    }
+  }
+};
 
 /**
  * Delete a resource and all its associated data
@@ -37,9 +99,13 @@ const rollback = () => run('ROLLBACK');
  * @param {number} userId - ID of the user
  * @returns {Promise<boolean>} - True if successful
  */
-const deleteResource = async (resourceType, resourceId, userId) => {
+const deleteResource = async (resourceType, resourceId, userId, options = {}) => {
+  const { manageTransaction = true } = options;
+  
   try {
-    await beginTransaction();
+    if (manageTransaction) {
+      await beginTransaction();
+    }
 
     // Verify resource exists and belongs to user
     const resource = await get(
@@ -57,11 +123,30 @@ const deleteResource = async (resourceType, resourceId, userId) => {
       [resourceType, resourceId, userId]
     );
 
-    // Delete tags
-    await run(
-      `DELETE FROM ${resourceType}_tags WHERE ${resourceType}_id = ? AND user_id = ?`,
-      [resourceId, userId]
+    // Get all tag IDs associated with this resource
+    const tagRows = await all(
+      'SELECT tag_id FROM item_tags WHERE item_id = ? AND item_type = ?',
+      [resourceId, resourceType]
     );
+    
+    // Delete item_tags records
+    await run(
+      'DELETE FROM item_tags WHERE item_id = ? AND item_type = ?',
+      [resourceId, resourceType]
+    );
+
+    // Check and delete orphaned tags
+    if (tagRows.length > 0) {
+      for (const tag of tagRows) {
+        const isReferenced = await isTagReferencedAsync(db, tag.tag_id);
+        if (!isReferenced) {
+          await run(
+            'DELETE FROM tags WHERE id = ?',
+            [tag.tag_id]
+          );
+        }
+      }
+    }
 
     // Delete the main resource
     await run(
@@ -69,10 +154,18 @@ const deleteResource = async (resourceType, resourceId, userId) => {
       [resourceId, userId]
     );
 
-    await commit();
+    if (manageTransaction) {
+      await commit();
+    }
     return true;
   } catch (error) {
-    await rollback();
+    if (manageTransaction) {
+      try {
+        await rollback();
+      } catch (rollbackError) {
+        console.error('Rollback failed:', rollbackError);
+      }
+    }
     throw error;
   }
 };
@@ -84,11 +177,15 @@ const deleteResource = async (resourceType, resourceId, userId) => {
  * @param {number} userId - ID of the user
  * @returns {Promise<boolean>} - True if successful
  */
-const bulkDeleteResources = async (resourceType, resourceIds, userId) => {
+const bulkDeleteResources = async (resourceType, resourceIds, userId, options = {}) => {
   if (!resourceIds.length) return true;
 
+  const { manageTransaction = true } = options;
+  
   try {
-    await beginTransaction();
+    if (manageTransaction) {
+      await beginTransaction();
+    }
 
     // Verify all resources exist and belong to user
     const placeholders = resourceIds.map(() => '?').join(',');
@@ -107,11 +204,30 @@ const bulkDeleteResources = async (resourceType, resourceIds, userId) => {
       [resourceType, ...resourceIds, userId]
     );
 
-    // Delete tags
-    await run(
-      `DELETE FROM ${resourceType}_tags WHERE ${resourceType}_id IN (${placeholders}) AND user_id = ?`,
-      [...resourceIds, userId]
+    // Get all tags associated with these resources
+    const tagRows = await all(
+      `SELECT DISTINCT tag_id FROM item_tags WHERE item_id IN (${placeholders}) AND item_type = ?`,
+      [...resourceIds, resourceType]
     );
+    
+    // Delete item_tags records
+    await run(
+      `DELETE FROM item_tags WHERE item_id IN (${placeholders}) AND item_type = ?`,
+      [...resourceIds, resourceType]
+    );
+
+    // Check and delete orphaned tags
+    if (tagRows && tagRows.length > 0) {
+      for (const tag of tagRows) {
+        const isReferenced = await isTagReferencedAsync(db, tag.tag_id);
+        if (!isReferenced) {
+          await run(
+            'DELETE FROM tags WHERE id = ?',
+            [tag.tag_id]
+          );
+        }
+      }
+    }
 
     // Delete the main resources
     await run(
@@ -119,10 +235,18 @@ const bulkDeleteResources = async (resourceType, resourceIds, userId) => {
       [...resourceIds, userId]
     );
 
-    await commit();
+    if (manageTransaction) {
+      await commit();
+    }
     return true;
   } catch (error) {
-    await rollback();
+    if (manageTransaction) {
+      try {
+        await rollback();
+      } catch (rollbackError) {
+        console.error('Rollback failed:', rollbackError);
+      }
+    }
     throw error;
   }
 };

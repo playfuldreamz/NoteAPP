@@ -58,28 +58,28 @@ export default function HomePage() {
       // Fetch all notes for stats
       const [notesResponse, allNotesResponse, transcriptsResponse, allTranscriptsResponse] = await Promise.all([
         // Recent notes (limited to 5)
-        fetch('http://localhost:5000/notes?limit=5', {
+        fetch('http://localhost:5000/api/notes?limit=5', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         }),
         // All notes for stats
-        fetch('http://localhost:5000/notes', {
+        fetch('http://localhost:5000/api/notes', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         }),
         // Recent transcripts (limited to 5)
-        fetch('http://localhost:5000/transcripts?limit=5', {
+        fetch('http://localhost:5000/api/transcripts?limit=5', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         }),
         // All transcripts for stats
-        fetch('http://localhost:5000/transcripts', {
+        fetch('http://localhost:5000/api/transcripts', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

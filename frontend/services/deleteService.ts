@@ -11,7 +11,7 @@ export const deleteResource = async (
   token: string
 ): Promise<boolean> => {
   try {
-    const response = await fetch(`${API_BASE}/${resourceType}s/${resourceId}`, {
+    const response = await fetch(`${API_BASE}/api/${resourceType}s/${resourceId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -40,7 +40,7 @@ export const bulkDeleteResources = async (
   token: string
 ): Promise<boolean> => {
   try {
-    const response = await fetch(`${API_BASE}/${resourceType}s/bulk-delete`, {
+    const response = await fetch(`${API_BASE}/api/${resourceType}s/bulk-delete`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,

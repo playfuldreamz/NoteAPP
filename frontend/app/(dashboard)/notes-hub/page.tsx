@@ -32,7 +32,7 @@ export default function NotesHubPage() {
     if (!token) return;
 
     try {
-      const response = await fetch('http://localhost:5000/transcripts', {
+      const response = await fetch('http://localhost:5000/api/transcripts', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -53,7 +53,7 @@ export default function NotesHubPage() {
     if (!token) return;
 
     try {
-      const response = await fetch('http://localhost:5000/notes', {
+      const response = await fetch('http://localhost:5000/api/notes', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -79,7 +79,7 @@ export default function NotesHubPage() {
     if (!token) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/notes/${id}`, {
+      const response = await fetch(`http://localhost:5000/api/notes/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

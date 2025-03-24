@@ -198,7 +198,9 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
       }
 
       await deleteResource('note', id, token);
-      // Remove the callback to prevent double deletion
+      // Update local state to remove the deleted note
+      setFilteredNotes(prev => prev.filter(n => n.id !== id));
+      setVisibleNotes(prev => prev.filter(n => n.id !== id));
       toast.success('Note deleted successfully!');
     } catch (error) {
       console.error('Delete error:', error);
@@ -270,9 +272,18 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
       }
 
       await bulkDeleteResources('note', ids, token);
-      ids.forEach(id => onDelete(id));
-      toast.success('Notes deleted successfully!');
+      
+      // Update local state by removing deleted notes
+      setFilteredNotes(prev => prev.filter(n => !ids.includes(n.id)));
+      setVisibleNotes(prev => prev.filter(n => !ids.includes(n.id)));
+      
+      // Refresh parent component
+      onTitleUpdate();
+      
+      // Clear selection
       setSelectedNoteIds(new Set());
+      
+      toast.success('Notes deleted successfully!');
     } catch (error) {
       console.error('Bulk delete error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to delete notes');
