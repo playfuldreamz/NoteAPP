@@ -459,6 +459,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                       value={getDownloadOptions(transcript.id).format}
                       onChange={(e) => handleDownloadOptionsChange(transcript.id, e)}
                       className="text-xs text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors px-1.5 py-1 border border-gray-200 dark:border-gray-700"
+                      aria-label="Select download format"
                     >
                       <option value="txt">TXT</option>
                       <option value="json">JSON</option>
@@ -496,6 +497,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                     <button
                       onClick={() => handleSeeMore(transcript.text, transcript.title || 'Untitled Transcript', transcript.id)}
                       className="text-blue-500 hover:underline text-xs ml-2"
+                      aria-label="View full transcript"
+                      title="View full transcript"
                     >
                       <Eye size={16} />
                     </button>
@@ -517,7 +520,12 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           </button>
         )}
         {visibleTranscripts.length > 5 && (
-          <button onClick={handleShowLess} className="text-blue-500 hover:underline text-sm">
+          <button
+            onClick={handleShowLess}
+            className="text-blue-500 hover:underline text-sm"
+            aria-label="Show less transcripts"
+            title="Show less transcripts"
+          >
             <ChevronUp size={16} />
           </button>
         )}

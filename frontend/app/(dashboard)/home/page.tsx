@@ -295,7 +295,10 @@ export default function HomePage() {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Insights</h2>
           </div>
           <div className="flex items-center gap-2">
-            <select className="text-sm bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
+            <select
+              className="text-sm bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2"
+              aria-label="Select time range for voice insights"
+            >
               <option>Last 7 days</option>
               <option>Last 30 days</option>
               <option>Last 3 months</option>
@@ -332,9 +335,9 @@ export default function HomePage() {
                     <div className="w-16 text-sm text-gray-600 dark:text-gray-300">{topic}</div>
                     <div className="flex-1">
                       <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-600">
-                        <div 
-                          className="h-2 rounded-full bg-blue-500 dark:bg-blue-400" 
-                          style={{ width: `${percentage}%` }}
+                        <div
+                          className="progress-bar"
+                          style={{ "--progress-width": `${percentage}%` } as React.CSSProperties}
                         ></div>
                       </div>
                     </div>

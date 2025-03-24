@@ -56,11 +56,6 @@ app.use('/api/notes', authenticateToken, notesRoutes);
 // Initialize database
 createTables();
 
-const { isTagReferenced } = require('./utils/dbUtils');
-
-
-
-
 // Tag management routes
 app.get('/tags', authenticateToken, (req, res) => {
   db.all('SELECT id, name FROM tags ORDER BY name ASC', (err, rows) => {

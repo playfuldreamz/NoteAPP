@@ -38,3 +38,14 @@
 .input-animation:focus {
   transform: scale(1.02);
 }
+
+.progress-bar {
+  width: var(--progress-width);
+  height: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: theme('colors.blue.500');
+}
+
+.dark .progress-bar {
+  background-color: theme('colors.blue.400');
+}
