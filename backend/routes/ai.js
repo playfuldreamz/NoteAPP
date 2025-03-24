@@ -464,65 +464,6 @@ router.post('/tags/:type/:id', validateItemType, async (req, res) => {
   }
 });
 
-// Password change endpoint
-router.put('/change-password', async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ error: 'Current and new password are required' });
-  }
-
-  try {
-    // Get user from token
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    // Verify current password
-    db.get(
-      'SELECT password FROM users WHERE id = ?',
-      [req.user.id],
-      async (err, user) => {
-        if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Database error' });
-        }
-        
-        if (!user) {
-          return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Verify current password
-        const validPassword = await bcrypt.compare(currentPassword, user.password);
-        if (!validPassword) {
-          return res.status(401).json({ error: 'Invalid current password' });
-        }
-
-        // Hash new password
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        
-        // Update password
-        db.run(
-          'UPDATE users SET password = ? WHERE id = ?',
-          [hashedPassword, req.user.id],
-          function(err) {
-            if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to update password' });
-            }
-            
-            res.json({ success: true });
-          }
-        );
-      }
-    );
-  } catch (error) {
-    console.error('Password change error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // Remove tag from note or transcript
 router.delete('/tags/:type/:id/:tag_id', validateItemType, async (req, res) => {
   const { type, id, tag_id } = req.params;

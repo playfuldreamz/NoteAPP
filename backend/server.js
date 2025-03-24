@@ -146,53 +146,6 @@ app.post('/transcripts/assemblyai-token', async (req, res) => {
   }
 });
 
-// Password change endpoint
-app.put('/change-password', authenticateToken, async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  const userId = req.user.id;
-
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ error: 'Current and new password are required' });
-  }
-
-  try {
-    // Verify current password
-    const user = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM users WHERE id = ?', [userId], (err, row) => {
-        if (err) reject(err);
-        resolve(row);
-      });
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const validPassword = await bcrypt.compare(currentPassword, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid current password' });
-    }
-
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    // Update password
-    await new Promise((resolve, reject) => {
-      db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId], function(err) {
-        if (err) reject(err);
-        resolve(this);
-      });
-    });
-
-    res.json({ message: 'Password updated successfully' });
-
-  } catch (error) {
-    console.error('Password change error:', error);
-    res.status(500).json({ error: 'Failed to update password' });
-  }
-});
-
 // Transcription settings routes
 app.get('/api/transcription/settings', authenticateToken, (req, res) => {
   const userId = req.user.id;
