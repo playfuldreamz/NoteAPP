@@ -132,6 +132,7 @@ const Modal: React.FC<ModalProps> = ({
                   type="text"
                   value={editableTitle}
                   onChange={(e) => setEditableTitle(e.target.value)}
+                  placeholder="Enter title"
                   className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500"
                 />
               ) : (
@@ -188,6 +189,7 @@ const Modal: React.FC<ModalProps> = ({
           
           <div className="flex items-center gap-2">
             <select
+              title="Select download format"
               value={perItemDownloadOptions.format}
               onChange={handlePerItemDownloadOptionsChange}
               className="text-sm text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors p-2 border border-gray-200 dark:border-gray-700"
