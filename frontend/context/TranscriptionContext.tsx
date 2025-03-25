@@ -146,7 +146,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost:5000/api/transcription/settings', {
+      const response = await fetch('http://localhost:5000/api/transcripts/transcription/settings', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -209,7 +209,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
           return;
         }
 
-        const response = await fetch('http://localhost:5000/api/transcription/settings', {
+        const response = await fetch('http://localhost:5000/api/transcripts/transcription/settings', {
           headers: {
             'Authorization': `Bearer ${token}`
           }

@@ -25,7 +25,7 @@ export class AssemblyAIProvider implements TranscriptionProvider {
   }
 
   private async getToken(): Promise<string> {
-    const response = await fetch('http://localhost:5000/transcripts/assemblyai-token', {
+    const response = await fetch('http://localhost:5000/api/transcripts/assemblyai-token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

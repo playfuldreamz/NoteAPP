@@ -6,6 +6,129 @@ const { authenticateToken } = require('../middleware/auth');
 const db = require('../database/connection');
 const { isTagReferenced } = require('../utils/dbUtils');
 
+// AssemblyAI token endpoint
+router.post('/assemblyai-token', async (req, res) => {
+  try {
+    const apiKey = req.body.apiKey;
+    if (!apiKey) {
+      return res.status(400).json({ error: 'API key is required' });
+    }
+
+    const response = await fetch('https://api.assemblyai.com/v2/realtime/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expires_in: 3600 }) // Token valid for 1 hour
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      // Check for specific error types
+      if (data.error && data.error.includes('paid-only')) {
+        return res.status(402).json({ 
+          error: 'AssemblyAI requires a credit card for real-time transcription',
+          type: 'PAYMENT_REQUIRED',
+          link: 'https://app.assemblyai.com/'
+        });
+      }
+      throw new Error(data.error || 'AssemblyAI API error');
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error generating AssemblyAI token:', error);
+    res.status(500).json({ 
+      error: error.message,
+      type: 'API_ERROR'
+    });
+  }
+});
+
+// Transcription settings routes
+router.get('/transcription/settings', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  
+  db.all(
+    'SELECT provider_id as provider, api_key, settings as options FROM transcription_settings WHERE user_id = ?',
+    [userId],
+    (err, rows) => {
+      if (err) {
+        console.error('Error fetching transcription settings:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      // Convert rows to the expected format
+      const settings = {};
+      rows.forEach(row => {
+        settings[row.provider] = {
+          apiKey: row.api_key,
+          options: row.options ? JSON.parse(row.options) : {}
+        };
+      });
+
+      res.json({ settings });
+    }
+  );
+});
+
+router.put('/transcription/settings', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const { provider, settings } = req.body;
+
+  if (!provider || !settings) {
+    return res.status(400).json({ error: 'Provider and settings are required' });
+  }
+
+  const { apiKey, options } = settings;
+  const settingsJson = options ? JSON.stringify(options) : null;
+
+  // First check if a record exists
+  db.get(
+    'SELECT id FROM transcription_settings WHERE user_id = ? AND provider_id = ?',
+    [userId, provider],
+    (err, row) => {
+      if (err) {
+        console.error('Error checking transcription settings:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (row) {
+        // Update existing record
+        db.run(
+          `UPDATE transcription_settings 
+           SET api_key = ?, settings = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE user_id = ? AND provider_id = ?`,
+          [apiKey, settingsJson, userId, provider],
+          function(err) {
+            if (err) {
+              console.error('Error updating transcription settings:', err);
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+            res.json({ success: true });
+          }
+        );
+      } else {
+        // Insert new record
+        db.run(
+          `INSERT INTO transcription_settings (user_id, provider_id, api_key, settings, language)
+           VALUES (?, ?, ?, ?, 'en')`,
+          [userId, provider, apiKey, settingsJson],
+          function(err) {
+            if (err) {
+              console.error('Error inserting transcription settings:', err);
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+            res.json({ success: true });
+          }
+        );
+      }
+    }
+  );
+});
+
 // Delete a single transcript
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
