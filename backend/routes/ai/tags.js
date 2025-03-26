@@ -1,16 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-
-// Database connection
-const dbPath = path.join(__dirname, '../../database.sqlite');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error connecting to database:', err.message);
-  }
-  console.log('Connected to database:', dbPath);
-});
+const db = require('../../database/connection');
 
 // Validate item type middleware
 const validateItemType = (req, res, next) => {
