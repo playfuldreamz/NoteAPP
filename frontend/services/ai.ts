@@ -74,7 +74,7 @@ export async function summarizeContent(content: string): Promise<string> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE}/api/ai/summarize`, {
+  const response = await fetch(`${API_BASE}/api/ai/tasks/summarize`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -95,7 +95,7 @@ export async function generateTranscriptTitle(content: string): Promise<string> 
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE}/api/ai/summarize`, {
+  const response = await fetch(`${API_BASE}/api/ai/tasks/summarize`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -171,7 +171,7 @@ export async function analyzeContentForTags(content: string): Promise<string[]> 
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE}/api/ai/tags/analyze`, {
+  const response = await fetch(`${API_BASE}/api/ai/tasks/tags/analyze`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -403,7 +403,7 @@ export async function enhanceTranscript(
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE}/api/ai/enhance-transcription`, {
+  const response = await fetch(`${API_BASE}/api/ai/tasks/enhance-transcription`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,

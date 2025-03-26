@@ -22,7 +22,9 @@ const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GE
 const app = express();
 
 // Import routes
-const aiRoutes = require('./routes/ai');
+const aiConfigRoutes = require('./routes/ai/config');
+const aiTasksRoutes = require('./routes/ai/tasks');
+const aiTagsRoutes = require('./routes/ai/tags');
 const actionItemsRoutes = require('./routes/actionItems');
 const transcriptsRoutes = require('./routes/transcripts');
 const notesRoutes = require('./routes/notes');
@@ -48,7 +50,9 @@ app.use((req, res, next) => {
 
 // Mount routes
 app.use('/api/auth', authRoutes);
-app.use('/api/ai', authenticateToken, aiRoutes);
+app.use('/api/ai/config', authenticateToken, aiConfigRoutes);
+app.use('/api/ai/tasks', authenticateToken, aiTasksRoutes);
+app.use('/api/ai/tags', authenticateToken, aiTagsRoutes);
 app.use('/api/action-items', authenticateToken, actionItemsRoutes);
 app.use('/api/transcripts', transcriptsRoutes);  // No auth required for token validation
 app.use('/api/notes', authenticateToken, notesRoutes);

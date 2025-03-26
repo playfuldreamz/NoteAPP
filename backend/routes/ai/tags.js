@@ -1,213 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const AIProviderFactory = require('../services/ai/factory');
-const AIConfigManager = require('../services/ai/config');
-const TranscriptionTask = require('../services/ai/tasks/transcription');
-const SummarizationTask = require('../services/ai/tasks/summarization');
-const TaggingTask = require('../services/ai/tasks/tagging');
 const sqlite3 = require('sqlite3').verbose();
-const bcrypt = require('bcrypt');
 const path = require('path');
 
 // Database connection
-const dbPath = path.join(__dirname, '../database.sqlite');
+const dbPath = path.join(__dirname, '../../database.sqlite');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error connecting to database:', err.message);
   }
   console.log('Connected to database:', dbPath);
 });
-
-// AI Provider Configuration Endpoints
-router.get('/config', async (req, res) => {
-  try {
-    const config = await AIConfigManager.getUserConfig(req.user.id);
-    res.json(config);
-  } catch (error) {
-    console.error('Error fetching AI config:', error);
-    res.status(500).json({ error: 'Failed to fetch AI configuration' });
-  }
-});
-
-router.put('/config', async (req, res) => {
-  try {
-    const { provider, apiKey } = req.body;
-    const userId = req.user.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User authentication required' });
-    }
-
-    await AIConfigManager.updateConfig(userId, { provider, apiKey });
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error updating AI config:', error);
-    res.status(500).json({ error: 'Failed to update AI configuration' });
-  }
-});
-
-// Get all AI provider settings for a user
-router.get('/config/all', async (req, res) => {
-  try {
-    const userId = req.user.id;
-    if (!userId) {
-      return res.status(401).json({ error: 'User authentication required' });
-    }
-
-    // Get all active settings for this user
-    const userSettings = await new Promise((resolve, reject) => {
-      db.all(
-        `SELECT provider, api_key FROM user_settings 
-         WHERE user_id = ? AND api_key IS NOT NULL AND api_key != ''`,
-        [userId],
-        (err, rows) => {
-          if (err) return reject(err);
-          resolve(rows.map(row => ({
-            provider: row.provider,
-            apiKey: row.api_key,
-            source: 'user'
-          })));
-        }
-      );
-    });
-
-    // Add environment keys for providers that don't have user settings
-    const settings = [...userSettings];
-    const userProviders = new Set(userSettings.map(s => s.provider));
-
-    // Add Gemini env key if no user setting
-    if (!userProviders.has('gemini') && process.env.GEMINI_API_KEY) {
-      settings.push({
-        provider: 'gemini',
-        apiKey: process.env.GEMINI_API_KEY,
-        source: 'env'
-      });
-    }
-
-    // Add OpenAI env key if no user setting
-    if (!userProviders.has('openai') && process.env.OPENAI_API_KEY) {
-      settings.push({
-        provider: 'openai',
-        apiKey: process.env.OPENAI_API_KEY,
-        source: 'env'
-      });
-    }
-
-    res.json(settings);
-  } catch (error) {
-    console.error('Error fetching AI config:', error);
-    res.status(500).json({ error: 'Failed to fetch AI configuration' });
-  }
-});
-
-// Transcription enhancement endpoint
-router.post('/enhance-transcription', async (req, res) => {
-  const { transcript, language = 'en-US' } = req.body;
-  
-  if (!transcript) {
-    return res.status(400).json({ error: 'Transcript is required' });
-  }
-
-  try {
-    const config = await AIConfigManager.getUserConfig(req.user.id);
-    const provider = await AIProviderFactory.createProvider(config.provider, config);
-    const transcriptionTask = new TranscriptionTask(provider);
-    
-    const result = await transcriptionTask.enhance(transcript, language);
-    res.json(result);
-  } catch (error) {
-    console.error('Transcription enhancement error:', error);
-    
-    // Check for API key related errors
-    if (error.message?.includes('API Key not found') || 
-        error.message?.includes('API_KEY_INVALID') ||
-        error.message?.includes('Invalid API key') ||
-        error.status === 401 || 
-        error.status === 403) {
-      return res.status(401).json({ 
-        error: 'Invalid or expired API key. Please check your AI provider settings.',
-        code: 'INVALID_API_KEY'
-      });
-    }
-    
-    res.status(500).json({ 
-      error: 'Failed to enhance transcription',
-      enhanced: transcript,
-      confidence: 0,
-      original: transcript
-    });
-  }
-});
-
-// Generate title for content
-router.post('/summarize', async (req, res) => {
-  const { content } = req.body;
-  
-  if (!content) {
-    return res.status(400).json({ error: 'Content is required' });
-  }
-
-  try {
-    const config = await AIConfigManager.getUserConfig(req.user.id);
-    const provider = await AIProviderFactory.createProvider(config.provider, config);
-    const summarizationTask = new SummarizationTask(provider);
-    
-    const title = await summarizationTask.summarize(content);
-    res.json({ title });
-  } catch (error) {
-    console.error('Content summarization error:', error);
-    
-    // Check for API key related errors
-    if (error.message?.includes('API Key not found') || 
-        error.message?.includes('API_KEY_INVALID') ||
-        error.message?.includes('Invalid API key') ||
-        error.status === 401 || 
-        error.status === 403) {
-      return res.status(401).json({ 
-        error: 'Invalid or expired API key. Please check your AI provider settings.',
-        code: 'INVALID_API_KEY'
-      });
-    }
-    
-    res.status(500).json({ error: 'Failed to generate title' });
-  }
-});
-
-// Analyze content for tags
-router.post('/tags/analyze', async (req, res) => {
-  const { content } = req.body;
-  
-  if (!content) {
-    return res.status(400).json({ error: 'Content is required' });
-  }
-
-  try {
-    const config = await AIConfigManager.getUserConfig(req.user.id);
-    const provider = await AIProviderFactory.createProvider(config.provider, config);
-    const taggingTask = new TaggingTask(provider);
-    
-    const tags = await taggingTask.analyze(content);
-    res.json({ tags });
-  } catch (error) {
-    console.error('Tag analysis error:', error);
-    
-    // Check for API key related errors
-    if (error.message?.includes('API Key not found') || 
-        error.message?.includes('API_KEY_INVALID') ||
-        error.message?.includes('Invalid API key') ||
-        error.status === 401 || 
-        error.status === 403) {
-      return res.status(401).json({ 
-        error: 'Invalid or expired API key. Please check your AI provider settings.',
-        code: 'INVALID_API_KEY'
-      });
-    }
-    
-    res.status(500).json({ error: 'Failed to analyze tags' });
-  }
-});
-
-
 
 // Validate item type middleware
 const validateItemType = (req, res, next) => {
@@ -260,7 +63,7 @@ const validateItemType = (req, res, next) => {
 };
 
 // Create new endpoint for tag creation
-router.post('/tags', async (req, res) => {
+router.post('/', async (req, res) => {
   const { name } = req.body;
   const userId = req.user.id;
   
@@ -359,7 +162,7 @@ router.post('/tags', async (req, res) => {
 });
 
 // Update tag assignment endpoint
-router.post('/tags/:type/:id', validateItemType, async (req, res) => {
+router.post('/:type/:id', validateItemType, async (req, res) => {
   const { type, id } = req.params;
   const { tag_id } = req.body;
   
@@ -464,7 +267,7 @@ router.post('/tags/:type/:id', validateItemType, async (req, res) => {
 });
 
 // Remove tag from note or transcript
-router.delete('/tags/:type/:id/:tag_id', validateItemType, async (req, res) => {
+router.delete('/:type/:id/:tag_id', validateItemType, async (req, res) => {
   const { type, id, tag_id } = req.params;
   
   // Validate IDs
@@ -541,7 +344,7 @@ router.delete('/tags/:type/:id/:tag_id', validateItemType, async (req, res) => {
 });
 
 // Get all tags
-router.get('/tags', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     db.all(
       `SELECT * FROM tags ORDER BY name ASC`,
@@ -560,7 +363,7 @@ router.get('/tags', async (req, res) => {
 });
 
 // Get user-specific tags
-router.get('/user-tags', async (req, res) => {
+router.get('/user', async (req, res) => {
   const userId = req.user.id;
   const itemType = req.query.type; // Get type from query parameter
 
@@ -604,7 +407,8 @@ router.get('/user-tags', async (req, res) => {
   }
 });
 
-router.post('/user-tags', async (req, res) => {
+// Create user tag association
+router.post('/user', async (req, res) => {
   const { tag_id } = req.body;
   const userId = req.user.id;
 
@@ -694,8 +498,8 @@ router.post('/user-tags', async (req, res) => {
   }
 });
 
-// Delete user tag endpoint
-router.delete('/user-tags/:tag_id', async (req, res) => {
+// Delete user tag association
+router.delete('/user/:tag_id', async (req, res) => {
   const { tag_id } = req.params;
   const userId = req.user.id;
 
@@ -770,44 +574,8 @@ router.delete('/user-tags/:tag_id', async (req, res) => {
   }
 });
 
-// Tag analysis endpoint
-router.post('/tags/analyze', async (req, res) => {
-  const { content } = req.body;
-  const userId = req.user.id;
-  
-  if (!content) {
-    return res.status(400).json({ error: 'Content is required' });
-  }
-
-  // Initialize AI with user context
-  const config = await AIConfigManager.getUserConfig(userId);
-  const provider = await AIProviderFactory.createProvider(config.provider, config);
-  const taggingTask = new TaggingTask(provider);
-  
-  try {
-    const tags = await taggingTask.analyze(content);
-    res.json({ tags });
-  } catch (error) {
-    console.error('Tag analysis error:', error);
-    
-    // Check for API key related errors
-    if (error.message?.includes('API Key not found') || 
-        error.message?.includes('API_KEY_INVALID') ||
-        error.message?.includes('Invalid API key') ||
-        error.status === 401 || 
-        error.status === 403) {
-      return res.status(401).json({ 
-        error: 'Invalid or expired API key. Please check your AI provider settings.',
-        code: 'INVALID_API_KEY'
-      });
-    }
-    
-    res.status(500).json({ error: 'Failed to analyze tags' });
-  }
-});
-
 // Get tags for a specific note or transcript
-router.get('/tags/:type/:id', async (req, res) => {
+router.get('/:type/:id', async (req, res) => {
   const { type, id } = req.params;
   
   try {
@@ -825,41 +593,6 @@ router.get('/tags/:type/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching tags:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Remove tag from note or transcript
-router.delete('/tags/:type/:id/:tag_id', validateItemType, async (req, res) => {
-  const { type, id, tag_id } = req.params;
-  
-  try {
-    db.run(
-      `DELETE FROM item_tags WHERE item_id = ? AND item_type = ? AND tag_id = ?`,
-      [id, type, tag_id],
-      function(err) {
-        if (err) {
-          console.error('Database error:', {
-            message: err.message,
-            code: err.code,
-            stack: err.stack,
-            sql: this.sql,
-            params: [id, type, tag_id]
-          });
-          return res.status(500).json({ error: 'Failed to remove tag' });
-        }
-        if (this.changes === 0) {
-          return res.status(404).json({ error: 'Tag association not found' });
-        }
-        res.json({ success: true });
-      }
-    );
-  } catch (error) {
-    console.error('Error removing tag:', {
-      message: error.message,
-      stack: error.stack,
-      request: req.params
-    });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
