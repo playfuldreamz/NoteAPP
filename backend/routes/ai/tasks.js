@@ -80,7 +80,7 @@ router.post('/summarize', async (req, res) => {
 });
 
 // Analyze content for tags
-router.post('', async (req, res) => {
+router.post('/tags/analyze', async (req, res) => {
   const { content } = req.body;
   
   if (!content) {
