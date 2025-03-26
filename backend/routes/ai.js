@@ -261,7 +261,7 @@ const validateItemType = (req, res, next) => {
 
 // Create new endpoint for tag creation
 router.post('/tags', async (req, res) => {
-  const { name, description } = req.body;
+  const { name } = req.body;
   const userId = req.user.id;
   
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -318,8 +318,8 @@ router.post('/tags', async (req, res) => {
       // Create new tag
       tag = await new Promise((resolve, reject) => {
         db.run(
-          'INSERT INTO tags (name, description) VALUES (?, ?)',
-          [name.trim(), description ? description.trim() : null],
+          'INSERT INTO tags (name) VALUES (?)',
+          [name.trim()],
           function(err) {
             if (err) {
               console.error('Tag creation error:', err);
@@ -327,8 +327,7 @@ router.post('/tags', async (req, res) => {
             } else {
               resolve({
                 id: this.lastID,
-                name: name.trim(),
-                description: description ? description.trim() : null
+                name: name.trim()
               });
             }
           }

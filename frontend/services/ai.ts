@@ -188,7 +188,7 @@ export async function analyzeContentForTags(content: string): Promise<string[]> 
   return data.tags;
 }
 
-export async function createTag(name: string, description?: string): Promise<Tag> {
+export async function createTag(name: string): Promise<Tag> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
@@ -199,7 +199,7 @@ export async function createTag(name: string, description?: string): Promise<Tag
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name }),
     });
 
     const data = await response.json();
@@ -212,8 +212,7 @@ export async function createTag(name: string, description?: string): Promise<Tag
   } catch (error) {
     console.error('Error creating tag:', {
       message: error instanceof Error ? error.message : 'Unknown error',
-      name,
-      description
+      name
     });
     throw error;
   }
