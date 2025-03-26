@@ -56,56 +56,6 @@ app.use('/api/notes', authenticateToken, notesRoutes);
 // Initialize database
 createTables();
 
-// Tag management routes
-app.get('/tags', authenticateToken, (req, res) => {
-  db.all('SELECT id, name FROM tags ORDER BY name ASC', (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(rows);
-  });
-});
-
-app.post('/tags', authenticateToken, (req, res) => {
-  const { name } = req.body;
-  
-  if (!name) {
-    return res.status(400).json({ error: 'Tag name is required' });
-  }
-
-  db.run('INSERT OR IGNORE INTO tags (name) VALUES (?)', [name], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    
-    if (this.changes === 0) {
-      // Tag already exists
-      db.get('SELECT id, name FROM tags WHERE name = ?', [name], (err, tag) => {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.status(200).json(tag);
-      });
-    } else {
-      // New tag created
-      res.status(201).json({ id: this.lastID, name });
-    }
-  });
-});
-
-app.delete('/tags/:id', authenticateToken, (req, res) => {
-  db.run('DELETE FROM tags WHERE id = ?', [req.params.id], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Tag not found' });
-    }
-    res.json({ message: 'Tag deleted' });
-  });
-});
-
-
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
