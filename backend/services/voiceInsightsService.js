@@ -1,0 +1,121 @@
+const db = require('../database/connection');
+
+const getVoiceInsights = async (userId, timeRange) => {
+  const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  try {
+    // Get all transcripts within the time range
+    const query = `
+      SELECT 
+        t.id, 
+        t.title, 
+        t.text, 
+        t.duration, 
+        t.date as created_at,
+        json_group_array(json_object('id', tg.id, 'name', tg.name)) AS tags
+      FROM transcripts t
+      LEFT JOIN item_tags it ON t.id = it.item_id AND it.item_type = 'transcript'
+      LEFT JOIN tags tg ON it.tag_id = tg.id
+      WHERE t.user_id = ? AND t.date >= datetime(?)
+      GROUP BY t.id
+      ORDER BY t.date ASC
+    `;
+
+    return new Promise((resolve, reject) => {
+      db.all(query, [userId, startDate.toISOString()], (err, transcripts) => {
+        if (err) {
+          console.error('Database error:', err);
+          return reject(err);
+        }
+
+        // Process transcripts
+        const timelineMap = new Map();
+        const topicsMap = new Map();
+        let totalTags = 0;
+
+        transcripts.forEach(transcript => {
+          // Parse tags
+          const tags = JSON.parse(transcript.tags).filter(tag => tag.id !== null);
+          
+          // Timeline data
+          const date = new Date(transcript.created_at).toISOString().split('T')[0];
+          const existing = timelineMap.get(date) || { date, duration: 0, count: 0 };
+          existing.duration += transcript.duration || 0;
+          existing.count += 1;
+          timelineMap.set(date, existing);
+
+          // Topics data
+          tags.forEach(tag => {
+            const count = (topicsMap.get(tag.name) || 0) + 1;
+            topicsMap.set(tag.name, count);
+            totalTags++;
+          });
+        });
+
+        // Calculate popular topics
+        const popularTopics = Array.from(topicsMap.entries())
+          .map(([topic, count]) => ({
+            topic,
+            count,
+            percentage: Math.round((count / Math.max(1, totalTags)) * 100)
+          }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 4);
+
+        // Calculate recording patterns
+        const patterns = {};
+        const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        transcripts.forEach(transcript => {
+          const date = new Date(transcript.created_at);
+          const day = daysOfWeek[date.getDay()];
+          const hour = date.getHours();
+          const slot = Math.floor(hour / 6);
+
+          if (!patterns[day]) {
+            patterns[day] = { 
+              day, 
+              slots: Array(4).fill(0).map((_, i) => ({ hour: i * 6, intensity: 0 }))
+            };
+          }
+          
+          patterns[day].slots[slot].intensity = Math.min(3, patterns[day].slots[slot].intensity + 1);
+        });
+
+        // Calculate quick stats
+        const totalDurationMs = transcripts.reduce((sum, t) => sum + (t.duration || 0), 0);
+        const totalDurationHours = totalDurationMs / (1000 * 60 * 60);
+        const weeklyRecordingTime = (totalDurationHours * 7) / days;
+        
+        const avgRecordingLength = transcripts.length > 0 
+          ? (totalDurationMs / transcripts.length) / (1000 * 60) 
+          : 0;
+
+        const transcriptsWithTags = transcripts.filter(t => {
+          const tags = JSON.parse(t.tags).filter(tag => tag.id !== null);
+          return tags.length > 0;
+        }).length;
+        const taggedNotesPercentage = Math.round((transcriptsWithTags / Math.max(1, transcripts.length)) * 100);
+
+        resolve({
+          recordingTimeline: Array.from(timelineMap.values()),
+          popularTopics,
+          recordingPatterns: Object.values(patterns),
+          quickStats: {
+            weeklyRecordingTime: Number(weeklyRecordingTime.toFixed(1)),
+            avgRecordingLength: Number(avgRecordingLength.toFixed(1)),
+            taggedNotesPercentage
+          }
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Error getting voice insights:', error);
+    throw error;
+  }
+};
+
+module.exports = {
+  getVoiceInsights
+};

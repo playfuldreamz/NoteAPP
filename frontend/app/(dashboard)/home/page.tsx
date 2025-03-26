@@ -5,6 +5,14 @@ import { Clock, Calendar, Activity, Star, Mic, FileText, Tags, Timer, Search, Ch
 import Link from 'next/link';
 import { toast } from 'react-toastify';
 import Modal from '../../../components/Modal';
+import {
+  TimeRangeSelector,
+  VoiceInsightsPanel,
+  RecordingTimeline,
+  PopularTopics,
+  RecordingPatterns,
+  QuickStats
+} from '../../../components/voice-insights';
 
 interface Note {
   id: number;
@@ -33,6 +41,32 @@ interface ModalState {
   tags?: Array<{ id: number; name: string; }>;
 }
 
+interface VoiceInsightsData {
+  timeRange: string;
+  recordingTimeline: Array<{
+    date: string;
+    duration: number;
+    count: number;
+  }>;
+  popularTopics: Array<{
+    topic: string;
+    percentage: number;
+    count: number;
+  }>;
+  recordingPatterns: Array<{
+    day: string;
+    slots: Array<{
+      hour: number;
+      intensity: number;
+    }>;
+  }>;
+  quickStats: {
+    weeklyRecordingTime: number;
+    avgRecordingLength: number;
+    taggedNotesPercentage: number;
+  };
+}
+
 export default function HomePage() {
   const [recentNotes, setRecentNotes] = useState<Note[]>([]);
   const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
@@ -49,6 +83,9 @@ export default function HomePage() {
     itemId: 0,
     type: 'note'
   });
+  const [timeRange, setTimeRange] = useState<string>('7d');
+  const [voiceInsights, setVoiceInsights] = useState<VoiceInsightsData | null>(null);
+  const [isLoadingInsights, setIsLoadingInsights] = useState<boolean>(false);
 
   const fetchRecentActivity = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -142,6 +179,37 @@ export default function HomePage() {
   const handleCloseModal = () => {
     setModalState(prev => ({ ...prev, isOpen: false }));
   };
+
+  const fetchVoiceInsights = useCallback(async (range: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setIsLoadingInsights(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/voice-insights?timeRange=${range}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch voice insights');
+      }
+
+      const data = await response.json();
+      setVoiceInsights(data);
+    } catch (error) {
+      console.error('Error fetching voice insights:', error);
+      toast.error('Failed to fetch voice insights');
+    } finally {
+      setIsLoadingInsights(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVoiceInsights(timeRange);
+  }, [timeRange, fetchVoiceInsights]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -294,109 +362,40 @@ export default function HomePage() {
             <Mic className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Insights</h2>
           </div>
-          <div className="flex items-center gap-2">
-            <select
-              className="text-sm bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2"
-              aria-label="Select time range for voice insights"
-            >
-              <option>Last 7 days</option>
-              <option>Last 30 days</option>
-              <option>Last 3 months</option>
-            </select>
-          </div>
+          <TimeRangeSelector 
+            value={timeRange} 
+            onChange={(value) => setTimeRange(value)} 
+          />
         </div>
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+        
+        <VoiceInsightsPanel>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Recording Timeline */}
-            <div className="md:col-span-2 h-[200px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Recording Timeline</h3>
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 h-full flex items-center justify-center">
-                Timeline visualization will go here
-              </div>
+            <div className="md:col-span-2">
+              <RecordingTimeline 
+                data={voiceInsights?.recordingTimeline} 
+                isLoading={isLoadingInsights} 
+              />
             </div>
-
-            {/* Popular Topics */}
-            <div className="h-[200px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Tags className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Popular Topics</h3>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { topic: 'meetings', percentage: 80 },
-                  { topic: 'ideas', percentage: 60 },
-                  { topic: 'tasks', percentage: 40 },
-                  { topic: 'research', percentage: 20 }
-                ].map(({ topic, percentage }) => (
-                  <div key={topic} className="flex items-center gap-3">
-                    <div className="w-16 text-sm text-gray-600 dark:text-gray-300">{topic}</div>
-                    <div className="flex-1">
-                      <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-600">
-                        <div
-                          className="progress-bar"
-                          style={{ "--progress-width": `${percentage}%` } as React.CSSProperties}
-                        ></div>
-                      </div>
-                    </div>
-                    <div className="w-10 text-right text-xs text-gray-500 dark:text-gray-400">{percentage}%</div>
-                  </div>
-                ))}
-              </div>
+            <div>
+              <PopularTopics 
+                data={voiceInsights?.popularTopics} 
+                isLoading={isLoadingInsights} 
+              />
             </div>
-
-            {/* Recording Patterns */}
-            <div className="md:col-span-2 h-[200px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Activity className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Recording Patterns</h3>
-              </div>
-              <div className="grid grid-cols-7 gap-1 mt-4">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-                  <div key={i} className="flex flex-col gap-1">
-                    <div className="text-xs text-center text-gray-500 dark:text-gray-400 mb-1">
-                      {day}
-                    </div>
-                    {Array.from({ length: 4 }).map((_, j) => (
-                      <div
-                        key={j}
-                        className={`h-6 rounded ${
-                          Math.random() > 0.5
-                            ? 'bg-blue-500/20 dark:bg-blue-400/20'
-                            : 'bg-gray-200 dark:bg-gray-600'
-                        }`}
-                      ></div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+            <div className="md:col-span-2">
+              <RecordingPatterns 
+                data={voiceInsights?.recordingPatterns} 
+                isLoading={isLoadingInsights} 
+              />
             </div>
-
-            {/* Quick Stats */}
-            <div className="h-[200px] bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Timer className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Quick Stats</h3>
-              </div>
-              <div className="flex flex-col justify-between h-[calc(100%-2rem)]">
-                <div>
-                  <div className="text-2xl font-medium text-gray-900 dark:text-gray-100">4.5h</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Avg. weekly recording time</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-medium text-gray-900 dark:text-gray-100">8.2min</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Avg. recording length</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-medium text-gray-900 dark:text-gray-100">85%</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Notes with tags</div>
-                </div>
-              </div>
+            <div>
+              <QuickStats 
+                data={voiceInsights?.quickStats} 
+                isLoading={isLoadingInsights} 
+              />
             </div>
           </div>
-        </div>
+        </VoiceInsightsPanel>
       </div>
 
       {/* Modal */}
