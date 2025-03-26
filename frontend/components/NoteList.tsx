@@ -4,7 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Modal from './Modal';
 import { ChevronUp, Trash2, Eye, Search, Sparkles, Download } from 'lucide-react';
 import TranscriptActions from './TranscriptActions';
-import { generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
+import { generateTranscriptTitle, updateNoteTitle } from '../services/ai';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 import { deleteResource, bulkDeleteResources } from '../services/deleteService';
@@ -221,7 +221,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
     setIsRegeneratingTitle(true);
     try {
       const newTitle = await generateTranscriptTitle(selectedNote);
-      await updateTranscriptTitle(selectedNoteId, newTitle);
+      await updateNoteTitle(selectedNoteId, newTitle);
       setSelectedNoteTitle(newTitle);
       
       // Update the title in the notes list
@@ -477,7 +477,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
                         );
                         setFilteredNotes(updatedNotes);
                         setVisibleNotes(updatedNotes.slice(0, visibleNotes.length));
-                      })}
+                      }, 'note')}
                       disabled={loadingTitles[note.id]}
                       className="text-xs text-blue-500 hover:text-blue-700 disabled:text-gray-400 disabled:cursor-not-allowed"
                     >

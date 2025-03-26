@@ -439,14 +439,14 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                     </h3>
                     {(!transcript.title || transcript.title === 'Untitled Transcript') && (
                       <button
-                        onClick={() => handleGenerateTitle(transcript.id, transcript.text, (id, title) => {
-                          setVisibleTranscripts(prev => prev.map(t => 
-                            t.id === id ? { ...t, title } : t
-                          ));
-                          setFilteredTranscripts(prev => prev.map(t =>
-                            t.id === id ? { ...t, title } : t
-                          ));
-                        })}
+                      onClick={() => handleGenerateTitle(transcript.id, transcript.text, (id, title) => {
+                        setVisibleTranscripts(prev => prev.map(t => 
+                          t.id === id ? { ...t, title } : t
+                        ));
+                        setFilteredTranscripts(prev => prev.map(t =>
+                          t.id === id ? { ...t, title } : t
+                        ));
+                      }, 'transcript')}
                         className="text-xs text-blue-500 hover:text-blue-700"
                         disabled={loadingTitles[transcript.id]}
                       >
