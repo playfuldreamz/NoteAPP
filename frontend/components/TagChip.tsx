@@ -24,7 +24,7 @@ const TagChip: React.FC<TagChipProps> = ({
   
   return (
     <div 
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium min-h-[24px]
         ${isSelected 
           ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100' 
           : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
@@ -34,7 +34,7 @@ const TagChip: React.FC<TagChipProps> = ({
         ${onClick || onToggle ? 'cursor-pointer' : ''}
       `}
       onClick={disabled ? undefined : (onClick || onToggle)}
-      role={onClick || onToggle ? "button" : undefined}
+      role={onClick || onToggle ? 'button' : undefined}
       tabIndex={onClick || onToggle ? 0 : undefined}
       onKeyPress={
         onClick || onToggle 
@@ -56,7 +56,7 @@ const TagChip: React.FC<TagChipProps> = ({
               onRemove();
             }
           }}
-          className="ml-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full p-0.5 cursor-pointer"
+          className="ml-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full p-0.5 text-xs cursor-pointer"
           role="button"
           tabIndex={0}
           onKeyPress={(e) => {
