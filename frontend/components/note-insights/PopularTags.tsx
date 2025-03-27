@@ -66,8 +66,7 @@ const PopularTags: React.FC<PopularTagsProps> = ({ data, isLoading }) => {
         position: 'top' as const,
       },
       title: {
-        display: true,
-        text: 'Popular Tags',
+        display: false,
       },
     },
     scales: {
@@ -83,6 +82,7 @@ const PopularTags: React.FC<PopularTagsProps> = ({ data, isLoading }) => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
       <div className="h-64">
+        <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-4">Popular Tags</h3>
         <Bar data={chartData} options={options} />
       </div>
     </div>
