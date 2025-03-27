@@ -31,25 +31,25 @@ const NoteQuickStats: React.FC<NoteQuickStatsProps> = ({ data, isLoading }) => {
   const stats = [
     {
       label: 'Total Notes',
-      value: data.total_notes,
+      value: data.total_notes ?? 0,
       icon: FileText,
       format: (v: number) => v.toLocaleString(),
     },
     {
       label: 'Avg Words/Note',
-      value: data.avg_words_per_note,
+      value: data.avg_words_per_note ?? 0,
       icon: Edit3,
       format: (v: number) => Math.round(v).toLocaleString(),
     },
     {
       label: 'Tagged Notes',
-      value: data.tagged_notes_percentage,
+      value: data.tagged_notes_percentage ?? 0,
       icon: Tags,
       format: (v: number) => `${Math.round(v)}%`,
     },
     {
       label: 'Edits/Week',
-      value: data.edit_frequency,
+      value: data.edit_frequency ?? 0,
       icon: Clock,
       format: (v: number) => v.toFixed(1),
     },

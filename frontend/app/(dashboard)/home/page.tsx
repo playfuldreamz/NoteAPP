@@ -92,10 +92,10 @@ interface NoteInsightsData {
     }>;
   }>;
   quickStats: {
-    totalNotes: number;
-    avgWordsPerNote: number;
-    taggedNotesPercentage: number;
-    editFrequency: number;
+    total_notes: number;
+    avg_words_per_note: number;
+    tagged_notes_percentage: number;
+    edit_frequency: number;
   };
 }
 
