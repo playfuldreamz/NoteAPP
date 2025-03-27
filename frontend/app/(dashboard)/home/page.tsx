@@ -13,6 +13,12 @@ import {
   RecordingPatterns,
   QuickStats
 } from '../../../components/voice-insights';
+import {
+  NotesTimeline,
+  PopularTags,
+  WritingPatterns,
+  NoteQuickStats
+} from '../../../components/note-insights';
 
 interface Note {
   id: number;
@@ -67,6 +73,32 @@ interface VoiceInsightsData {
   };
 }
 
+interface NoteInsightsData {
+  timeRange: string;
+  notesTimeline: Array<{
+    date: string;
+    count: number;
+  }>;
+  popularTags: Array<{
+    tag: string;
+    percentage: number;
+    count: number;
+  }>;
+  writingPatterns: Array<{
+    day: string;
+    slots: Array<{
+      hour: number;
+      intensity: number;
+    }>;
+  }>;
+  quickStats: {
+    totalNotes: number;
+    avgWordsPerNote: number;
+    taggedNotesPercentage: number;
+    editFrequency: number;
+  };
+}
+
 export default function HomePage() {
   const [recentNotes, setRecentNotes] = useState<Note[]>([]);
   const [recentTranscripts, setRecentTranscripts] = useState<Transcript[]>([]);
@@ -86,6 +118,8 @@ export default function HomePage() {
   const [timeRange, setTimeRange] = useState<string>('7d');
   const [voiceInsights, setVoiceInsights] = useState<VoiceInsightsData | null>(null);
   const [isLoadingInsights, setIsLoadingInsights] = useState<boolean>(false);
+  const [noteInsights, setNoteInsights] = useState<NoteInsightsData | null>(null);
+  const [isLoadingNoteInsights, setIsLoadingNoteInsights] = useState<boolean>(false);
 
   const fetchRecentActivity = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -210,6 +244,37 @@ export default function HomePage() {
   useEffect(() => {
     fetchVoiceInsights(timeRange);
   }, [timeRange, fetchVoiceInsights]);
+
+  const fetchNoteInsights = useCallback(async (range: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setIsLoadingNoteInsights(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/note-insights?timeRange=${range}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch note insights');
+      }
+
+      const data = await response.json();
+      setNoteInsights(data);
+    } catch (error) {
+      console.error('Error fetching note insights:', error);
+      toast.error('Failed to fetch note insights');
+    } finally {
+      setIsLoadingNoteInsights(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNoteInsights(timeRange);
+  }, [timeRange, fetchNoteInsights]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -392,6 +457,49 @@ export default function HomePage() {
               <QuickStats 
                 data={voiceInsights?.quickStats} 
                 isLoading={isLoadingInsights} 
+              />
+            </div>
+          </div>
+        </VoiceInsightsPanel>
+      </div>
+
+      {/* Note Insights */}
+      <div className="col-span-full mt-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Note Insights</h2>
+          </div>
+          <TimeRangeSelector 
+            value={timeRange} 
+            onChange={(value) => setTimeRange(value)} 
+          />
+        </div>
+        
+        <VoiceInsightsPanel>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <NotesTimeline 
+                data={noteInsights?.notesTimeline} 
+                isLoading={isLoadingNoteInsights} 
+              />
+            </div>
+            <div>
+              <PopularTags 
+                data={noteInsights?.popularTags} 
+                isLoading={isLoadingNoteInsights} 
+              />
+            </div>
+            <div className="md:col-span-2">
+              <WritingPatterns 
+                data={noteInsights?.writingPatterns} 
+                isLoading={isLoadingNoteInsights} 
+              />
+            </div>
+            <div>
+              <NoteQuickStats 
+                data={noteInsights?.quickStats} 
+                isLoading={isLoadingNoteInsights} 
               />
             </div>
           </div>
