@@ -11,9 +11,10 @@ import {
   ScatterDataPoint,
   Scale,
   Tick,
+  CategoryScale,
 } from 'chart.js';
 
-ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
+ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend, CategoryScale);
 
 interface WritingPatternsProps {
   data?: Array<{
@@ -46,15 +47,22 @@ const WritingPatterns: React.FC<WritingPatternsProps> = ({ data, isLoading }) =>
   }
 
   const chartData = {
-    datasets: data.map((dayData, index) => ({
-      label: dayData.day,
-      data: dayData.slots.map(slot => ({
-        x: slot.hour,
-        y: days.indexOf(dayData.day),
-        r: slot.intensity * 10,
+    datasets: data
+      // Sort data to match the days array order
+      .sort((a, b) => days.indexOf(a.day) - days.indexOf(b.day))
+      // Remove duplicates by keeping only the first occurrence of each day
+      .filter((dayData, index, array) => 
+        array.findIndex(item => item.day === dayData.day) === index
+      )
+      .map((dayData, index) => ({
+        label: dayData.day,
+        data: dayData.slots.map(slot => ({
+          x: slot.hour,
+          y: dayData.day,
+          r: slot.intensity * 10,
+        })),
+        backgroundColor: `hsla(${(index * 360) / 7}, 70%, 50%, 0.5)`,
       })),
-      backgroundColor: `hsla(${(index * 360) / 7}, 70%, 50%, 0.5)`,
-    })),
   };
 
   const options: ChartOptions<'scatter'> = {
@@ -62,14 +70,16 @@ const WritingPatterns: React.FC<WritingPatternsProps> = ({ data, isLoading }) =>
     maintainAspectRatio: false,
     scales: {
       y: {
-        type: 'linear',
-        min: -0.5,
-        max: 6.5,
+        type: 'category',
+        labels: days,
+        reverse: true,
+        grid: {
+          display: true,
+          drawOnChartArea: true,
+          drawTicks: true,
+        },
         ticks: {
-          callback: function(this: Scale<any>, tickValue: string | number) {
-            const value = typeof tickValue === 'string' ? parseFloat(tickValue) : tickValue;
-            return days[Math.round(value)] || '';
-          }
+          padding: 10
         }
       },
       x: {
@@ -97,7 +107,7 @@ const WritingPatterns: React.FC<WritingPatternsProps> = ({ data, isLoading }) =>
         callbacks: {
           label: function(context) {
             const hour = Math.round(context.parsed.x);
-            const day = days[Math.round(context.parsed.y)];
+            const day = context.parsed.y;
             const intensity = (context.raw as ScatterDataPoint & { r: number }).r / 10;
             return `${day} ${hour}:00 - Activity: ${intensity.toFixed(2)}`;
           },
