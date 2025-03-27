@@ -19,6 +19,7 @@ import {
   WritingPatterns,
   NoteQuickStats
 } from '../../../components/note-insights';
+import { motion } from 'framer-motion';
 
 interface Note {
   id: number;
@@ -280,7 +281,12 @@ export default function HomePage() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
       {/* Quick Actions */}
-      <div className="h-full flex flex-col">
+      <motion.div 
+        className="h-full flex flex-col"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         <div className="flex items-center gap-2 mb-4">
           <Activity className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h2>
@@ -301,10 +307,15 @@ export default function HomePage() {
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Recent Activity */}
-      <div className="h-full flex flex-col">
+      <motion.div 
+        className="h-full flex flex-col"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Activity className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -345,10 +356,15 @@ export default function HomePage() {
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Recent Recordings */}
-      <div className="h-full flex flex-col">
+      <motion.div 
+        className="h-full flex flex-col"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Mic className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -389,10 +405,15 @@ export default function HomePage() {
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Statistics */}
-      <div className="h-full flex flex-col">
+      <motion.div 
+        className="h-full flex flex-col"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.3 }}
+      >
         <div className="flex items-center gap-2 mb-4">
           <ChartBar className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Statistics</h2>
@@ -419,10 +440,15 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Voice Insights */}
-      <div className="col-span-full mt-6">
+      <motion.div 
+        className="col-span-full mt-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.4 }}
+      >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Mic className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -463,10 +489,15 @@ export default function HomePage() {
             </div>
           </div>
         </VoiceInsightsPanel>
-      </div>
+      </motion.div>
 
       {/* Note Insights */}
-      <div className="col-span-full mt-6">
+      <motion.div 
+        className="col-span-full mt-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.5 }}
+      >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -507,7 +538,7 @@ export default function HomePage() {
             </div>
           </div>
         </VoiceInsightsPanel>
-      </div>
+      </motion.div>
 
       {/* Modal */}
       <Modal

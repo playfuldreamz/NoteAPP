@@ -7,6 +7,7 @@ import AudioRecorder from "../../../components/AudioRecorder";
 import TranscriptsList from "../../../components/TranscriptsList";
 import NoteSaver from "../../../components/NoteSaver";
 import NoteList from "../../../components/NoteList";
+import { motion } from 'framer-motion';
 
 interface Note {
   id: number;
@@ -19,7 +20,7 @@ interface Note {
 interface NoteListProps {
   notes: Note[];
   onDelete: (id: number) => Promise<void>;
-  onTitleUpdate: (id: number, newTitle: string) => Promise<void>; // Add this line
+  onTitleUpdate: (id: number, newTitle: string) => Promise<void>; 
 }
 
 export default function NotesHubPage() {
@@ -101,8 +102,17 @@ export default function NotesHubPage() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <div className="space-y-8">
-        <div>
+      <motion.div 
+        className="space-y-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
           <div className="flex items-center gap-3 mb-4">
             <Mic className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Audio Recorder</h2>
@@ -112,8 +122,12 @@ export default function NotesHubPage() {
             updateTranscripts={fetchTranscripts}
             transcript={transcript}
           />
-        </div>
-        <div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+        >
           <div className="flex items-center gap-3 mb-4">
             <ListMusic className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Transcripts</h2>
@@ -122,10 +136,19 @@ export default function NotesHubPage() {
             transcripts={transcripts}
             updateTranscripts={fetchTranscripts}
           />
-        </div>
-      </div>
-      <div className="space-y-8">
-        <div>
+        </motion.div>
+      </motion.div>
+      <motion.div 
+        className="space-y-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+        >
           <div className="flex items-center gap-3 mb-4">
             <Save className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Save Note</h2>
@@ -134,8 +157,12 @@ export default function NotesHubPage() {
             transcript={transcript}
             onSave={fetchNotes}
           />
-        </div>
-        <div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.4 }}
+        >
           <div className="flex items-center gap-3 mb-4">
             <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Notes</h2>
@@ -145,8 +172,8 @@ export default function NotesHubPage() {
             onDelete={handleDeleteNote}
             onTitleUpdate={fetchNotes}
           />
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
