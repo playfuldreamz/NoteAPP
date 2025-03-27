@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Pause } from 'lucide-react';
+import { Mic, MicOff, Pause, Square } from 'lucide-react';
 
 interface RecordingControlsProps {
   isRecording: boolean;
@@ -71,7 +71,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
           className="p-2 rounded-lg bg-gray-500 hover:bg-gray-600 text-white"
           title="Stop Recording"
         >
-          <MicOff className="w-5 h-5" />
+          <Square className="w-5 h-5" />
         </button>
       )}
       
