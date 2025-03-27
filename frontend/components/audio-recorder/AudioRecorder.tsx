@@ -2,13 +2,11 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import Link from 'next/link';
-import { Settings } from 'lucide-react'; // Only keep Settings icon if needed here
-
-import { generateTranscriptTitle, enhanceTranscript, InvalidAPIKeyError } from '../../services/ai';
+import { Settings } from 'lucide-react';
 import { useTranscription } from '../../context/TranscriptionContext';
 import type { TranscriptionResult, ProviderType } from '../../services/transcription/types';
 import { TranscriptionProviderFactory } from '../../services/transcription/providerFactory';
+import { generateTranscriptTitle, enhanceTranscript as enhanceTranscriptAPI, InvalidAPIKeyError } from '../../services/ai';
 
 // Import the new modular components
 import RecordingControls from './RecordingControls';
@@ -272,39 +270,46 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
     }
   };
 
-  // Enhance transcript
-  const handleEnhanceTranscript = async () => {
-    if (!originalTranscript.trim()) {
-      toast.info('Nothing to enhance. Record something first!');
+  // Function to enhance the transcript using AI
+  const enhanceTranscript = async () => {
+    if (!originalTranscript || originalTranscript.trim() === '') {
+      toast.info('No transcript to enhance');
       return;
     }
-    
-    setIsEnhancing(true);
-    
+
     try {
-      const result = await enhanceTranscript(originalTranscript);
-      setEnhancedTranscript(result.enhanced);
+      setIsEnhancing(true);
+      const enhanced = await enhanceTranscriptAPI(originalTranscript);
+      // Make sure we're setting a string value, not an object
+      setEnhancedTranscript(typeof enhanced === 'string' ? enhanced : enhanced.enhanced || '');
       setShowEnhanced(true);
     } catch (error) {
+      console.error('Error enhancing transcript:', error);
       if (error instanceof InvalidAPIKeyError) {
-        toast.error('Invalid API key. Please check your settings.');
-        setShowSettings(true);
+        toast.error('Invalid API key for AI enhancement. Please check your settings.');
       } else {
-        toast.error(`Error enhancing transcript: ${(error as Error).message}`);
+        toast.error('Failed to enhance transcript');
       }
     } finally {
       setIsEnhancing(false);
     }
   };
 
-  // Save transcript
+  // Function to generate title and save transcript
   const handleSaveTranscript = async () => {
-    const transcriptToSave = showEnhanced && enhancedTranscript ? enhancedTranscript : originalTranscript;
-    const title = await generateTranscriptTitle(transcriptToSave);
-    
-    setIsLoading(true);
-    
+    if (!originalTranscript || originalTranscript.trim() === '') {
+      toast.info('No transcript to save');
+      return;
+    }
+
     try {
+      setIsLoading(true);
+      
+      // Generate a title for the transcript
+      const title = await generateTranscriptTitle(originalTranscript);
+      
+      const transcriptToSave = showEnhanced && enhancedTranscript ? enhancedTranscript : originalTranscript;
+      
       const token = localStorage.getItem('token');
       if (!token) {
         toast.error('You must be logged in to save transcripts');
@@ -379,13 +384,36 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
                         onStop={stopRecording}
                         onPause={pauseRecording}
                     />
-                    <RecorderSettings
-                        showSettings={showSettings}
-                        toggleSettings={() => setShowSettings(!showSettings)}
-                    />
+                    <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-medium border border-gray-200 dark:border-gray-600">
+                            <div className={`w-1.5 h-1.5 rounded-full ${selectedProvider === 'webspeech' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+                            <span className="text-gray-700 dark:text-gray-300">
+                                {selectedProvider === 'webspeech' ? 'Web Speech' : 
+                                 selectedProvider === 'assemblyai' ? 'AssemblyAI' :
+                                 selectedProvider === 'deepgram' ? 'Deepgram' :
+                                 selectedProvider === 'whisper' ? 'Whisper' :
+                                 selectedProvider === 'azure' ? 'Azure Speech' : selectedProvider}
+                            </span>
+                        </div>
+                        <button
+                          onClick={() => setShowSettings(!showSettings)}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                          title="Transcription Settings"
+                        >
+                          <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                        </button>
+                    </div>
                 </div>
             </div>
             
+            {/* Settings dropdown appears here, between controls and transcript */}
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showSettings ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                <RecorderSettings
+                    showSettings={showSettings}
+                    toggleSettings={() => setShowSettings(!showSettings)}
+                />
+            </div>
+
             <TranscriptionDisplay
                 originalTranscript={originalTranscript}
                 interimTranscript=""
@@ -401,7 +429,7 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
                 isEnhancing={isEnhancing}
                 isSaving={isLoading}
                 canEnhance={true}
-                onEnhance={handleEnhanceTranscript}
+                onEnhance={enhanceTranscript}
                 onSave={handleSaveTranscript}
                 onReset={handleResetTranscript}
             />

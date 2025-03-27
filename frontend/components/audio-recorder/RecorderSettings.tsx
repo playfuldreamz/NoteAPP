@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Loader, Check, AlertCircle } from 'lucide-react';
+import { Loader, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useTranscription } from '../../context/TranscriptionContext';
 import { TranscriptionProviderFactory } from '../../services/transcription/providerFactory';
@@ -131,110 +131,89 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
 
 
   return (
-    <div className="relative">
-      <div className="flex items-center gap-1">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-medium border border-gray-200 dark:border-gray-600">
-                <div className={`w-1.5 h-1.5 rounded-full ${isKeyValid || activeProvider === 'webspeech' ? 'bg-green-500' : isKeyValid === false ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
-                <span className="text-gray-700 dark:text-gray-300">
-                    {PROVIDER_DISPLAY_NAMES[activeProvider]}
-                </span>
-            </div>
-          <button
-            onClick={toggleSettings}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-            title="Transcription Settings"
+    <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 w-full">
+      <div className="space-y-4">
+        {/* Provider Selection */}
+        <div>
+          <label htmlFor="provider-select" className="block text-sm font-medium mb-1 dark:text-gray-200">
+            Transcription Provider
+          </label>
+          <select
+            id="provider-select"
+            value={selectedProvider}
+            onChange={(e) => handleProviderChange(e.target.value as ProviderType)}
+            className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
           >
-            <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          </button>
-      </div>
-
-      {/* Settings Panel */}
-      {showSettings && (
-         <div className="absolute right-0 mt-2 w-72 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20">
-          <div className="space-y-4">
-            {/* Provider Selection */}
-            <div>
-              <label htmlFor="provider-select" className="block text-sm font-medium mb-1 dark:text-gray-200">
-                Transcription Provider
-              </label>
-              <select
-                id="provider-select"
-                value={selectedProvider}
-                onChange={(e) => handleProviderChange(e.target.value as ProviderType)}
-                className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
-              >
-                {availableProviders.map((p) => (
-                  <option key={p} value={p}>
-                    {PROVIDER_DISPLAY_NAMES[p]}
-                  </option>
-                ))}
-              </select>
-                <div className="flex items-center text-xs mt-1 h-4">
-                    {selectedProvider !== 'webspeech' && ( // Only show status for non-webspeech
-                         <>
-                            <span className="mr-1">Status:</span>
-                            {isValidatingKey ? (
-                            <span className="flex items-center text-blue-500">
-                                <Loader className="w-3 h-3 mr-1 animate-spin" /> Validating...
-                            </span>
-                            ) : isKeyValid ? (
-                            <span className="flex items-center text-green-500">
-                                <Check className="w-3 h-3 mr-1" /> Valid
-                            </span>
-                            ) : isKeyValid === false ? (
-                            <span className="flex items-center text-red-500">
-                                <AlertCircle className="w-3 h-3 mr-1" /> Invalid Key
-                            </span>
-                            ) : (
-                            <span className="flex items-center text-yellow-500">
-                                <AlertCircle className="w-3 h-3 mr-1" /> Key Required
-                            </span>
-                            )}
-                        </>
-                    )}
-               </div>
-            </div>
-
-            {/* Provider-specific Settings */}
-            {selectedProvider !== 'webspeech' && (
-              <div>
-                <label htmlFor="api-key" className="block text-sm font-medium mb-1 dark:text-gray-200">
-                  API Key
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    id="api-key"
-                    value={apiKeyInput}
-                    onChange={(e) => {
-                      setApiKeyInput(e.target.value);
-                      setIsKeyValid(null); // Reset validation status on change
-                    }}
-                    className="flex-1 p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
-                    placeholder={`Enter ${PROVIDER_DISPLAY_NAMES[selectedProvider]} API Key`}
-                  />
-                  <button
-                    onClick={handleApplyKey}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                      isValidatingKey
-                        ? 'bg-gray-400 cursor-not-allowed text-white'
-                        : 'bg-blue-500 hover:bg-blue-600 text-white'
-                    }`}
-                    disabled={isValidatingKey || !apiKeyInput}
-                  >
-                    {isValidatingKey ? (
-                      <Loader className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Apply'
-                    )}
-                  </button>
-                </div>
-              </div>
+            {availableProviders.map((p) => (
+              <option key={p} value={p}>
+                {PROVIDER_DISPLAY_NAMES[p]}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center text-xs mt-1 h-4">
+            {selectedProvider !== 'webspeech' && ( // Only show status for non-webspeech
+              <>
+                <span className="mr-1">Status:</span>
+                {isValidatingKey ? (
+                  <span className="flex items-center text-blue-500">
+                    <Loader className="w-3 h-3 mr-1 animate-spin" /> Validating...
+                  </span>
+                ) : isKeyValid ? (
+                  <span className="flex items-center text-green-500">
+                    <Check className="w-3 h-3 mr-1" /> Valid
+                  </span>
+                ) : isKeyValid === false ? (
+                  <span className="flex items-center text-red-500">
+                    <AlertCircle className="w-3 h-3 mr-1" /> Invalid Key
+                  </span>
+                ) : (
+                  <span className="flex items-center text-yellow-500">
+                    <AlertCircle className="w-3 h-3 mr-1" /> Key Required
+                  </span>
+                )}
+              </>
             )}
-            {/* Placeholder for other settings like language, etc. */}
           </div>
         </div>
-      )}
+
+        {/* Provider-specific Settings */}
+        {selectedProvider !== 'webspeech' && (
+          <div>
+            <label htmlFor="api-key" className="block text-sm font-medium mb-1 dark:text-gray-200">
+              API Key
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                id="api-key"
+                value={apiKeyInput}
+                onChange={(e) => {
+                  setApiKeyInput(e.target.value);
+                  setIsKeyValid(null); // Reset validation status on change
+                }}
+                className="flex-1 p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+                placeholder={`Enter ${PROVIDER_DISPLAY_NAMES[selectedProvider]} API Key`}
+              />
+              <button
+                onClick={handleApplyKey}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                  isValidatingKey
+                    ? 'bg-gray-400 cursor-not-allowed text-white'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
+                disabled={isValidatingKey || !apiKeyInput}
+              >
+                {isValidatingKey ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Apply'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Placeholder for other settings like language, etc. */}
+      </div>
     </div>
   );
 };
