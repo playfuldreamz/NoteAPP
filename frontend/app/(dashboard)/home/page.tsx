@@ -5,8 +5,8 @@ import { Clock, Calendar, Activity, Star, Mic, FileText, Tags, Timer, Search, Ch
 import Link from 'next/link';
 import { toast } from 'react-toastify';
 import Modal from '../../../components/Modal';
+import TimeRangeSelector from '../../../components/shared/TimeRangeSelector';
 import {
-  TimeRangeSelector,
   VoiceInsightsPanel,
   RecordingTimeline,
   PopularTopics,
@@ -115,7 +115,8 @@ export default function HomePage() {
     itemId: 0,
     type: 'note'
   });
-  const [timeRange, setTimeRange] = useState<string>('7d');
+  const [voiceTimeRange, setVoiceTimeRange] = useState<string>('7d');
+  const [noteTimeRange, setNoteTimeRange] = useState<string>('7d');
   const [voiceInsights, setVoiceInsights] = useState<VoiceInsightsData | null>(null);
   const [isLoadingInsights, setIsLoadingInsights] = useState<boolean>(false);
   const [noteInsights, setNoteInsights] = useState<NoteInsightsData | null>(null);
@@ -242,8 +243,8 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    fetchVoiceInsights(timeRange);
-  }, [timeRange, fetchVoiceInsights]);
+    fetchVoiceInsights(voiceTimeRange);
+  }, [voiceTimeRange, fetchVoiceInsights]);
 
   const fetchNoteInsights = useCallback(async (range: string) => {
     const token = localStorage.getItem('token');
@@ -273,8 +274,8 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    fetchNoteInsights(timeRange);
-  }, [timeRange, fetchNoteInsights]);
+    fetchNoteInsights(noteTimeRange);
+  }, [noteTimeRange, fetchNoteInsights]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -428,8 +429,9 @@ export default function HomePage() {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Voice Insights</h2>
           </div>
           <TimeRangeSelector 
-            value={timeRange} 
-            onChange={(value) => setTimeRange(value)} 
+            value={voiceTimeRange} 
+            onChange={(value: string) => setVoiceTimeRange(value)}
+            ariaLabel="Select time range for voice insights"
           />
         </div>
         
@@ -471,8 +473,9 @@ export default function HomePage() {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Note Insights</h2>
           </div>
           <TimeRangeSelector 
-            value={timeRange} 
-            onChange={(value) => setTimeRange(value)} 
+            value={noteTimeRange} 
+            onChange={(value: string) => setNoteTimeRange(value)}
+            ariaLabel="Select time range for note insights"
           />
         </div>
         
