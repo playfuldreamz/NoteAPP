@@ -49,3 +49,29 @@
 .dark .progress-bar {
   background-color: theme('colors.blue.400');
 }
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: theme('colors.gray.400') transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: theme('colors.gray.400');
+  border-radius: 3px;
+}
+
+.dark .custom-scrollbar {
+  scrollbar-color: theme('colors.gray.600') transparent;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: theme('colors.gray.600');
+}
