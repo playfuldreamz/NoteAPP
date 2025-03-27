@@ -32,7 +32,12 @@ const PopularTopics: React.FC<PopularTopicsProps> = ({ data = [], isLoading = fa
         <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
           {data.map(({ topic, percentage, count }) => (
             <div key={topic} className="flex items-center gap-3">
-              <div className="w-16 text-sm text-gray-600 dark:text-gray-300 truncate">{topic}</div>
+              <div 
+                className="w-16 text-sm text-gray-600 dark:text-gray-300 truncate"
+                title={topic}  
+              >
+                {topic}
+              </div>
               <div className="flex-1">
                 <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-600">
                   <div
