@@ -84,12 +84,12 @@ const getVoiceInsights = async (userId, timeRange) => {
         });
 
         // Calculate quick stats
-        const totalDurationMs = transcripts.reduce((sum, t) => sum + (t.duration || 0), 0);
-        const totalDurationHours = totalDurationMs / (1000 * 60 * 60);
+        const totalDurationSeconds = transcripts.reduce((sum, t) => sum + (t.duration || 0), 0);
+        const totalDurationHours = totalDurationSeconds / (60 * 60);  // Convert seconds to hours
         const weeklyRecordingTime = (totalDurationHours * 7) / days;
         
         const avgRecordingLength = transcripts.length > 0 
-          ? (totalDurationMs / transcripts.length) / (1000 * 60) 
+          ? (totalDurationSeconds / transcripts.length) / 60  // Convert seconds to minutes
           : 0;
 
         const transcriptsWithTags = transcripts.filter(t => {
