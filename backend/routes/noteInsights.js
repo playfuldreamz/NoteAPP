@@ -100,20 +100,26 @@ router.get('/', async (req, res) => {
         FROM notes
         WHERE user_id = ? AND timestamp >= datetime(?)
         GROUP BY day, hour
+        HAVING intensity > 0
+      ),
+      active_slots AS (
+        SELECT 
+          day,
+          json_group_array(
+            json_object(
+              'hour', hour,
+              'intensity', intensity
+            )
+          ) as slots
+        FROM note_patterns
+        GROUP BY day
       )
       SELECT 
-        g.day,
-        json_group_array(
-          json_object(
-            'hour', g.hour,
-            'intensity', COALESCE(np.intensity, 0)
-          )
-        ) as slots
-      FROM day_hour_grid g
-      LEFT JOIN note_patterns np ON g.day = np.day AND g.hour = np.hour
-      GROUP BY g.day
+        day,
+        slots
+      FROM active_slots
       ORDER BY 
-        CASE g.day
+        CASE day
           WHEN 'Sunday' THEN 0
           WHEN 'Monday' THEN 1
           WHEN 'Tuesday' THEN 2
