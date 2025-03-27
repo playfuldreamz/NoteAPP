@@ -230,6 +230,14 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         if (onTagsUpdate) {
           onTagsUpdate(updatedTags);
         }
+        
+        // Immediately remove the selected tag from suggestions
+        setSuggestedTags(prevSuggestions => 
+          prevSuggestions.filter(suggestion => 
+            suggestion.toLowerCase() !== tagName.toLowerCase()
+          )
+        );
+        
         // Don't show toast here since it's just selecting an existing tag
         return;
       }
@@ -243,6 +251,14 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       if (onTagsUpdate) {
         onTagsUpdate(updatedTags);
       }
+      
+      // Immediately remove the selected tag from suggestions
+      setSuggestedTags(prevSuggestions => 
+        prevSuggestions.filter(suggestion => 
+          suggestion.toLowerCase() !== tagName.toLowerCase()
+        )
+      );
+      
       // Only show toast for newly created tags
       toast.success('Tag created successfully');
     } catch (error) {
@@ -268,47 +284,77 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     setIsSaving(true);
 
     try {
-      const newTag = await createTag(tagName);
-      if (!newTag?.id) throw new Error('Invalid response from createTag');
+      // First check if tag already exists in the user's tags
+      const existingTag = tags.find(tag => 
+        tag.name.toLowerCase() === tagName.toLowerCase()
+      );
+      
+      if (existingTag) {
+        // Check if this tag is already on this item
+        if (selectedTags.some(tag => tag.id === existingTag.id)) {
+          toast.info('This tag is already added to this item');
+          return null;
+        }
+        
+        // Add the existing tag to the current item
+        const response = await addTagToItem(normalizedType, itemId, existingTag);
+        
+        if (response) {
+          // Update UI state
+          const updatedTags = [...selectedTags, existingTag];
+          setSelectedTags(updatedTags);
+          updateItemTags(itemId, normalizedType, updatedTags);
+          if (onTagsUpdate) {
+            onTagsUpdate(updatedTags);
+          }
+          
+          toast.success('Tag added successfully');
+          return existingTag;
+        }
+      } else {
+        // Tag doesn't exist, create a new one
+        const newTag = await createTag(tagName);
+        if (!newTag?.id) throw new Error('Invalid response from createTag');
 
-      // Add the tag to the item immediately
-      const response = await addTagToItem(normalizedType, itemId, newTag);
+        // Add the tag to the item immediately
+        const response = await addTagToItem(normalizedType, itemId, newTag);
 
-      if (!response || typeof response.id !== 'number') {
-        throw new Error('Invalid response from addTagToItem');
+        if (!response || typeof response.id !== 'number') {
+          throw new Error('Invalid response from addTagToItem');
+        }
+
+        const addedTag: Tag = {
+          id: response.id,
+          name: response.name,
+          description: response.description || ''
+        };
+
+        // Update the UI states
+        setTags(prev => [...prev, newTag]);
+        const updatedSelectedTags = [...selectedTags, addedTag];
+        setSelectedTags(updatedSelectedTags);
+        updateItemTags(itemId, normalizedType, updatedSelectedTags);
+        if (onTagsUpdate) {
+          onTagsUpdate(updatedSelectedTags);
+        }
+
+        toast.success('Tag created and added successfully');
+        return newTag;
       }
-
-      const addedTag: Tag = {
-        id: response.id,
-        name: response.name,
-        description: response.description || ''
-      };
-
-      // Update the UI states
-      setTags(prev => [...prev, newTag]);
-      const updatedSelectedTags = [...selectedTags, addedTag];
-      setSelectedTags(updatedSelectedTags);
-      updateItemTags(itemId, normalizedType, updatedSelectedTags);
-      if (onTagsUpdate) {
-        onTagsUpdate(updatedSelectedTags);
-      }
-
-      toast.success('Tag created and added successfully');
-      return newTag;
+      
+      return null;
     } catch (error) {
-      console.error('Error creating tag:', error);
+      console.error('Error handling tag creation:', error);
       if (error instanceof Error) {
         if (error.message.includes('401')) {
           toast.error('Please log in to create tags');
         } else if (error.message.includes('400')) {
           toast.error('Invalid tag name');
-        } else if (error.message.includes('You already have this tag')) {
-          toast.error('You already have this tag');
         } else {
-          toast.error('Failed to create tag');
+          toast.error('Failed to create or add tag');
         }
       } else {
-        toast.error('Failed to create tag');
+        toast.error('Failed to create or add tag');
       }
       return null;
     } finally {
