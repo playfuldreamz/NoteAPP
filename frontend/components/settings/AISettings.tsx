@@ -93,8 +93,23 @@ export const AISettings: React.FC<AISettingsProps> = ({
   }, [apiKey, tempProvider]);
 
   useEffect(() => {
-    // Initialize savedApiKeys with the initial selectedProvider values
+    // Load saved keys from storage first
+    const storageKey = getUserStorageKey();
+    let existingSavedKeys = {};
+    if (storageKey) {
+      try {
+        const storedKeys = localStorage.getItem(storageKey);
+        if (storedKeys) {
+          existingSavedKeys = JSON.parse(storedKeys);
+        }
+      } catch (error) {
+        console.error('Error loading saved API keys:', error);
+      }
+    }
+
+    // Merge current provider's key with existing saved keys
     setSavedApiKeys({
+      ...existingSavedKeys,
       [selectedProvider.provider]: {
         key: selectedProvider.apiKey,
         source: selectedProvider.source
