@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, FileText, Settings, LogOut, NotebookPen } from 'lucide-react';
+import { Home, FileText, Settings, LogOut, LayoutGrid } from 'lucide-react';
 
 interface SidebarProps {
   onLogout: () => void;
@@ -33,7 +33,7 @@ export default function Sidebar({ onLogout, onOpenSettings }: SidebarProps) {
             }`}
             title="Notes Hub"
           >
-            <NotebookPen className="w-5 h-5" />
+            <LayoutGrid className="w-5 h-5" />
           </Link>
           <button
             className="flex items-center justify-center h-10 w-10 mx-auto rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
