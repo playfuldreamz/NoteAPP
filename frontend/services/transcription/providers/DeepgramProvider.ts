@@ -7,9 +7,11 @@ export class DeepgramProvider implements TranscriptionProvider {
   private onResultCallback: ((result: TranscriptionResult) => void) | null = null;
   private onErrorCallback: ((error: Error) => void) | null = null;
   private apiKey: string;
+  private finalTranscript: string = '';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+    this.finalTranscript = '';
   }
 
   name = 'deepgram';
@@ -45,10 +47,14 @@ export class DeepgramProvider implements TranscriptionProvider {
 
 async initialize(options?: TranscriptionOptions): Promise<void> {
   // No need to request microphone access here
+  this.finalTranscript = '';
 }
 
 async start(): Promise<void> {
   try {
+    // Reset the final transcript when starting a new session
+    this.finalTranscript = '';
+    
     // Request microphone access
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     
@@ -90,11 +96,26 @@ async start(): Promise<void> {
           const transcript = data.channel.alternatives[0].transcript;
           const confidence = data.channel.alternatives[0].confidence;
           
-          this.onResultCallback({
-            transcript,
-            isFinal: data.is_final,
-            confidence,
-          });
+          if (data.is_final && transcript.trim()) {
+            // Add to final transcript when we get a final result
+            this.finalTranscript += ' ' + transcript;
+            this.finalTranscript = this.finalTranscript.trim();
+            
+            this.onResultCallback({
+              transcript: this.finalTranscript,
+              isFinal: true,
+              confidence,
+            });
+          } else {
+            // For interim results, combine with the final transcript
+            const combinedTranscript = this.finalTranscript + (this.finalTranscript && transcript ? ' ' : '') + transcript;
+            
+            this.onResultCallback({
+              transcript: combinedTranscript,
+              isFinal: false,
+              confidence,
+            });
+          }
         }
       };
 
@@ -132,6 +153,15 @@ async start(): Promise<void> {
     if (this.socket) {
       this.socket.close();
     }
+    
+    // Send the final transcript one last time
+    if (this.onResultCallback && this.finalTranscript) {
+      this.onResultCallback({
+        transcript: this.finalTranscript,
+        isFinal: true,
+        confidence: 1.0,
+      });
+    }
   }
 
   onResult(callback: (result: TranscriptionResult) => void): void {
@@ -164,5 +194,6 @@ async start(): Promise<void> {
 
     this.onResultCallback = null;
     this.onErrorCallback = null;
+    this.finalTranscript = '';
   }
 }

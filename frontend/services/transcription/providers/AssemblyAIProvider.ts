@@ -7,9 +7,11 @@ export class AssemblyAIProvider implements TranscriptionProvider {
   private onResultCallback: ((result: TranscriptionResult) => void) | null = null;
   private onErrorCallback: ((error: Error) => void) | null = null;
   private apiKey: string;
+  private finalTranscript: string = '';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+    this.finalTranscript = '';
   }
 
   name = 'assemblyai';
@@ -47,6 +49,9 @@ export class AssemblyAIProvider implements TranscriptionProvider {
 
   async initialize(options?: TranscriptionOptions): Promise<void> {
     try {
+      // Reset the final transcript when initializing
+      this.finalTranscript = '';
+      
       const token = await this.getToken();
       
       // Get microphone stream
@@ -59,10 +64,24 @@ export class AssemblyAIProvider implements TranscriptionProvider {
         const data = JSON.parse(message.data);
         if (data.message_type === 'FinalTranscript' || data.message_type === 'PartialTranscript') {
           if (this.onResultCallback) {
-            this.onResultCallback({
-              transcript: data.text,
-              isFinal: data.message_type === 'FinalTranscript'
-            });
+            if (data.message_type === 'FinalTranscript' && data.text.trim()) {
+              // Add to final transcript when we get a final result
+              this.finalTranscript += ' ' + data.text;
+              this.finalTranscript = this.finalTranscript.trim();
+              
+              this.onResultCallback({
+                transcript: this.finalTranscript,
+                isFinal: true
+              });
+            } else if (data.message_type === 'PartialTranscript') {
+              // For partial results, combine with the final transcript
+              const combinedTranscript = this.finalTranscript + (this.finalTranscript && data.text ? ' ' : '') + data.text;
+              
+              this.onResultCallback({
+                transcript: combinedTranscript,
+                isFinal: false
+              });
+            }
           }
         }
       };
@@ -115,6 +134,8 @@ export class AssemblyAIProvider implements TranscriptionProvider {
       throw new Error('AssemblyAI provider not initialized');
     }
 
+    // Reset the final transcript when starting a new session
+    this.finalTranscript = '';
     this.mediaRecorder.start(100); // Send data every 100ms
   }
 
@@ -122,6 +143,15 @@ export class AssemblyAIProvider implements TranscriptionProvider {
     if (this.mediaRecorder) {
       this.mediaRecorder.stop();
     }
+    
+    // Send the final transcript one last time
+    if (this.onResultCallback && this.finalTranscript) {
+      this.onResultCallback({
+        transcript: this.finalTranscript,
+        isFinal: true
+      });
+    }
+    
     this.cleanup();
   }
 
@@ -147,5 +177,7 @@ export class AssemblyAIProvider implements TranscriptionProvider {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
     }
+    
+    this.finalTranscript = '';
   }
 }
