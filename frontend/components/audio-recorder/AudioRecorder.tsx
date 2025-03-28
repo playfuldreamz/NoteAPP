@@ -11,6 +11,7 @@ import RecorderSettings from './RecorderSettings';
 import TranscriptionDisplay from './TranscriptionDisplay';
 import RecorderActions from './RecorderActions';
 import ProviderIndicator from './ProviderIndicator';
+import WaveformVisualizer from './WaveformVisualizer';
 
 interface AudioRecorderContainerProps {
   setTranscript: React.Dispatch<React.SetStateAction<string>>; // Keep if parent needs final transcript
@@ -69,10 +70,11 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
   const handleStartRecording = async () => {
     if (recorder.isRecording && recorder.isPaused) {
       // Resume recording
-      recorder.startRecording();
+      recorder.resumeRecording();
       return;
     }
     
+    // Start speech recognition and recording
     const started = await transcription.startTranscription();
     if (started) {
       recorder.startRecording();
@@ -108,8 +110,44 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
           </div>
         </div>
         
-        {/* Settings dropdown appears here, between controls and transcript */}
-        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showSettings ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+        {/* Create a separate container for the waveform to avoid overlap */}
+        <div 
+          style={{ 
+            margin: recorder.isRecording && !recorder.isPaused ? '0' : '0',
+            padding: '0',
+            height: recorder.isRecording && !recorder.isPaused ? 'auto' : '0',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Waveform Visualizer - Only visible when actively recording (not paused) */}
+          <div 
+            className={`transition-all duration-300 ease-in-out ${recorder.isRecording && !recorder.isPaused ? 'opacity-100' : 'opacity-0'}`}
+            style={{ 
+              height: recorder.isRecording && !recorder.isPaused ? '75px' : '0',
+              overflow: 'hidden'
+            }}
+          >
+            <WaveformVisualizer 
+              isRecording={recorder.isRecording}
+              isPaused={recorder.isPaused}
+              audioStream={recorder.audioStream}
+              height={75}
+              theme={typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'}
+            />
+          </div>
+        </div>
+        
+        {/* Settings dropdown appears here, between waveform and transcript */}
+        <div 
+          className={`transition-all duration-300 ease-in-out overflow-hidden ${showSettings ? 'opacity-100' : 'opacity-0'}`}
+          style={{
+            height: showSettings ? 'auto' : '0',
+            margin: showSettings ? '1rem 0' : '0',
+            padding: showSettings ? '0.5rem 0' : '0',
+            position: 'relative',
+            visibility: showSettings ? 'visible' : 'hidden'
+          }}
+        >
           <RecorderSettings
             showSettings={showSettings}
             toggleSettings={() => setShowSettings(!showSettings)}

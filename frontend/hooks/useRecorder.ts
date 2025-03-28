@@ -90,19 +90,28 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
       return;
     }
     
-    // Setup audio context if not already done
-    if (!audioStream) {
-      const success = await setupAudioContext();
-      if (!success) return;
-    }
-    
-    setIsRecording(true);
-    setIsPaused(false);
-    setStartTime(Date.now());
-    setPausedTime(0); // Reset paused time when starting a new recording
-    
-    if (options.onRecordingStart) {
-      options.onRecordingStart();
+    // Always create a new audio stream when starting a new recording
+    try {
+      // Stop any existing stream
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+      }
+      
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setAudioStream(stream);
+      
+      setIsRecording(true);
+      setIsPaused(false);
+      setStartTime(Date.now());
+      setPausedTime(0);
+      
+      // Call the onRecordingStart callback if provided
+      if (options.onRecordingStart) {
+        options.onRecordingStart();
+      }
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
     }
   };
 
