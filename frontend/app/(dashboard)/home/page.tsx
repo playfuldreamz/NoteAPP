@@ -72,6 +72,7 @@ interface VoiceInsightsData {
     avgRecordingLength: number;
     taggedNotesPercentage: number;
   };
+  tagsTimeline: any;
 }
 
 interface NoteInsightsData {
@@ -98,6 +99,7 @@ interface NoteInsightsData {
     tagged_notes_percentage: number;
     edit_frequency: number;
   };
+  tagsTimeline: any;
 }
 
 export default function HomePage() {
@@ -497,6 +499,7 @@ export default function HomePage() {
             <div className="md:col-span-2">
               <RecordingTimeline 
                 data={voiceInsights?.recordingTimeline} 
+                tagsData={voiceInsights?.tagsTimeline}
                 isLoading={isLoadingInsights} 
               />
             </div>
@@ -546,6 +549,7 @@ export default function HomePage() {
             <div className="md:col-span-2">
               <NotesTimeline 
                 data={noteInsights?.notesTimeline} 
+                tagsData={noteInsights?.tagsTimeline}
                 isLoading={isLoadingNoteInsights} 
               />
             </div>

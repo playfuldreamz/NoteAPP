@@ -33,6 +33,18 @@ const getVoiceInsights = async (userId, timeRange) => {
       ORDER BY t.date ASC
     `;
 
+    // Get tag creation data for transcripts
+    const tagCreationQuery = `
+      SELECT DATE(ut.created_at) as date, COUNT(*) as count
+      FROM user_tags ut
+      JOIN item_tags it ON ut.tag_id = it.tag_id
+      WHERE ut.user_id = ? 
+      AND ut.created_at >= datetime(?)
+      AND it.item_type = 'transcript'
+      GROUP BY DATE(ut.created_at)
+      ORDER BY date ASC
+    `;
+
     return new Promise((resolve, reject) => {
       db.all(query, [userId, startDate.toISOString()], (err, transcripts) => {
         if (err) {
@@ -64,59 +76,68 @@ const getVoiceInsights = async (userId, timeRange) => {
           });
         });
 
-        // Calculate popular topics
-        const popularTopics = Array.from(topicsMap.entries())
-          .map(([topic, count]) => ({
-            topic,
-            count,
-            percentage: Math.round((count / Math.max(1, totalTags)) * 100)
-          }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 10);
-
-        // Calculate recording patterns
-        const patterns = {};
-        const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        transcripts.forEach(transcript => {
-          const date = new Date(transcript.created_at);
-          const day = daysOfWeek[date.getDay()];
-          const hour = date.getHours();
-          const slot = Math.floor(hour / 6);
-
-          if (!patterns[day]) {
-            patterns[day] = { 
-              day, 
-              slots: Array(4).fill(0).map((_, i) => ({ hour: i * 6, intensity: 0 }))
-            };
+        // Get tag creation timeline data
+        db.all(tagCreationQuery, [userId, startDate.toISOString()], (tagErr, tagTimeline) => {
+          if (tagErr) {
+            console.error('Database error:', tagErr);
+            return reject(tagErr);
           }
+
+          // Calculate popular topics
+          const popularTopics = Array.from(topicsMap.entries())
+            .map(([topic, count]) => ({
+              topic,
+              count,
+              percentage: Math.round((count / Math.max(1, totalTags)) * 100)
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+
+          // Calculate recording patterns
+          const patterns = {};
+          const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          transcripts.forEach(transcript => {
+            const date = new Date(transcript.created_at);
+            const day = daysOfWeek[date.getDay()];
+            const hour = date.getHours();
+            const slot = Math.floor(hour / 6);
+
+            if (!patterns[day]) {
+              patterns[day] = { 
+                day, 
+                slots: Array(4).fill(0).map((_, i) => ({ hour: i * 6, intensity: 0 }))
+              };
+            }
+            
+            patterns[day].slots[slot].intensity = Math.min(3, patterns[day].slots[slot].intensity + 1);
+          });
+
+          // Calculate quick stats
+          const totalDurationSeconds = transcripts.reduce((sum, t) => sum + (t.duration || 0), 0);
+          const totalDurationHours = totalDurationSeconds / (60 * 60);  // Convert seconds to hours
+          const weeklyRecordingTime = (totalDurationHours * 7) / days;
           
-          patterns[day].slots[slot].intensity = Math.min(3, patterns[day].slots[slot].intensity + 1);
-        });
+          const avgRecordingLength = transcripts.length > 0 
+            ? (totalDurationSeconds / transcripts.length) / 60  // Convert seconds to minutes
+            : 0;
 
-        // Calculate quick stats
-        const totalDurationSeconds = transcripts.reduce((sum, t) => sum + (t.duration || 0), 0);
-        const totalDurationHours = totalDurationSeconds / (60 * 60);  // Convert seconds to hours
-        const weeklyRecordingTime = (totalDurationHours * 7) / days;
-        
-        const avgRecordingLength = transcripts.length > 0 
-          ? (totalDurationSeconds / transcripts.length) / 60  // Convert seconds to minutes
-          : 0;
+          const transcriptsWithTags = transcripts.filter(t => {
+            const tags = JSON.parse(t.tags).filter(tag => tag.id !== null);
+            return tags.length > 0;
+          }).length;
+          const taggedNotesPercentage = Math.round((transcriptsWithTags / Math.max(1, transcripts.length)) * 100);
 
-        const transcriptsWithTags = transcripts.filter(t => {
-          const tags = JSON.parse(t.tags).filter(tag => tag.id !== null);
-          return tags.length > 0;
-        }).length;
-        const taggedNotesPercentage = Math.round((transcriptsWithTags / Math.max(1, transcripts.length)) * 100);
-
-        resolve({
-          recordingTimeline: Array.from(timelineMap.values()),
-          popularTopics,
-          recordingPatterns: Object.values(patterns),
-          quickStats: {
-            weeklyRecordingTime: Number(weeklyRecordingTime.toFixed(1)),
-            avgRecordingLength: Number(avgRecordingLength.toFixed(1)),
-            taggedNotesPercentage
-          }
+          resolve({
+            recordingTimeline: Array.from(timelineMap.values()),
+            tagsTimeline: tagTimeline,
+            popularTopics,
+            recordingPatterns: Object.values(patterns),
+            quickStats: {
+              weeklyRecordingTime: Number(weeklyRecordingTime.toFixed(1)),
+              avgRecordingLength: Number(avgRecordingLength.toFixed(1)),
+              taggedNotesPercentage
+            }
+          });
         });
       });
     });

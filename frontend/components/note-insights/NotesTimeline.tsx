@@ -26,10 +26,14 @@ interface NotesTimelineProps {
     date: string;
     count: number;
   }>;
+  tagsData?: Array<{
+    date: string;
+    count: number;
+  }>;
   isLoading?: boolean;
 }
 
-const NotesTimeline: React.FC<NotesTimelineProps> = ({ data, isLoading }) => {
+const NotesTimeline: React.FC<NotesTimelineProps> = ({ data, tagsData, isLoading }) => {
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-64 flex items-center justify-center">
@@ -38,7 +42,7 @@ const NotesTimeline: React.FC<NotesTimelineProps> = ({ data, isLoading }) => {
     );
   }
 
-  if (!data || data.length === 0) {
+  if ((!data || data.length === 0) && (!tagsData || tagsData.length === 0)) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-64 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">No timeline data available</p>
@@ -46,16 +50,43 @@ const NotesTimeline: React.FC<NotesTimelineProps> = ({ data, isLoading }) => {
     );
   }
 
+  // Create a combined set of dates from both datasets
+  const allDates = new Set([
+    ...(data?.map(item => item.date) || []),
+    ...(tagsData?.map(item => item.date) || [])
+  ]);
+  
+  // Sort dates chronologically
+  const sortedDates = Array.from(allDates).sort();
+
+  // Create datasets with 0 counts for missing dates
+  const notesData = sortedDates.map(date => {
+    const found = data?.find(item => item.date === date);
+    return found ? found.count : 0;
+  });
+
+  const tagsCreatedData = sortedDates.map(date => {
+    const found = tagsData?.find(item => item.date === date);
+    return found ? found.count : 0;
+  });
+
   const chartData = {
-    labels: data.map(item => item.date),
+    labels: sortedDates,
     datasets: [
       {
         label: 'Notes Created',
-        data: data.map(item => item.count),
+        data: notesData,
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.5)',
         tension: 0.4,
       },
+      {
+        label: 'Tags Created',
+        data: tagsCreatedData,
+        borderColor: 'rgb(139, 92, 246)',
+        backgroundColor: 'rgba(139, 92, 246, 0.5)',
+        tension: 0.4,
+      }
     ],
   };
 

@@ -31,12 +31,22 @@ interface TimelineData {
   count: number;
 }
 
+interface TagsTimelineData {
+  date: string;
+  count: number;
+}
+
 interface RecordingTimelineProps {
   data?: TimelineData[];
+  tagsData?: TagsTimelineData[];
   isLoading?: boolean;
 }
 
-const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], isLoading = false }) => {
+const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ 
+  data = [], 
+  tagsData = [], 
+  isLoading = false 
+}) => {
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-64 flex items-center justify-center">
@@ -45,7 +55,7 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], isLoad
     );
   }
 
-  if (!data || data.length === 0) {
+  if ((!data || data.length === 0) && (!tagsData || tagsData.length === 0)) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-64 flex items-center justify-center">
         <p className="text-gray-500 dark:text-gray-400">No recording data available</p>
@@ -53,17 +63,52 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], isLoad
     );
   }
 
+  // Create a combined set of dates from both datasets
+  const allDates = new Set([
+    ...(data?.map(item => item.date) || []),
+    ...(tagsData?.map(item => item.date) || [])
+  ]);
+  
+  // Sort dates chronologically
+  const sortedDates = Array.from(allDates).sort();
+
+  // Format dates for display
+  const formattedDates = sortedDates.map(date => 
+    new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  );
+
+  // Create datasets with 0 counts for missing dates
+  const recordingData = sortedDates.map(date => {
+    const found = data?.find(item => item.date === date);
+    return found ? Math.round(found.duration) : 0;
+  });
+
+  const tagsCreatedData = sortedDates.map(date => {
+    const found = tagsData?.find(item => item.date === date);
+    return found ? found.count : 0;
+  });
+
   const chartData = {
-    labels: data.map(item => new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })),
+    labels: formattedDates,
     datasets: [
       {
         label: 'Recording Duration',
-        data: data.map(item => Math.round(item.duration)),
+        data: recordingData,
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.5)',
         tension: 0.4,
         fill: true,
+        yAxisID: 'y',
       },
+      {
+        label: 'Tags Created',
+        data: tagsCreatedData,
+        borderColor: 'rgb(139, 92, 246)',
+        backgroundColor: 'rgba(139, 92, 246, 0.5)',
+        tension: 0.4,
+        fill: true,
+        yAxisID: 'y1',
+      }
     ],
   };
 
@@ -81,11 +126,22 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], isLoad
     scales: {
       y: {
         type: 'linear' as const,
+        display: true,
+        position: 'left',
         beginAtZero: true,
         ticks: {
           callback: function(this: Scale<any>, value: number | string) {
             return `${value}m`;
           },
+        },
+      },
+      y1: {
+        type: 'linear' as const,
+        display: true,
+        position: 'right',
+        beginAtZero: true,
+        grid: {
+          drawOnChartArea: false,
         },
       },
     },
