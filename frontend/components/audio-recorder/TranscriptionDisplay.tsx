@@ -116,7 +116,7 @@ const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
         <div className={`transition-all duration-300 ease-in-out ${isOriginalCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'opacity-100'}`}>
           <div
             ref={originalTranscriptRef}
-            className={`p-4 bg-gray-700 dark:bg-gray-800 rounded-lg ${originalHeight} custom-scrollbar transition-all duration-300`}
+            className={`p-4 bg-gray-100 dark:bg-gray-700 rounded-lg ${originalHeight} custom-scrollbar transition-all duration-300`}
             aria-live="polite"
           >
             <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
