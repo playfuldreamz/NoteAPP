@@ -1,4 +1,3 @@
-export { default as TimeRangeSelector } from './TimeRangeSelector';
 export { default as RecordingTimeline } from './RecordingTimeline';
 export { default as PopularTopics } from './PopularTopics';
 export { default as RecordingPatterns } from './RecordingPatterns';

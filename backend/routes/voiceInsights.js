@@ -9,8 +9,8 @@ router.get('/', authenticateToken, async (req, res) => {
     const timeRange = req.query.timeRange || '7d';
     
     // Validate time range
-    if (!['7d', '30d', '90d'].includes(timeRange)) {
-      return res.status(400).json({ message: 'Invalid time range. Must be 7d, 30d, or 90d.' });
+    if (!['24h', '7d', '30d', '90d'].includes(timeRange)) {
+      return res.status(400).json({ message: 'Invalid time range. Must be 24h, 7d, 30d, or 90d.' });
     }
 
     const insights = await getVoiceInsights(req.user.id, timeRange);

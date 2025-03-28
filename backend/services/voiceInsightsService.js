@@ -1,9 +1,19 @@
 const db = require('../database/connection');
 
 const getVoiceInsights = async (userId, timeRange) => {
-  const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+  let days;
+  let hours;
+  
+  if (timeRange === '24h') {
+    days = 1;
+    hours = 24;
+  } else {
+    days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+    hours = days * 24;
+  }
+  
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(startDate.getHours() - hours);
 
   try {
     // Get all transcripts within the time range
