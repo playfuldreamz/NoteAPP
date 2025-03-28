@@ -27,9 +27,9 @@ export default function Sidebar({ onLogout, onOpenSettings }: SidebarProps) {
             <Home className="w-5 h-5" />
           </Link>
           <Link 
-            href="/notes-hub"
+            href="/hub"
             className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors ${
-              pathname === '/notes-hub' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+              pathname === '/hub' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
             title="Notes Hub"
           >

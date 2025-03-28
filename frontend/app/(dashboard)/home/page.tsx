@@ -324,11 +324,11 @@ export default function HomePage() {
         </div>
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1">
           <div className="space-y-3">
-            <Link href="/notes-hub" className="w-full flex items-center justify-between px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors group">
+            <Link href="/hub" className="w-full flex items-center justify-between px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors group">
               <span className="text-blue-700 dark:text-blue-300 group-hover:text-blue-800 dark:group-hover:text-blue-200">Start Recording</span>
               <Mic className="w-5 h-5 text-blue-500 dark:text-blue-400" />
             </Link>
-            <Link href="/notes-hub" className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <Link href="/hub" className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
               <span className="text-gray-700 dark:text-gray-300">View All Notes</span>
               <FileText className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </Link>
@@ -353,7 +353,7 @@ export default function HomePage() {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h2>
           </div>
           <Link 
-            href="/notes-hub" 
+            href="/hub" 
             className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
           >
             View All
@@ -402,7 +402,7 @@ export default function HomePage() {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Recent Recordings</h2>
           </div>
           <Link 
-            href="/notes-hub" 
+            href="/hub" 
             className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
           >
             View All

@@ -93,8 +93,9 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
 
   return (
     <div className="space-y-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      <div className="flex flex-col space-y-4">
-        <div className="flex justify-between items-center">
+      <div className="flex flex-col">
+        {/* Recording Controls */}
+        <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-2">
             <RecordingControls 
               isRecording={recorder.isRecording}
@@ -110,16 +111,15 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
           </div>
         </div>
         
-        {/* Create a separate container for the waveform to avoid overlap */}
+        {/* Waveform Visualizer - Only visible when actively recording (not paused) */}
         <div 
           style={{ 
-            margin: recorder.isRecording && !recorder.isPaused ? '0' : '0',
-            padding: '0',
             height: recorder.isRecording && !recorder.isPaused ? 'auto' : '0',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            marginBottom: recorder.isRecording && !recorder.isPaused ? '16px' : '0',
+            transition: 'all 0.3s ease-in-out'
           }}
         >
-          {/* Waveform Visualizer - Only visible when actively recording (not paused) */}
           <div 
             className={`transition-all duration-300 ease-in-out ${recorder.isRecording && !recorder.isPaused ? 'opacity-100' : 'opacity-0'}`}
             style={{ 
@@ -137,12 +137,12 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
           </div>
         </div>
         
-        {/* Settings dropdown appears here, between waveform and transcript */}
+        {/* Settings dropdown */}
         <div 
           className={`transition-all duration-300 ease-in-out overflow-hidden ${showSettings ? 'opacity-100' : 'opacity-0'}`}
           style={{
             height: showSettings ? 'auto' : '0',
-            margin: showSettings ? '1rem 0' : '0',
+            marginBottom: showSettings ? '16px' : '0',
             padding: showSettings ? '0.5rem 0' : '0',
             position: 'relative',
             visibility: showSettings ? 'visible' : 'hidden'
@@ -154,25 +154,31 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
           />
         </div>
 
-        <TranscriptionDisplay
-          originalTranscript={transcription.originalTranscript}
-          interimTranscript=""
-          enhancedTranscript={transcription.enhancedTranscript}
-          showEnhanced={transcription.showEnhanced}
-          isEnhancing={transcription.isEnhancing}
-          enhancementProgress={0}
-        />
+        {/* Transcription Display */}
+        <div className="mb-4">
+          <TranscriptionDisplay
+            originalTranscript={transcription.originalTranscript}
+            interimTranscript=""
+            enhancedTranscript={transcription.enhancedTranscript}
+            showEnhanced={transcription.showEnhanced}
+            isEnhancing={transcription.isEnhancing}
+            enhancementProgress={0}
+          />
+        </div>
         
-        <RecorderActions
-          transcript={transcription.originalTranscript}
-          isRecording={recorder.isRecording}
-          isEnhancing={transcription.isEnhancing}
-          isSaving={transcriptSaver.isSaving}
-          canEnhance={true}
-          onEnhance={transcription.enhanceTranscript}
-          onSave={handleSaveTranscript}
-          onReset={transcriptSaver.resetTranscript}
-        />
+        {/* Recorder Actions */}
+        <div>
+          <RecorderActions
+            transcript={transcription.originalTranscript}
+            isRecording={recorder.isRecording}
+            isEnhancing={transcription.isEnhancing}
+            isSaving={transcriptSaver.isSaving}
+            canEnhance={true}
+            onEnhance={transcription.enhanceTranscript}
+            onSave={handleSaveTranscript}
+            onReset={transcriptSaver.resetTranscript}
+          />
+        </div>
       </div>
     </div>
   );
