@@ -72,7 +72,7 @@ const getVoiceInsights = async (userId, timeRange) => {
             percentage: Math.round((count / Math.max(1, totalTags)) * 100)
           }))
           .sort((a, b) => b.count - a.count)
-          .slice(0, 4);
+          .slice(0, 10);
 
         // Calculate recording patterns
         const patterns = {};
