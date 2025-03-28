@@ -66,14 +66,17 @@ export default function TranscriptActions({
 
   useEffect(() => {
     // Get unique tags from the context
-    const uniqueTags = new Set<UserTag>();
+    const uniqueTags = new Map<number, UserTag>();
     Object.entries(itemTags).forEach(([key, tags]) => {
       if (key.startsWith(itemType)) {
-        tags.forEach(tag => uniqueTags.add({ ...tag, is_user_tag: true }));
+        tags.forEach(tag => {
+          // Use the tag ID as the key to ensure uniqueness
+          uniqueTags.set(tag.id, { ...tag, is_user_tag: true });
+        });
       }
     });
     
-    setAvailableTags(Array.from(uniqueTags));
+    setAvailableTags(Array.from(uniqueTags.values()));
   }, [itemTags, itemType]);
 
   useEffect(() => {
@@ -305,7 +308,7 @@ export default function TranscriptActions({
                   : availableTags
                 ).slice(0, 10).map((tag: UserTag) => (
                   <UserTagChip
-                    key={tag.id}
+                    key={`${tag.id}-${tag.name}`}
                     tag={tag}
                     isSelected={filters.tags.includes(tag.name)}
                     onToggle={handleTagClick}
@@ -324,7 +327,7 @@ export default function TranscriptActions({
                 <div className="flex flex-wrap gap-2">
                   {availableTags.slice(10).map(tag => (
                     <UserTagChip
-                      key={tag.id}
+                      key={`${tag.id}-${tag.name}`}
                       tag={tag}
                       isSelected={filters.tags.includes(tag.name)}
                       onToggle={handleTagClick}
