@@ -122,6 +122,7 @@ export default function HomePage() {
   const [isLoadingInsights, setIsLoadingInsights] = useState<boolean>(false);
   const [noteInsights, setNoteInsights] = useState<NoteInsightsData | null>(null);
   const [isLoadingNoteInsights, setIsLoadingNoteInsights] = useState<boolean>(false);
+  const [isRegeneratingTitle, setIsRegeneratingTitle] = useState<boolean>(false);
 
   const fetchRecentActivity = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -277,6 +278,36 @@ export default function HomePage() {
   useEffect(() => {
     fetchNoteInsights(noteTimeRange);
   }, [noteTimeRange, fetchNoteInsights]);
+
+  const handleRegenerateTitle = async () => {
+    if (!modalState.content || !modalState.itemId) return;
+    
+    setIsRegeneratingTitle(true);
+    try {
+      const { generateTranscriptTitle, updateNoteTitle, updateTranscriptTitle } = await import('../../../services/ai');
+      
+      const newTitle = await generateTranscriptTitle(modalState.content);
+      
+      if (modalState.type === 'note') {
+        await updateNoteTitle(modalState.itemId, newTitle);
+      } else {
+        await updateTranscriptTitle(modalState.itemId, newTitle);
+      }
+      
+      setModalState(prev => ({
+        ...prev,
+        title: newTitle
+      }));
+      
+      toast.success('Title regenerated successfully');
+      fetchRecentActivity(); // Refresh data to show updated title
+    } catch (error) {
+      console.error('Error regenerating title:', error);
+      toast.error('Failed to regenerate title');
+    } finally {
+      setIsRegeneratingTitle(false);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -549,6 +580,9 @@ export default function HomePage() {
         itemId={modalState.itemId}
         type={modalState.type}
         initialTags={modalState.tags}
+        onRegenerateTitle={handleRegenerateTitle}
+        isRegeneratingTitle={isRegeneratingTitle}
+        onTitleUpdate={fetchRecentActivity}
       />
     </div>
   );
