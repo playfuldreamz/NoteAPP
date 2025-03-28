@@ -19,6 +19,7 @@ interface UseRecorderReturn {
   pauseRecording: () => void;
   resumeRecording: () => void;
   resetRecording: () => void;
+  audioStream: MediaStream | null;
 }
 
 export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn {
@@ -28,8 +29,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
   const [pausedTime, setPausedTime] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [pauseStartTime, setPauseStartTime] = useState<number | null>(null);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   
   // Timer for recording duration
   useEffect(() => {
@@ -54,11 +57,43 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
     };
   }, [isRecording, isPaused, startTime, pausedTime]);
 
-  const startRecording = () => {
+  // Cleanup audio resources on unmount
+  useEffect(() => {
+    return () => {
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+      }
+      
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+    };
+  }, [audioStream]);
+
+  const setupAudioContext = async () => {
+    try {
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setAudioStream(stream);
+      
+      return true;
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      return false;
+    }
+  };
+
+  const startRecording = async () => {
     if (isRecording && isPaused) {
       // Resume recording
       resumeRecording();
       return;
+    }
+    
+    // Setup audio context if not already done
+    if (!audioStream) {
+      const success = await setupAudioContext();
+      if (!success) return;
     }
     
     setIsRecording(true);
@@ -84,6 +119,11 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+      }
+      
+      // Stop the audio tracks
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
       }
       
       if (options.onRecordingStop) {
@@ -143,9 +183,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
     setStartTime(null);
     setPauseStartTime(null);
     
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+    // Stop and clean up any existing audio stream
+    if (audioStream) {
+      audioStream.getTracks().forEach(track => track.stop());
+      setAudioStream(null);
     }
   };
 
@@ -160,6 +201,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
     stopRecording,
     pauseRecording,
     resumeRecording,
-    resetRecording
+    resetRecording,
+    audioStream
   };
 }

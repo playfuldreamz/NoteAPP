@@ -23,6 +23,43 @@ const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
   const [isOriginalCollapsed, setIsOriginalCollapsed] = useState(false);
   const [isEnhancedCollapsed, setIsEnhancedCollapsed] = useState(false);
   const [isManualScroll, setIsManualScroll] = useState(false);
+  
+  // Calculate dynamic heights based on content
+  const [originalHeight, setOriginalHeight] = useState('min-h-[2.5rem]');
+  const [enhancedHeight, setEnhancedHeight] = useState('min-h-[2.5rem]');
+
+  // Update heights based on content
+  useEffect(() => {
+    if (originalTranscriptRef.current) {
+      const contentHeight = originalTranscriptRef.current.scrollHeight;
+      const lines = (originalTranscript + interimTranscript).split('\n').length;
+      
+      // For original transcript - match the enhanced transcript's cleaner appearance
+      if (lines <= 1) {
+        setOriginalHeight('h-auto overflow-visible');
+      } else if (lines <= 5) {
+        setOriginalHeight('h-auto overflow-visible');
+      } else {
+        setOriginalHeight('max-h-[12rem] overflow-y-auto');
+      }
+    }
+  }, [originalTranscript, interimTranscript]);
+
+  // Update enhanced transcript height
+  useEffect(() => {
+    if (enhancedTranscriptRef.current) {
+      const lines = enhancedTranscript.split('\n').length;
+      
+      // Enhanced transcript already looks good
+      if (lines <= 1) {
+        setEnhancedHeight('h-auto overflow-visible');
+      } else if (lines <= 5) {
+        setEnhancedHeight('h-auto overflow-visible');
+      } else {
+        setEnhancedHeight('max-h-[12rem] overflow-y-auto');
+      }
+    }
+  }, [enhancedTranscript]);
 
   // Auto-scroll original transcript
   useEffect(() => {
@@ -76,10 +113,10 @@ const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
             {isOriginalCollapsed ? <ChevronDown size={16} className="text-gray-400 group-hover:text-blue-500" /> : <ChevronUp size={16} className="text-gray-400 group-hover:text-blue-500" />}
           </button>
         </div>
-        <div className={`transition-all duration-300 ease-in-out ${isOriginalCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[200px] opacity-100'}`}>
+        <div className={`transition-all duration-300 ease-in-out ${isOriginalCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'opacity-100'}`}>
           <div
             ref={originalTranscriptRef}
-            className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-y-auto h-[200px] custom-scrollbar"
+            className={`p-4 bg-gray-700 dark:bg-gray-800 rounded-lg ${originalHeight} custom-scrollbar transition-all duration-300`}
             aria-live="polite"
           >
             <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
@@ -107,10 +144,10 @@ const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({
               </div>
             )}
           </div>
-             <div className={`transition-all duration-300 ease-in-out ${isEnhancedCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[200px] opacity-100'}`}>
+             <div className={`transition-all duration-300 ease-in-out ${isEnhancedCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'opacity-100'}`}>
                 <div
                     ref={enhancedTranscriptRef}
-                    className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg overflow-y-auto h-[200px] custom-scrollbar"
+                    className={`p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg ${enhancedHeight} custom-scrollbar transition-all duration-300`}
                 >
                 {isEnhancing && enhancementProgress < 100 ? (
                   <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
