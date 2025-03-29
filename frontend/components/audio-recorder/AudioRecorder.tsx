@@ -87,12 +87,20 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
 
   // Handle saving transcript
   const handleSaveTranscript = async () => {
-    await transcriptSaver.saveTranscript(
-      transcription.originalTranscript,
-      recorder.elapsedTime,
-      transcription.showEnhanced,
-      transcription.enhancedTranscript
-    );
+    try {
+      await transcriptSaver.saveTranscript(
+        transcription.originalTranscript,
+        recorder.elapsedTime,
+        transcription.showEnhanced,
+        transcription.enhancedTranscript
+      );
+      
+      // Only reset the recorder after successful save
+      recorder.resetRecording();
+    } catch (error) {
+      console.error('Error saving transcript:', error);
+      // Don't reset if there was an error saving
+    }
   };
 
   return (

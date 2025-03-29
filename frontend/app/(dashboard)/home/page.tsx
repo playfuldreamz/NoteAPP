@@ -9,9 +9,9 @@ import TimeRangeSelector from '../../../components/shared/TimeRangeSelector';
 import {
   VoiceInsightsPanel,
   RecordingTimeline,
-  PopularTopics,
   RecordingPatterns,
-  QuickStats
+  PopularTopics,
+  QuickStats,
 } from '../../../components/voice-insights';
 import {
   NotesTimeline,
@@ -237,6 +237,7 @@ export default function HomePage() {
       }
 
       const data = await response.json();
+      console.log('Voice insights data received:', data);
       setVoiceInsights(data);
     } catch (error) {
       console.error('Error fetching voice insights:', error);
@@ -268,6 +269,7 @@ export default function HomePage() {
       }
 
       const data = await response.json();
+      console.log('Note insights data received:', data);
       setNoteInsights(data);
     } catch (error) {
       console.error('Error fetching note insights:', error);
@@ -425,7 +427,7 @@ export default function HomePage() {
                       {transcript.title || 'Untitled Recording'}
                     </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500">
-                      {new Date(transcript.date).toLocaleString()} • {Math.floor(transcript.duration / 60)}:{(transcript.duration % 60).toString().padStart(2, '0')}
+                      {new Date(transcript.date).toLocaleString()} • {transcript.duration ? `${Math.floor(transcript.duration / 60)}:${(transcript.duration % 60).toString().padStart(2, '0')}` : '0:00'}
                     </p>
                   </div>
                 </div>

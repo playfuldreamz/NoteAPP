@@ -118,12 +118,16 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
   const stopRecording = () => {
     // If recording is paused, treat this as a full stop
     if (isRecording) {
+      // Store the final elapsed time before stopping
+      const finalElapsedTime = elapsedTime;
+      
       setIsRecording(false);
       setIsPaused(false);
       setStartTime(null);
       setPauseStartTime(null);
-      setElapsedTime(0); // Reset the timer when stopping
-      setPausedTime(0);  // Reset paused time as well
+      // Don't reset the elapsed time here, so it can be used for saving
+      // setElapsedTime(0); 
+      // setPausedTime(0);  
       
       if (timerRef.current) {
         clearInterval(timerRef.current);

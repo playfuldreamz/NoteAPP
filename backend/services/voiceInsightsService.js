@@ -35,13 +35,13 @@ const getVoiceInsights = async (userId, timeRange) => {
 
     // Get tag creation data for transcripts
     const tagCreationQuery = `
-      SELECT DATE(ut.created_at) as date, COUNT(*) as count
-      FROM user_tags ut
-      JOIN item_tags it ON ut.tag_id = it.tag_id
-      WHERE ut.user_id = ? 
-      AND ut.created_at >= datetime(?)
-      AND it.item_type = 'transcript'
-      GROUP BY DATE(ut.created_at)
+      SELECT strftime('%Y-%m-%d', it.created_at) as date, COUNT(*) as count
+      FROM item_tags it
+      JOIN tags t ON it.tag_id = t.id
+      WHERE it.item_type = 'transcript'
+      AND EXISTS (SELECT 1 FROM transcripts tr WHERE tr.id = it.item_id AND tr.user_id = ?)
+      AND it.created_at >= datetime(?)
+      GROUP BY strftime('%Y-%m-%d', it.created_at)
       ORDER BY date ASC
     `;
 
@@ -82,6 +82,9 @@ const getVoiceInsights = async (userId, timeRange) => {
             console.error('Database error:', tagErr);
             return reject(tagErr);
           }
+
+          console.log('Tag timeline data:', JSON.stringify(tagTimeline));
+          console.log('Query params:', userId, startDate.toISOString());
 
           // Calculate popular topics
           const popularTopics = Array.from(topicsMap.entries())
@@ -129,7 +132,10 @@ const getVoiceInsights = async (userId, timeRange) => {
 
           resolve({
             recordingTimeline: Array.from(timelineMap.values()),
-            tagsTimeline: tagTimeline,
+            tagsTimeline: tagTimeline.map(item => ({
+              date: item.date,
+              count: item.count
+            })),
             popularTopics,
             recordingPatterns: Object.values(patterns),
             quickStats: {
