@@ -191,12 +191,64 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
       <NoteEditorModal
         isOpen={showExpandedEditor}
         onClose={() => setShowExpandedEditor(false)}
-        initialContent={noteContent.split('\n').map(line => `<div>${line || '<br>'}</div>`).join('')}
+        initialContent={noteContent}
         transcript={transcript}
         onSave={() => {
           onSave();
           setNoteContent('');
           setShowExpandedEditor(false);
+        }}
+        onContentChange={(htmlContent) => {
+          // Convert HTML content back to plain text for the textarea
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = htmlContent;
+          
+          // Process the content to extract plain text with proper line breaks
+          const processNode = (node: Node): string => {
+            let result = '';
+            
+            if (node.nodeType === Node.TEXT_NODE) {
+              result += node.textContent;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+              // Handle different element types
+              if (node.nodeName === 'BR') {
+                result += '\n';
+              } else if (node.nodeName === 'DIV' || node.nodeName === 'P') {
+                // For block elements, add a newline if needed
+                if (result && !result.endsWith('\n') && node.previousSibling) {
+                  result += '\n';
+                }
+                
+                // Process all child nodes
+                for (let i = 0; i < node.childNodes.length; i++) {
+                  result += processNode(node.childNodes[i]);
+                }
+                
+                // Add a newline after block elements if they have content
+                if (node.childNodes.length > 0 && !result.endsWith('\n') && node.nextSibling) {
+                  result += '\n';
+                }
+              } else {
+                // For other elements, just process their children
+                for (let i = 0; i < node.childNodes.length; i++) {
+                  result += processNode(node.childNodes[i]);
+                }
+              }
+            }
+            
+            return result;
+          };
+          
+          let plainText = processNode(tempDiv);
+          
+          // Normalize newlines - replace multiple consecutive newlines with a maximum of two
+          plainText = plainText.replace(/\n{3,}/g, '\n\n');
+          
+          // Trim leading/trailing whitespace
+          plainText = plainText.trim();
+          
+          // Update the textarea content
+          setNoteContent(plainText);
         }}
       />
     </>

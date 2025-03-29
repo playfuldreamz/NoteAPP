@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Save, TagIcon, CheckSquare, Edit3, Check } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { generateTranscriptTitle } from '../../services/ai';
+import ContentEditable from 'react-contenteditable';
 
 interface NoteEditorModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface NoteEditorModalProps {
   initialContent: string;
   transcript: string;
   onSave: () => void;
+  onContentChange?: (content: string) => void;
 }
 
 const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
@@ -16,11 +18,13 @@ const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   onClose,
   initialContent,
   transcript,
-  onSave
+  onSave,
+  onContentChange
 }) => {
-  const [noteContent, setNoteContent] = useState(initialContent);
+  const [noteContent, setNoteContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [editorRef, setEditorRef] = useState<HTMLDivElement | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const contentEditableRef = useRef<any>(null);
   const [activeTab, setActiveTab] = useState('extensions');
   const [isScrolled, setIsScrolled] = useState(false);
   const [title, setTitle] = useState('Untitled Note');
@@ -30,9 +34,19 @@ const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   // Maximum content size to try if we get a payload too large error
   const MAX_FALLBACK_CONTENT_SIZE = 100 * 1024; // 100KB limit for fallback
 
+  // Initialize content when the modal opens
   useEffect(() => {
-    setNoteContent(initialContent);
-  }, [initialContent]);
+    if (isOpen) {
+      // Convert plain text to HTML for the editor
+      const htmlContent = initialContent
+        .split('\n')
+        .map(line => line.trim() ? `<div>${line}</div>` : '<div><br></div>')
+        .join('');
+      
+      // Set the HTML content
+      setNoteContent(htmlContent);
+    }
+  }, [isOpen, initialContent]);
 
   // Reset title when modal is opened
   useEffect(() => {
@@ -42,13 +56,14 @@ const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     }
   }, [isOpen]);
 
+  // Handle modal open/close effects
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       // Focus the editor when modal opens
       setTimeout(() => {
-        if (editorRef) {
-          editorRef.focus();
+        if (editorRef.current) {
+          editorRef.current.focus();
         }
       }, 100);
     } else {
@@ -57,17 +72,28 @@ const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, editorRef]);
+  }, [isOpen]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setIsScrolled(e.currentTarget.scrollTop > 0);
   };
 
   const formatText = (command: string, value: string = '') => {
-    if (!editorRef) return;
-    
     document.execCommand(command, false, value);
-    editorRef.focus();
+    
+    // Update the content state after formatting
+    if (contentEditableRef.current?.el?.current) {
+      const newContent = contentEditableRef.current.el.current.innerHTML;
+      setNoteContent(newContent);
+      
+      // Notify parent component if callback exists
+      if (onContentChange) {
+        onContentChange(newContent);
+      }
+      
+      // Focus back on the editor
+      contentEditableRef.current.el.current.focus();
+    }
   };
 
   // Handle paste events to clean up HTML
@@ -80,6 +106,27 @@ const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     if (text) {
       // Insert as plain text - this is the key to avoiding HTML formatting issues
       document.execCommand('insertText', false, text);
+      
+      // Update the content state after paste
+      if (contentEditableRef.current?.el?.current) {
+        const newContent = contentEditableRef.current.el.current.innerHTML;
+        setNoteContent(newContent);
+        
+        // Notify parent component if callback exists
+        if (onContentChange) {
+          onContentChange(newContent);
+        }
+      }
+    }
+  };
+
+  // Handle content changes from the editor
+  const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
+    const newContent = e.currentTarget.innerHTML;
+    setNoteContent(newContent);
+    
+    if (onContentChange) {
+      onContentChange(newContent);
     }
   };
 
@@ -262,6 +309,31 @@ const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     }
   };
 
+  // Handle input events in the editor
+  const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
+    // Get the current content
+    const newContent = e.currentTarget.innerHTML;
+    
+    // Update our state
+    setNoteContent(newContent);
+    
+    // Notify parent component if callback exists
+    if (onContentChange) {
+      onContentChange(newContent);
+    }
+  };
+
+  // Handle key press events to ensure proper behavior
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Make sure the cursor stays in the right place
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.execCommand('insertHTML', false, '<div><br></div>');
+      return false;
+    }
+    return true;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -402,9 +474,13 @@ const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             {/* Editor and Save Button Container */}
             <div className="flex flex-col flex-grow overflow-hidden">
               {/* Editor with fixed height and scrolling */}
-              <div
-                ref={setEditorRef}
-                contentEditable
+              <ContentEditable
+                innerRef={contentEditableRef}
+                html={noteContent}
+                onChange={handleContentChange}
+                onPaste={handlePaste}
+                tagName="div"
+                disabled={false}
                 className="flex-grow p-4 bg-white dark:bg-gray-800 dark:text-gray-200 prose dark:prose-invert max-w-none rounded-lg shadow-sm overflow-y-auto"
                 style={{
                   minHeight: "300px",
@@ -412,11 +488,7 @@ const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
                   scrollbarWidth: 'thin',
                   scrollbarColor: 'rgb(156 163 175) transparent'
                 }}
-                dangerouslySetInnerHTML={{ __html: noteContent }}
-                onInput={(e) => setNoteContent(e.currentTarget.innerHTML)}
-                onPaste={handlePaste}
               />
-
               {/* Save button in sticky container at bottom */}
               <div className="sticky bottom-0 pt-4 bg-white dark:bg-gray-900 z-10">
                 <button 
