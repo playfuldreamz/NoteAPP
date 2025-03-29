@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import TaggingModule from './TaggingModule';
 import ActionItemsModule from './ActionItemsModule';
-import { Tag, updateNoteTitle, updateTranscriptTitle } from '../services/ai';
-import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check, Edit3 } from 'lucide-react';
+import { Tag, updateNoteTitle, updateTranscriptTitle, updateNoteContent, updateTranscriptContent } from '../services/ai';
+import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check, Edit3, Save } from 'lucide-react';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import { toast } from 'react-toastify';
+import EditorToolbar from './notes/editor/EditorToolbar';
+import { textToHtml } from './notes/editor/editorContentUtils';
+import ContentEditable from 'react-contenteditable';
 
 interface ModalProps {
   isOpen: boolean;
@@ -19,13 +22,14 @@ interface ModalProps {
   onRegenerateTitle?: () => void;
   isRegeneratingTitle?: boolean;
   onTitleUpdate?: () => void;
+  onContentUpdate?: (content: string) => void;
 }
 
 const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
-  content,
-  title,
+  content: initialContent,
+  title: initialTitle,
   itemId,
   type,
   children,
@@ -33,7 +37,8 @@ const Modal: React.FC<ModalProps> = ({
   onTagsUpdate,
   onRegenerateTitle,
   isRegeneratingTitle = false,
-  onTitleUpdate
+  onTitleUpdate,
+  onContentUpdate
 }) => {
   const [tags, setTags] = useState<Tag[]>(initialTags);
   const [activeTab, setActiveTab] = useState('tags');
@@ -49,12 +54,26 @@ const Modal: React.FC<ModalProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const { downloadDocument, isDownloading } = useDownloadDocument();
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editableTitle, setEditableTitle] = useState(title || '');
+  const [editableTitle, setEditableTitle] = useState(initialTitle || '');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editableContent, setEditableContent] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [content, setContent] = useState(initialContent);
+  const contentEditableRef = useRef<HTMLDivElement>(null);
+
+  // Initialize editable content when entering edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      // Convert plain text to HTML for the editor if it's not already HTML
+      const htmlContent = content.startsWith('<') ? content : textToHtml(content);
+      setEditableContent(htmlContent);
+    }
+  }, [isEditMode, content]);
 
   // Update editableTitle when title prop changes
   useEffect(() => {
-    setEditableTitle(title || '');
-  }, [title]);
+    setEditableTitle(initialTitle || '');
+  }, [initialTitle]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setIsScrolled(e.currentTarget.scrollTop > 0);
@@ -105,7 +124,7 @@ const Modal: React.FC<ModalProps> = ({
 
   const handleCancelEdit = () => {
     setIsEditingTitle(false);
-    setEditableTitle(title || '');
+    setEditableTitle(initialTitle || '');
   };
 
   useEffect(() => {
@@ -120,10 +139,90 @@ const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, onTitleUpdate]);
 
+  // Format text for the editor
+  const formatText = (command: string, value: string = '') => {
+    document.execCommand(command, false, value);
+  };
+
+  // Handle paste events to clean up HTML
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    
+    // Get clipboard data as plain text only
+    const text = e.clipboardData.getData('text/plain');
+    
+    if (text) {
+      // Insert as plain text - this is the key to avoiding HTML formatting issues
+      document.execCommand('insertText', false, text);
+    }
+  };
+
+  // Handle content changes from the editor - using ContentEditable's onChange
+  const handleContentChange = (e: { target: { value: string } }) => {
+    setEditableContent(e.target.value);
+  };
+
+  // Save edited content
+  const saveContent = async () => {
+    setIsSaving(true);
+    try {
+      // Extract text from HTML content while preserving line breaks
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = editableContent;
+      
+      // Replace <div> and <br> with proper line breaks before extracting text
+      const html = tempDiv.innerHTML;
+      // Replace <div><br></div> (empty lines) with double newlines
+      const htmlWithLineBreaks1 = html.replace(/<div><br><\/div>/g, '\n\n');
+      // Replace <div>content</div> with content + newline
+      const htmlWithLineBreaks2 = htmlWithLineBreaks1.replace(/<div>(.*?)<\/div>/g, '$1\n');
+      // Replace <br> with newlines
+      const htmlWithLineBreaks3 = htmlWithLineBreaks2.replace(/<br>/g, '\n');
+      
+      // Now extract text from the modified HTML
+      tempDiv.innerHTML = htmlWithLineBreaks3;
+      const plainText = tempDiv.textContent || tempDiv.innerText || '';
+      
+      // Trim any trailing newlines but preserve internal ones
+      const trimmedText = plainText.replace(/\n+$/, '');
+
+      if (type === 'note') {
+        await updateNoteContent(itemId, trimmedText);
+        // Update the content state with the new content
+        setContent(trimmedText);
+        toast.success('Note content updated successfully');
+      } else {
+        await updateTranscriptContent(itemId, trimmedText);
+        // Update the content state with the new content
+        setContent(trimmedText);
+        toast.success('Transcript content updated successfully');
+      }
+      // Exit edit mode after successful save
+      setIsEditMode(false);
+      
+      // Notify parent component if callback exists
+      if (onContentUpdate) {
+        onContentUpdate(trimmedText);
+      }
+    } catch (error) {
+      console.error('Failed to save content:', error);
+      toast.error(`Failed to save content: ${(error as Error).message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle canceling edit mode
+  const handleCancelEditContent = () => {
+    setIsEditMode(false);
+    // Reset editable content to original content
+    setEditableContent(content.startsWith('<') ? content : textToHtml(content));
+  };
+
   if (!isOpen) return null;
 
   // Validate and normalize type
-  const normalizedType = type === 'note' ? 'note' : 'transcript';
+  const normalizedType = type === 'note' || type === 'transcript' ? type : 'note';
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-sm">
@@ -200,7 +299,8 @@ const Modal: React.FC<ModalProps> = ({
               className="text-sm text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors p-2 border border-gray-200 dark:border-gray-700"
             >
               <option value="txt">TXT</option>
-              <option value="json">JSON</option>
+              <option value="md">MD</option>
+              <option value="html">HTML</option>
               <option value="pdf">PDF</option>
             </select>
             
@@ -210,7 +310,7 @@ const Modal: React.FC<ModalProps> = ({
                 type: type === 'note' ? 'note' : 'transcript',
                 content,
                 timestamp: new Date().toISOString(),
-                title: title || 'Untitled',
+                title: initialTitle || 'Untitled',
                 tags,
                 ...(type === 'note' ? { transcript: '' } : {})
               }, perItemDownloadOptions)}
@@ -219,6 +319,14 @@ const Modal: React.FC<ModalProps> = ({
               title="Download content"
             >
               <Download size={20} className={isDownloading ? 'opacity-50' : ''} />
+            </button>
+
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              title={isEditMode ? "Cancel editing" : "Edit content"}
+            >
+              <Edit3 size={20} className={isEditMode ? 'text-blue-500' : ''} />
             </button>
             
             <button 
@@ -243,24 +351,74 @@ const Modal: React.FC<ModalProps> = ({
               scrollbarColor: 'rgb(156 163 175) transparent'
             }}
           >
-            <div className="relative">
-              <button
-                onClick={handleCopy}
-                className="absolute top-0 right-0 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                title="Copy content"
-              >
-                {isCopied ? (
-                  <Check size={16} className="text-green-500" />
-                ) : (
-                  <Copy size={16} />
-                )}
-              </button>
-              <div className={`max-w-none pt-10 ${type === 'transcript' ? 'font-mono text-sm' : 'prose dark:prose-invert'}`}>
-                <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed bg-transparent p-0 m-0 border-0">
-                  {content}
-                </pre>
+            {isEditMode ? (
+              <div className="flex flex-col h-full">
+                {/* Editor Toolbar */}
+                <EditorToolbar formatText={formatText} />
+                
+                {/* Editor Content */}
+                <div className="relative flex-grow mt-4">
+                  <ContentEditable
+                    innerRef={contentEditableRef}
+                    html={editableContent}
+                    onChange={handleContentChange}
+                    onPaste={handlePaste}
+                    tagName="div"
+                    className="min-h-[300px] p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-y-auto font-mono text-sm max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed"
+                    style={{
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: 'rgb(156 163 175) transparent'
+                    }}
+                  />
+                  
+                  {/* Save Button */}
+                  <div className="mt-4 flex justify-end space-x-3">
+                    <button 
+                      onClick={handleCancelEditContent}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium text-sm hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={saveContent}
+                      disabled={isSaving}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? (
+                        <>
+                          <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          Save Changes
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="relative">
+                <button
+                  onClick={handleCopy}
+                  className="absolute top-0 right-0 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  title="Copy content"
+                >
+                  {isCopied ? (
+                    <Check size={16} className="text-green-500" />
+                  ) : (
+                    <Copy size={16} />
+                  )}
+                </button>
+                <div className={`max-w-none pt-10 font-mono text-sm`}>
+                  <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed bg-transparent p-0 m-0 border-0">
+                    {content}
+                  </pre>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right panel - Tabs and modules */}

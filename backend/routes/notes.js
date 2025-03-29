@@ -146,4 +146,28 @@ router.put('/:id/title', authenticateToken, (req, res) => {
   );
 });
 
+// Update note content
+router.put('/:id/content', authenticateToken, (req, res) => {
+  const noteId = req.params.id;
+  const { content } = req.body;
+
+  if (!content) {
+    return res.status(400).json({ error: 'Content is required' });
+  }
+
+  db.run(
+    'UPDATE notes SET content = ? WHERE id = ? AND user_id = ?',
+    [content, noteId, req.user.id],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Note not found or unauthorized' });
+      }
+      res.json({ message: 'Note content updated successfully' });
+    }
+  );
+});
+
 module.exports = router;

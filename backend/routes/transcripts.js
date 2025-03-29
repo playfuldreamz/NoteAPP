@@ -296,7 +296,31 @@ router.put('/:id/title', authenticateToken, (req, res) => {
   );
 });
 
-// Transcript routes
+// Update transcript content
+router.put('/:id/content', authenticateToken, (req, res) => {
+  const transcriptId = req.params.id;
+  const { content } = req.body;
+
+  if (!content) {
+    return res.status(400).json({ error: 'Content is required' });
+  }
+
+  db.run(
+    'UPDATE transcripts SET text = ? WHERE id = ? AND user_id = ?',
+    [content, transcriptId, req.user.id],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Transcript not found or unauthorized' });
+      }
+      res.json({ message: 'Transcript content updated successfully' });
+    }
+  );
+});
+
+// Get all transcripts with tags
 router.get('/', authenticateToken, (req, res) => {
   const query = `
     SELECT
@@ -329,7 +353,7 @@ router.get('/', authenticateToken, (req, res) => {
   });
 });
 
-
+// Create a new transcript
 router.post('/', authenticateToken, async (req, res) => {
   try {
     if (!req.body) {
