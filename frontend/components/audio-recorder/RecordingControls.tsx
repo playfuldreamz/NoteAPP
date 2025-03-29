@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Pause, Square } from 'lucide-react';
+import { Mic, MicOff, Pause, Square, Play } from 'lucide-react';
 
 interface RecordingControlsProps {
   isRecording: boolean;
@@ -43,7 +43,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         onClick={handleButtonClick}
         className={`p-2 rounded-lg ${
           isRecording && !isPaused
-            ? 'bg-red-500 hover:bg-red-600 text-white'
+            ? 'bg-gray-500 hover:bg-gray-600 text-white'
             : isPaused
             ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
             : 'bg-blue-500 hover:bg-blue-600 text-white'
@@ -59,7 +59,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         {isRecording && !isPaused ? (
           <Pause className="w-5 h-5" />
         ) : isPaused ? (
-          <Mic className="w-5 h-5" />
+          <Play className="w-5 h-5" />
         ) : (
           <Mic className="w-5 h-5" />
         )}
@@ -68,7 +68,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       {isRecording && (
         <button
           onClick={onStop}
-          className="p-2 rounded-lg bg-gray-500 hover:bg-gray-600 text-white"
+          className="p-2 rounded-lg bg-red-500 hover:bg-red-600 text-white"
           title="Stop Recording"
         >
           <Square className="w-5 h-5" />
