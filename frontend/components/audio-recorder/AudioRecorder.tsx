@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRecorder } from '../../hooks/useRecorder';
 import { useTranscriptionManager } from '../../hooks/useTranscriptionManager';
 import { useTranscriptSaver } from '../../hooks/useTranscriptSaver';
+import { useTranscription } from '../../context/TranscriptionContext';
 
 // Import the modular components
 import RecordingControls from './RecordingControls';
@@ -26,6 +27,9 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
 }) => {
   // State for UI
   const [showSettings, setShowSettings] = useState(false);
+  
+  // Get the current transcription provider
+  const { activeProvider } = useTranscription();
   
   // Use our custom hooks
   const recorder = useRecorder({
@@ -173,7 +177,7 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
             isRecording={recorder.isRecording}
             isEnhancing={transcription.isEnhancing}
             isSaving={transcriptSaver.isSaving}
-            canEnhance={true}
+            canEnhance={activeProvider === 'webspeech'}
             onEnhance={transcription.enhanceTranscript}
             onSave={handleSaveTranscript}
             onReset={transcriptSaver.resetTranscript}
