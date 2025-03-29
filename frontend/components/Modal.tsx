@@ -75,6 +75,11 @@ const Modal: React.FC<ModalProps> = ({
     setEditableTitle(initialTitle || '');
   }, [initialTitle]);
 
+  // Update content when initialContent prop changes
+  useEffect(() => {
+    setContent(initialContent);
+  }, [initialContent]);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setIsScrolled(e.currentTarget.scrollTop > 0);
   };
