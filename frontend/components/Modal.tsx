@@ -368,43 +368,47 @@ const Modal: React.FC<ModalProps> = ({
         {/* Content area with custom scrollbar */}
         <div 
           className="flex-1 overflow-hidden flex flex-col lg:flex-row"
-          onScroll={handleScroll}
         >
           {/* Left panel - Content */}
-          <div className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 py-4 lg:border-r border-gray-200 dark:border-gray-700"
+          <div className={`flex-1 min-w-0 ${isEditMode ? '' : 'overflow-y-auto'} px-4 sm:px-6 py-4 lg:border-r border-gray-200 dark:border-gray-700 flex flex-col`}
             style={{
               scrollbarWidth: 'thin',
               scrollbarColor: 'rgb(156 163 175) transparent'
             }}
+            onScroll={handleScroll}
           >
             {isEditMode ? (
-              <div className="flex flex-col h-full">
-                {/* Editor Toolbar */}
+              <>
+                {/* Formatting Toolbar */}
                 <EditorToolbar formatText={formatText} />
                 
                 {/* Editor Content */}
-                <div className="relative flex-grow mt-4">
-                  {hasEditableContent() && (
-                    <button
-                      onClick={handleCopyEditableContent}
-                      className="absolute top-2 right-2 p-2 z-10 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                      title="Copy content"
-                    >
-                      <Copy size={16} />
-                    </button>
-                  )}
-                  <ContentEditable
-                    innerRef={contentEditableRef}
-                    html={editableContent}
-                    onChange={handleContentChange}
-                    onPaste={handlePaste}
-                    tagName="div"
-                    className="min-h-[300px] p-4 bg-white dark:bg-transparent rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-y-auto font-mono text-sm max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed"
-                    style={{
-                      scrollbarWidth: 'thin',
-                      scrollbarColor: 'rgb(156 163 175) transparent'
-                    }}
-                  />
+                <div className="flex flex-col flex-grow mt-4">
+                  <div className="flex-grow relative">
+                    {hasEditableContent() && (
+                      <button
+                        onClick={handleCopyEditableContent}
+                        className="absolute top-2 right-2 p-2 z-10 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        title="Copy content"
+                      >
+                        <Copy size={16} />
+                      </button>
+                    )}
+                    <ContentEditable
+                      innerRef={contentEditableRef}
+                      html={editableContent}
+                      onChange={handleContentChange}
+                      onPaste={handlePaste}
+                      tagName="div"
+                      className="min-h-[300px] p-4 bg-white dark:bg-transparent rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-y-auto font-mono text-sm max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed"
+                      style={{
+                        minHeight: "300px",
+                        maxHeight: "calc(100vh - 250px)", // Adjust based on header, toolbar and button heights
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: 'rgb(156 163 175) transparent'
+                      }}
+                    />
+                  </div>
                   
                   {/* Save Button */}
                   <div className="mt-4 flex justify-end space-x-3">
@@ -427,13 +431,13 @@ const Modal: React.FC<ModalProps> = ({
                       ) : (
                         <>
                           <Save size={16} />
-                          Save Changes
+                          Save
                         </>
                       )}
                     </button>
                   </div>
                 </div>
-              </div>
+              </> 
             ) : (
               <div className="relative">
                 <button

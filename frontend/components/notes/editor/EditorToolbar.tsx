@@ -7,7 +7,7 @@ interface EditorToolbarProps {
 
 const EditorToolbar: React.FC<EditorToolbarProps> = ({ formatText }) => {
   return (
-    <div className="sticky top-0 z-10 mb-4 flex items-center gap-1 p-2 bg-white dark:bg-gray-900 rounded-lg overflow-x-auto shadow-sm">
+    <div className="sticky top-0 z-50 mb-4 flex items-center gap-1 p-2 bg-white dark:bg-gray-900 rounded-lg overflow-x-auto shadow-sm">
       <button
         onClick={() => formatText('bold')}
         className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg focus:outline-none transition-colors"
