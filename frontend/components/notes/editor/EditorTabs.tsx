@@ -8,7 +8,7 @@ interface EditorTabsProps {
 
 const EditorTabs: React.FC<EditorTabsProps> = ({ activeTab, setActiveTab }) => {
   return (
-    <div className="flex-1 min-w-0 lg:max-w-[40%] xl:max-w-[35%] overflow-hidden flex flex-col border-t border-gray-200 dark:border-gray-700 lg:border-t-0">
+    <div className="flex-1 min-w-0 lg:max-w-[45%] xl:max-w-[40%] overflow-hidden flex flex-col border-t border-gray-200 dark:border-gray-700 lg:border-t-0">
       {/* Tabs navigation */}
       <div className="flex items-center px-4 sm:px-6 py-2 gap-1 border-b border-gray-200 dark:border-gray-700">
         <button
