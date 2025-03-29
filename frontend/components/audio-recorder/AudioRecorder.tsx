@@ -28,8 +28,8 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
   // State for UI
   const [showSettings, setShowSettings] = useState(false);
   
-  // Get the current transcription provider
-  const { activeProvider } = useTranscription();
+  // Get the current transcription provider and selected provider
+  const { activeProvider, provider } = useTranscription();
   
   // Use our custom hooks
   const recorder = useRecorder({
@@ -177,7 +177,7 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
             isRecording={recorder.isRecording}
             isEnhancing={transcription.isEnhancing}
             isSaving={transcriptSaver.isSaving}
-            canEnhance={activeProvider === 'webspeech'}
+            canEnhance={activeProvider === 'webspeech' && provider === 'webspeech'}
             onEnhance={transcription.enhanceTranscript}
             onSave={handleSaveTranscript}
             onReset={transcriptSaver.resetTranscript}
