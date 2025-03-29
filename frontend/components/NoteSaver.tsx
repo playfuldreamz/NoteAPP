@@ -156,7 +156,7 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
           value={noteContent}
           onChange={(e) => setNoteContent(e.target.value)}
           placeholder="Write your note here..."
-          className="w-full h-32 p-2 border border-gray-300 dark:border-gray-600 rounded-md mb-4 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+          className="w-full h-32 p-2 border border-gray-300 dark:border-gray-600 rounded-md mb-4 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-transparent dark:text-gray-200 dark:placeholder-gray-400"
           disabled={isSaving || isGeneratingTitle}
         />
         <div className="flex justify-between items-center">

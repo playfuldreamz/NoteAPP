@@ -71,7 +71,7 @@ const EditorContent: React.FC<EditorContentProps> = ({
           onPaste={handlePaste}
           tagName="div"
           disabled={false}
-          className="min-h-[300px] p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-y-auto font-mono text-sm max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed"
+          className="min-h-[300px] p-4 bg-white dark:bg-transparent rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-y-auto font-mono text-sm max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed"
           style={{
             minHeight: "300px",
             maxHeight: "calc(100vh - 250px)", // Adjust based on header, toolbar and button heights

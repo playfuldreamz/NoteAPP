@@ -399,7 +399,7 @@ const Modal: React.FC<ModalProps> = ({
                     onChange={handleContentChange}
                     onPaste={handlePaste}
                     tagName="div"
-                    className="min-h-[300px] p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-y-auto font-mono text-sm max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed"
+                    className="min-h-[300px] p-4 bg-white dark:bg-transparent rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-y-auto font-mono text-sm max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed"
                     style={{
                       scrollbarWidth: 'thin',
                       scrollbarColor: 'rgb(156 163 175) transparent'
