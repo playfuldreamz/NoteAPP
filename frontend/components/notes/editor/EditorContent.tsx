@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import ContentEditable from 'react-contenteditable';
-import { Save } from 'lucide-react';
+import { Save, Copy, Check } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 interface EditorContentProps {
   noteContent: string;
@@ -18,10 +19,51 @@ const EditorContent: React.FC<EditorContentProps> = ({
   saveNote
 }) => {
   const contentEditableRef = useRef<HTMLDivElement>(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  // Function to check if there's actual content to copy
+  const hasContent = () => {
+    // Create a temporary div to extract text from HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = noteContent;
+    const text = tempDiv.textContent || tempDiv.innerText || '';
+    return text.trim().length > 0;
+  };
+
+  // Handle copy functionality
+  const handleCopy = async () => {
+    try {
+      // Create a temporary div to extract text from HTML
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = noteContent;
+      const text = tempDiv.textContent || tempDiv.innerText || '';
+      
+      await navigator.clipboard.writeText(text);
+      setIsCopied(true);
+      toast.success('Content copied to clipboard');
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy content:', error);
+      toast.error('Failed to copy content');
+    }
+  };
 
   return (
     <div className="flex flex-col flex-grow">
       <div className="flex-grow relative">
+        {hasContent() && (
+          <button
+            onClick={handleCopy}
+            className="absolute top-2 right-2 p-2 z-10 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            title="Copy content"
+          >
+            {isCopied ? (
+              <Check size={16} className="text-green-500" />
+            ) : (
+              <Copy size={16} />
+            )}
+          </button>
+        )}
         <ContentEditable
           innerRef={contentEditableRef}
           html={noteContent}

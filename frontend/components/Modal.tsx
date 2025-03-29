@@ -219,6 +219,32 @@ const Modal: React.FC<ModalProps> = ({
     setEditableContent(content.startsWith('<') ? content : textToHtml(content));
   };
 
+  // Function to check if there's actual content to copy in edit mode
+  const hasEditableContent = () => {
+    if (!editableContent) return false;
+    // Create a temporary div to extract text from HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = editableContent;
+    const text = tempDiv.textContent || tempDiv.innerText || '';
+    return text.trim().length > 0;
+  };
+
+  // Handle copy functionality for edit mode
+  const handleCopyEditableContent = async () => {
+    try {
+      // Create a temporary div to extract text from HTML
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = editableContent;
+      const text = tempDiv.textContent || tempDiv.innerText || '';
+      
+      await navigator.clipboard.writeText(text);
+      toast.success('Content copied to clipboard');
+    } catch (error) {
+      console.error('Failed to copy content:', error);
+      toast.error('Failed to copy content');
+    }
+  };
+
   if (!isOpen) return null;
 
   // Validate and normalize type
@@ -358,6 +384,15 @@ const Modal: React.FC<ModalProps> = ({
                 
                 {/* Editor Content */}
                 <div className="relative flex-grow mt-4">
+                  {hasEditableContent() && (
+                    <button
+                      onClick={handleCopyEditableContent}
+                      className="absolute top-2 right-2 p-2 z-10 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                      title="Copy content"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  )}
                   <ContentEditable
                     innerRef={contentEditableRef}
                     html={editableContent}
