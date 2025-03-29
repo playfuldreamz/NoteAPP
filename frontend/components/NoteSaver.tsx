@@ -16,6 +16,9 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
+  // Maximum content size to try if we get a payload too large error
+  const MAX_FALLBACK_CONTENT_SIZE = 100000; // ~100KB
+
   const saveNote = async () => {
     if (!noteContent.trim()) {
       console.log('Attempting to show empty note toast');
@@ -60,32 +63,83 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
       }
       
       // Save note with generated or default title
-      const response = await fetch('http://localhost:5000/api/notes', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          content: noteContent,
-          transcript: transcript,
-          title: title
-        })
-      });
+      try {
+        const response = await fetch('http://localhost:5000/api/notes', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            content: noteContent,
+            transcript: transcript,
+            title: title
+          })
+        });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to save note');
+        if (!response.ok) {
+          // Check if it's a payload too large error
+          if (response.status === 413) {
+            throw new Error('PAYLOAD_TOO_LARGE');
+          }
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to save note');
+        }
+
+        const data = await response.json();
+        console.log('Attempting to show success toast');
+        toast.success('Note saved successfully!');
+        setNoteContent(''); // Clear the input
+        onSave(); // Refresh the notes list
+      } catch (error) {
+        // Handle payload too large error with a fallback approach
+        if (error instanceof Error && error.message === 'PAYLOAD_TOO_LARGE') {
+          console.warn('Payload too large, attempting to save with reduced content...');
+          toast.info('Note is very large, attempting to save with a simplified format...');
+          
+          // Try saving with just the content and a default title
+          try {
+            // Truncate content if it's extremely large
+            let truncatedContent = noteContent;
+            if (noteContent.length > MAX_FALLBACK_CONTENT_SIZE) {
+              truncatedContent = noteContent.substring(0, MAX_FALLBACK_CONTENT_SIZE) + 
+                "\n\n[Note was truncated due to size limitations]";
+            }
+            
+            const fallbackResponse = await fetch('http://localhost:5000/api/notes', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                content: truncatedContent,
+                title: 'Untitled Large Note'
+              })
+            });
+
+            if (!fallbackResponse.ok) {
+              const fallbackData = await fallbackResponse.json();
+              throw new Error(fallbackData.error || 'Failed to save note even with reduced content');
+            }
+
+            console.log('Saved note with fallback approach');
+            toast.success('Note saved successfully with simplified format!');
+            setNoteContent(''); // Clear the input
+            onSave(); // Refresh the notes list
+          } catch (fallbackError) {
+            console.error('Fallback save error:', fallbackError);
+            toast.error('Failed to save note even with reduced size. Please try with less content.');
+          }
+        } else {
+          // Handle other errors
+          console.error('Save error:', error);
+          console.log('Attempting to show error toast');
+          toast.error('Failed to save note. Please try again');
+        }
       }
-
-      console.log('Attempting to show success toast');
-      toast.success('Note saved successfully!');
-      setNoteContent(''); // Clear the input
-      onSave(); // Refresh the notes list
     } catch (error) {
-      console.error('Save error:', error);
-      console.log('Attempting to show error toast');
+      console.error('Overall save error:', error);
       toast.error('Failed to save note. Please try again');
     } finally {
       setIsSaving(false);

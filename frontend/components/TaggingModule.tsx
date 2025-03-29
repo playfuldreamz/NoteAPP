@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   analyzeContentForTags,
   createTag,
@@ -61,7 +61,18 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   const [isLoadingSuggestedTags, setIsLoadingSuggestedTags] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [shouldRefreshSuggestions, setShouldRefreshSuggestions] = useState(true);
+  
+  // Track the last analyzed content to prevent unnecessary refreshes
+  const lastAnalyzedContent = useRef<string>('');
+  // Track if we're in the middle of a tag operation
+  const isTagOperationInProgress = useRef(false);
+  // Store the current content for comparison
+  const currentContentRef = useRef<string>(content);
+  
+  // Update the content ref when content changes
+  useEffect(() => {
+    currentContentRef.current = content;
+  }, [content]);
 
   // Reset state when item changes
   useEffect(() => {
@@ -69,7 +80,8 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     setSuggestedTags([]);
     setIsLoadingTags(true);
     setIsLoadingSuggestedTags(true);
-    setShouldRefreshSuggestions(true);
+    lastAnalyzedContent.current = '';
+    isTagOperationInProgress.current = false;
   }, [itemId, initialTags]);
 
   // Load tags when component mounts or item changes
@@ -103,22 +115,29 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     loadTags();
   }, [type, itemId, initialTags, updateItemTags, onTagsUpdate, normalizedType]);
 
-  // Analyze content for suggested tags
-  useEffect(() => {
-    // Skip analysis if we shouldn't refresh suggestions
-    if (!shouldRefreshSuggestions) return;
+  // Analyze content for suggested tags - completely separated from tag selection
+  const analyzeSuggestedTags = useCallback(async () => {
+    // Skip if we're in the middle of a tag operation
+    if (isTagOperationInProgress.current) return;
     
-    const analyzeContent = async () => {
-      if (!content.trim()) {
-        setSuggestedTags([]);
-        setIsLoadingSuggestedTags(false);
-        return;
-      }
+    const contentToAnalyze = currentContentRef.current;
+    
+    // Skip if content hasn't changed since last analysis
+    if (contentToAnalyze === lastAnalyzedContent.current) return;
+    
+    if (!contentToAnalyze.trim()) {
+      setSuggestedTags([]);
+      setIsLoadingSuggestedTags(false);
+      return;
+    }
 
-      try {
-        setIsLoadingSuggestedTags(true);
-        const suggestions = await analyzeContentForTags(content);
+    try {
+      setIsLoadingSuggestedTags(true);
+      const suggestions = await analyzeContentForTags(contentToAnalyze);
 
+      // Only update if we're not in the middle of a tag operation
+      // and if the content hasn't changed during the API call
+      if (!isTagOperationInProgress.current && contentToAnalyze === currentContentRef.current) {
         // Filter out tags that are already selected
         const filteredSuggestions = suggestions.filter(
           suggestion => !selectedTags.some(tag =>
@@ -127,44 +146,54 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         );
 
         setSuggestedTags(filteredSuggestions);
-      } catch (error) {
-        console.error('Error analyzing content:', error);
-        if (error instanceof InvalidAPIKeyError) {
-          const toastId = toast.error(
-            <div className="flex flex-col gap-2">
-              <div>AI Provider API key is invalid or expired</div>
-              <button
-                onClick={() => {
-                  setShowSettings(true);
-                  toast.dismiss(toastId);
-                }}
-                className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
-              >
-                <Settings size={14} />
-                Update API Key in Settings
-              </button>
-            </div>,
-            {
-              autoClose: false,
-              closeOnClick: false,
-              onClick: () => {
+        lastAnalyzedContent.current = contentToAnalyze;
+      }
+    } catch (error) {
+      console.error('Error analyzing content:', error);
+      if (error instanceof InvalidAPIKeyError) {
+        const toastId = toast.error(
+          <div className="flex flex-col gap-2">
+            <div>AI Provider API key is invalid or expired</div>
+            <button
+              onClick={() => {
                 setShowSettings(true);
                 toast.dismiss(toastId);
-              }
+              }}
+              className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
+            >
+              <Settings size={14} />
+              Update API Key in Settings
+            </button>
+          </div>,
+          {
+            autoClose: false,
+            closeOnClick: false,
+            onClick: () => {
+              setShowSettings(true);
+              toast.dismiss(toastId);
             }
-          );
-        } else {
-          toast.error('Failed to analyze content for tags');
-        }
-        setSuggestedTags([]);
-      } finally {
-        setIsLoadingSuggestedTags(false);
+          }
+        );
+      } else {
+        toast.error('Failed to analyze content for tags');
       }
-    };
-
-    const debounceTimer = setTimeout(analyzeContent, 1000);
+      setSuggestedTags([]);
+    } finally {
+      setIsLoadingSuggestedTags(false);
+    }
+  }, [selectedTags]);
+  
+  // Debounced content analysis
+  useEffect(() => {
+    // Skip if we're in the middle of a tag operation
+    if (isTagOperationInProgress.current) return;
+    
+    // Skip if content hasn't changed
+    if (content === lastAnalyzedContent.current) return;
+    
+    const debounceTimer = setTimeout(analyzeSuggestedTags, 1000);
     return () => clearTimeout(debounceTimer);
-  }, [content, selectedTags, shouldRefreshSuggestions]);
+  }, [content, analyzeSuggestedTags]);
 
   const handleAddTag = async (tagName: string) => {
     setIsSaving(true);
@@ -199,6 +228,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
 
   const handleRemoveTag = async (tagId: number) => {
     setIsSaving(true);
+    
     try {
       await removeTagFromItem(normalizedType, itemId, tagId);
 
@@ -223,12 +253,26 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       return; // Tag is already selected
     }
 
-    // Disable suggestion refreshing while handling tag click
-    setShouldRefreshSuggestions(false);
+    // Set flag to prevent suggestion refreshes during tag operations
+    isTagOperationInProgress.current = true;
     setIsSaving(true);
+    
+    // Store the current suggestions to restore them later
+    const currentSuggestions = [...suggestedTags];
+    
     try {
+      // Immediately remove the selected tag from suggestions for better UX
+      setSuggestedTags(prevSuggestions => 
+        prevSuggestions.filter(suggestion => 
+          suggestion.toLowerCase() !== tagName.toLowerCase()
+        )
+      );
+      
       // First try to add the existing tag
-      const existingTag = tags.find(tag => tag.name.toLowerCase() === tagName.toLowerCase());
+      const existingTag = tags.find(tag => 
+        tag.name.toLowerCase() === tagName.toLowerCase()
+      );
+      
       if (existingTag) {
         await addTagToItem(normalizedType, itemId, existingTag);
         const updatedTags = [...selectedTags, existingTag];
@@ -237,13 +281,6 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         if (onTagsUpdate) {
           onTagsUpdate(updatedTags);
         }
-        
-        // Immediately remove the selected tag from suggestions
-        setSuggestedTags(prevSuggestions => 
-          prevSuggestions.filter(suggestion => 
-            suggestion.toLowerCase() !== tagName.toLowerCase()
-          )
-        );
         
         // Don't show toast here since it's just selecting an existing tag
         return;
@@ -259,13 +296,6 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
         if (onTagsUpdate) {
           onTagsUpdate(updatedTags);
         }
-        
-        // Immediately remove the selected tag from suggestions
-        setSuggestedTags(prevSuggestions => 
-          prevSuggestions.filter(suggestion => 
-            suggestion.toLowerCase() !== tagName.toLowerCase()
-          )
-        );
         
         // Only show toast for newly created tags
         toast.success('Tag created successfully');
@@ -311,18 +341,24 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     } catch (error) {
       console.error('Error handling tag click:', error);
       toast.error('Failed to add tag');
+      
+      // Restore the suggestions if there was an error
+      setSuggestedTags(currentSuggestions);
     } finally {
       setIsSaving(false);
-      // Re-enable suggestion refreshing for content changes
-      // But do it after a delay to prevent immediate refresh
-      setTimeout(() => setShouldRefreshSuggestions(true), 500);
+      
+      // Keep the flag on for a short time to prevent immediate refreshes
+      setTimeout(() => {
+        isTagOperationInProgress.current = false;
+      }, 1000);
     }
   };
 
   const handleCreateTag = async (tagName: string): Promise<Tag | null> => {
-    if (isSaving) return null;
+    // Set flag to prevent suggestion refreshes during tag operations
+    isTagOperationInProgress.current = true;
     setIsSaving(true);
-
+    
     try {
       // First check if tag already exists in the user's tags
       const existingTag = tags.find(tag => 
@@ -399,6 +435,11 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       return null;
     } finally {
       setIsSaving(false);
+      
+      // Keep the flag on for a short time to prevent immediate refreshes
+      setTimeout(() => {
+        isTagOperationInProgress.current = false;
+      }, 1000);
     }
   };
 
