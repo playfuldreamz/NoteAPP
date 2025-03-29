@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Save, Settings } from 'lucide-react';
+import { Save, Settings, Maximize2 } from 'lucide-react';
 import { summarizeContent, InvalidAPIKeyError } from '../services/ai';
 import SettingsModal from './settings/SettingsModal';
+import NoteEditorModal from './notes/NoteEditorModal';
 
 interface NoteSaverProps {
   transcript: string;
@@ -15,6 +16,7 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showExpandedEditor, setShowExpandedEditor] = useState(false);
 
   // Maximum content size to try if we get a payload too large error
   const MAX_FALLBACK_CONTENT_SIZE = 100000; // ~100KB
@@ -149,26 +151,35 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
-      <textarea
-        value={noteContent}
-        onChange={(e) => setNoteContent(e.target.value)}
-        placeholder="Write your note here..."
-        className="w-full h-32 p-2 border border-gray-300 dark:border-gray-600 rounded-md mb-4 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-        disabled={isSaving || isGeneratingTitle}
-      />
-      <button 
-        onClick={saveNote}
-        disabled={isSaving || isGeneratingTitle}
-        className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
-          isSaving || isGeneratingTitle
-            ? 'bg-blue-200 dark:bg-blue-900 text-blue-50 dark:text-blue-200 cursor-not-allowed'
-            : 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 hover:shadow-md active:scale-[0.98]'
-        } w-full sm:w-auto`}
-      >
-        <Save size={20} />
-        {isGeneratingTitle ? 'Generating Title...' : isSaving ? 'Saving...' : 'Save Note'}
-      </button>
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8 relative">
+        <textarea
+          value={noteContent}
+          onChange={(e) => setNoteContent(e.target.value)}
+          placeholder="Write your note here..."
+          className="w-full h-32 p-2 border border-gray-300 dark:border-gray-600 rounded-md mb-4 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+          disabled={isSaving || isGeneratingTitle}
+        />
+        <div className="flex justify-between items-center">
+          <button 
+            onClick={saveNote}
+            disabled={isSaving || isGeneratingTitle}
+            className={`relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm shadow-sm transition-all ${
+              isSaving || isGeneratingTitle
+                ? 'bg-blue-200 dark:bg-blue-900 text-blue-50 dark:text-blue-200 cursor-not-allowed'
+                : 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 hover:shadow-md active:scale-[0.98]'
+            } w-full sm:w-auto`}
+          >
+            <Save size={20} />
+            {isGeneratingTitle ? 'Generating Title...' : isSaving ? 'Saving...' : 'Save Note'}
+          </button>
+          <button
+            onClick={() => setShowExpandedEditor(true)}
+            className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            title="Expand editor"
+          >
+            <Maximize2 size={20} />
+          </button>
+        </div>
       </div>
       <SettingsModal
         isOpen={showSettings}
@@ -176,6 +187,17 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
         setUsername={() => {}}
         currentModel=""
         modelSource=""
+      />
+      <NoteEditorModal
+        isOpen={showExpandedEditor}
+        onClose={() => setShowExpandedEditor(false)}
+        initialContent={noteContent}
+        transcript={transcript}
+        onSave={() => {
+          onSave();
+          setNoteContent('');
+          setShowExpandedEditor(false);
+        }}
       />
     </>
   );

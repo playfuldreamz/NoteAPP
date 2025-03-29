@@ -247,8 +247,45 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
 
   const truncateText = (text: string | null) => {
     if (!text) return '';
-    const words = text.split(' ');
-    return words.length > 5 ? words.slice(0, 5).join(' ') + '...' : text;
+    
+    // First, normalize the text by removing HTML tags if any are present
+    const cleanText = text.replace(/<[^>]*>/g, '');
+    
+    // Split by newlines to get separate lines
+    const lines = cleanText.split(/\r?\n/).filter(line => line.trim() !== '');
+    
+    if (lines.length === 0) return '';
+    
+    // If we have mostly single-character lines (like numbered lists), 
+    // treat the whole text as a single chunk
+    const singleCharLines = lines.filter(line => line.trim().length <= 2);
+    if (singleCharLines.length > lines.length / 2) {
+      // It's likely a numbered list or similar pattern
+      // Join everything and treat as one chunk of text
+      const allText = lines.join(' ');
+      const words = allText.split(' ').filter(word => word.trim() !== '');
+      return words.length > 10 ? words.slice(0, 10).join(' ') + '...' : allText;
+    }
+    
+    // Otherwise, process normally with line-based approach
+    // Take only the first two non-empty lines
+    const limitedLines = lines.slice(0, 2);
+    
+    // For each line, limit to reasonable number of words
+    const truncatedLines = limitedLines.map(line => {
+      const words = line.split(' ').filter(word => word.trim() !== '');
+      return words.length > 5 ? words.slice(0, 5).join(' ') + '...' : line;
+    });
+    
+    // Join the lines back together
+    let result = truncatedLines.join(' — ');
+    
+    // Add ellipsis if there were more lines
+    if (lines.length > 2) {
+      result += '...';
+    }
+    
+    return result;
   };
 
   const handleLoadMore = () => {
