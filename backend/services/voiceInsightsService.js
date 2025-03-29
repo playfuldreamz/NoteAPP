@@ -83,9 +83,6 @@ const getVoiceInsights = async (userId, timeRange) => {
             return reject(tagErr);
           }
 
-          console.log('Tag timeline data:', JSON.stringify(tagTimeline));
-          console.log('Query params:', userId, startDate.toISOString());
-
           // Calculate popular topics
           const popularTopics = Array.from(topicsMap.entries())
             .map(([topic, count]) => ({
