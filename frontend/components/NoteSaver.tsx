@@ -191,7 +191,7 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
       <NoteEditorModal
         isOpen={showExpandedEditor}
         onClose={() => setShowExpandedEditor(false)}
-        initialContent={noteContent}
+        initialContent={noteContent.split('\n').map(line => `<div>${line || '<br>'}</div>`).join('')}
         transcript={transcript}
         onSave={() => {
           onSave();

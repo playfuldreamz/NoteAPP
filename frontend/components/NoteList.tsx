@@ -199,8 +199,22 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
 
       await deleteResource('note', id, token);
       // Update local state to remove the deleted note
-      setFilteredNotes(prev => prev.filter(n => n.id !== id));
-      setVisibleNotes(prev => prev.filter(n => n.id !== id));
+      setFilteredNotes(prev => {
+        const newFiltered = prev.filter(n => n.id !== id);
+        return newFiltered;
+      });
+      
+      // Update visible notes while maintaining 5 items
+      setVisibleNotes(prev => {
+        const remainingNotes = prev.filter(n => n.id !== id);
+        // If we now have fewer than 5 visible notes, add more from filtered notes if available
+        if (remainingNotes.length < 5) {
+          const newFiltered = filteredNotes.filter(n => n.id !== id);
+          return newFiltered.slice(0, 5);
+        }
+        return remainingNotes;
+      });
+      
       toast.success('Note deleted successfully!');
     } catch (error) {
       console.error('Delete error:', error);

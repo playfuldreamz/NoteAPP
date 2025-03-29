@@ -505,7 +505,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
                 const existingTag = tags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
                 return (
                   <TagChip
-                    key={`suggested-${existingTag?.id || tagName}`}
+                    key={`suggested-${existingTag?.id || tagName}-${Math.random().toString(36).substr(2, 9)}`}
                     tag={existingTag || { id: -1, name: tagName }}
                     onClick={() => handleTagClick(tagName)}
                     disabled={isSaving}

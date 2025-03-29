@@ -214,7 +214,24 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
       }
 
       await deleteResource('transcript', id, token);
-      updateTranscripts();
+      
+      // Update filtered transcripts
+      setFilteredTranscripts(prev => {
+        const newFiltered = prev.filter(t => t.id !== id);
+        return newFiltered;
+      });
+      
+      // Update visible transcripts while maintaining 5 items
+      setVisibleTranscripts(prev => {
+        const remainingTranscripts = prev.filter(t => t.id !== id);
+        // If we now have fewer than 5 visible transcripts, add more from filtered if available
+        if (remainingTranscripts.length < 5) {
+          const newFiltered = filteredTranscripts.filter(t => t.id !== id);
+          return newFiltered.slice(0, 5);
+        }
+        return remainingTranscripts;
+      });
+      
       toast.success('Transcript deleted successfully!');
     } catch (error) {
       console.error('Delete error:', error);
@@ -229,21 +246,47 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setIsModalOpen(true);
   };
 
-  const truncateText = (text: string) => {
-    const words = text.split(' ');
-    return words.length > 6 ? words.slice(0, 6).join(' ') + '...' : text;
-  };
-
-  const handleLoadMore = () => {
-    const currentLength = visibleTranscripts.length;
-    const newVisibleTranscripts = filteredTranscripts.slice(0, currentLength + 5);
-    setVisibleTranscripts(newVisibleTranscripts);
-    setShowLoadMore(newVisibleTranscripts.length < filteredTranscripts.length);
-  };
-
-  const handleShowLess = () => {
-    setVisibleTranscripts(filteredTranscripts.slice(0, 5));
-    setShowLoadMore(filteredTranscripts.length > 5);
+  const truncateText = (text: string | null) => {
+    if (!text) return '';
+    
+    // First, normalize the text by removing HTML tags if any are present
+    const cleanText = text.replace(/<[^>]*>/g, '');
+    
+    // Split by newlines to get separate lines
+    const lines = cleanText.split(/\r?\n/).filter(line => line.trim() !== '');
+    
+    if (lines.length === 0) return '';
+    
+    // If we have mostly single-character lines (like numbered lists), 
+    // treat the whole text as a single chunk
+    const singleCharLines = lines.filter(line => line.trim().length <= 2);
+    if (singleCharLines.length > lines.length / 2) {
+      // It's likely a numbered list or similar pattern
+      // Join everything and treat as one chunk of text
+      const allText = lines.join(' ');
+      const words = allText.split(' ').filter(word => word.trim() !== '');
+      return words.length > 10 ? words.slice(0, 10).join(' ') + '...' : allText;
+    }
+    
+    // Otherwise, process normally with line-based approach
+    // Take only the first two non-empty lines
+    const limitedLines = lines.slice(0, 2);
+    
+    // For each line, limit to reasonable number of words
+    const truncatedLines = limitedLines.map(line => {
+      const words = line.split(' ').filter(word => word.trim() !== '');
+      return words.length > 5 ? words.slice(0, 5).join(' ') + '...' : line;
+    });
+    
+    // Join the lines back together
+    let result = truncatedLines.join(' — ');
+    
+    // Add ellipsis if there were more lines
+    if (lines.length > 2) {
+      result += '...';
+    }
+    
+    return result;
   };
 
   const handleRegenerateTitle = async () => {
@@ -336,6 +379,18 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   useEffect(() => {
     if (onTitleUpdate) onTitleUpdate();
   }, [isModalOpen, onTitleUpdate]);
+
+  const handleLoadMore = () => {
+    const currentLength = visibleTranscripts.length;
+    const newVisibleTranscripts = filteredTranscripts.slice(0, currentLength + 5);
+    setVisibleTranscripts(newVisibleTranscripts);
+    setShowLoadMore(newVisibleTranscripts.length < filteredTranscripts.length);
+  };
+
+  const handleShowLess = () => {
+    setVisibleTranscripts(filteredTranscripts.slice(0, 5));
+    setShowLoadMore(filteredTranscripts.length > 5);
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
