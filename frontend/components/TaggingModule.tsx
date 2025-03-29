@@ -61,6 +61,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   const [isLoadingSuggestedTags, setIsLoadingSuggestedTags] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [shouldRefreshSuggestions, setShouldRefreshSuggestions] = useState(true);
 
   // Reset state when item changes
   useEffect(() => {
@@ -68,6 +69,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     setSuggestedTags([]);
     setIsLoadingTags(true);
     setIsLoadingSuggestedTags(true);
+    setShouldRefreshSuggestions(true);
   }, [itemId, initialTags]);
 
   // Load tags when component mounts or item changes
@@ -103,6 +105,9 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
 
   // Analyze content for suggested tags
   useEffect(() => {
+    // Skip analysis if we shouldn't refresh suggestions
+    if (!shouldRefreshSuggestions) return;
+    
     const analyzeContent = async () => {
       if (!content.trim()) {
         setSuggestedTags([]);
@@ -159,7 +164,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
 
     const debounceTimer = setTimeout(analyzeContent, 1000);
     return () => clearTimeout(debounceTimer);
-  }, [content, selectedTags]);
+  }, [content, selectedTags, shouldRefreshSuggestions]);
 
   const handleAddTag = async (tagName: string) => {
     setIsSaving(true);
@@ -218,6 +223,8 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       return; // Tag is already selected
     }
 
+    // Disable suggestion refreshing while handling tag click
+    setShouldRefreshSuggestions(false);
     setIsSaving(true);
     try {
       // First try to add the existing tag
@@ -306,17 +313,10 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       toast.error('Failed to add tag');
     } finally {
       setIsSaving(false);
+      // Re-enable suggestion refreshing for content changes
+      // But do it after a delay to prevent immediate refresh
+      setTimeout(() => setShouldRefreshSuggestions(true), 500);
     }
-  };
-
-  const getErrorMessage = (error: unknown): string => {
-    if (error instanceof Error) {
-      if (error.message.includes('400')) return 'Invalid request - please check your input';
-      if (error.message.includes('404')) return 'Resource not found';
-      if (error.message.includes('500')) return 'Server error - please try again';
-      return error.message;
-    }
-    return 'Failed to update tags';
   };
 
   const handleCreateTag = async (tagName: string): Promise<Tag | null> => {
@@ -415,6 +415,16 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     }
 
     return suggestions;
+  };
+
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+      if (error.message.includes('400')) return 'Invalid request - please check your input';
+      if (error.message.includes('404')) return 'Resource not found';
+      if (error.message.includes('500')) return 'Server error - please try again';
+      return error.message;
+    }
+    return 'Failed to update tags';
   };
 
   return (
