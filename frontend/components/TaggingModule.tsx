@@ -221,7 +221,7 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
     setIsSaving(true);
     try {
       // First try to add the existing tag
-      const existingTag = tags.find(tag => tag.name === tagName);
+      const existingTag = tags.find(tag => tag.name.toLowerCase() === tagName.toLowerCase());
       if (existingTag) {
         await addTagToItem(normalizedType, itemId, existingTag);
         const updatedTags = [...selectedTags, existingTag];
@@ -243,24 +243,64 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
       }
 
       // If tag doesn't exist, create and add it
-      const newTag = await createTag(tagName);
-      await addTagToItem(normalizedType, itemId, newTag);
-      const updatedTags = [...selectedTags, newTag];
-      setSelectedTags(updatedTags);
-      updateItemTags(itemId, normalizedType, updatedTags);
-      if (onTagsUpdate) {
-        onTagsUpdate(updatedTags);
+      try {
+        const newTag = await createTag(tagName);
+        await addTagToItem(normalizedType, itemId, newTag);
+        const updatedTags = [...selectedTags, newTag];
+        setSelectedTags(updatedTags);
+        updateItemTags(itemId, normalizedType, updatedTags);
+        if (onTagsUpdate) {
+          onTagsUpdate(updatedTags);
+        }
+        
+        // Immediately remove the selected tag from suggestions
+        setSuggestedTags(prevSuggestions => 
+          prevSuggestions.filter(suggestion => 
+            suggestion.toLowerCase() !== tagName.toLowerCase()
+          )
+        );
+        
+        // Only show toast for newly created tags
+        toast.success('Tag created successfully');
+      } catch (error) {
+        // Handle the "User already has this tag" error
+        if (error instanceof Error && error.message.includes('User already has this tag')) {
+          // Find the existing tag in the list of all tags
+          const allTags = await getAllTags();
+          const existingTag = allTags.find(tag => tag.name.toLowerCase() === tagName.toLowerCase());
+          
+          if (existingTag) {
+            // Check if the tag is already associated with this item
+            if (!selectedTags.some(tag => tag.id === existingTag.id)) {
+              // Add the existing tag to the current item
+              await addTagToItem(normalizedType, itemId, existingTag);
+              
+              // Update UI state
+              const updatedTags = [...selectedTags, existingTag];
+              setSelectedTags(updatedTags);
+              updateItemTags(itemId, normalizedType, updatedTags);
+              if (onTagsUpdate) {
+                onTagsUpdate(updatedTags);
+              }
+              
+              // Immediately remove the selected tag from suggestions
+              setSuggestedTags(prevSuggestions => 
+                prevSuggestions.filter(suggestion => 
+                  suggestion.toLowerCase() !== tagName.toLowerCase()
+                )
+              );
+              
+              toast.success('Tag added successfully');
+            } else {
+              toast.info('This tag is already added to this item');
+            }
+          } else {
+            throw new Error('Failed to find existing tag');
+          }
+        } else {
+          throw error; // Re-throw if it's not the specific error we're handling
+        }
       }
-      
-      // Immediately remove the selected tag from suggestions
-      setSuggestedTags(prevSuggestions => 
-        prevSuggestions.filter(suggestion => 
-          suggestion.toLowerCase() !== tagName.toLowerCase()
-        )
-      );
-      
-      // Only show toast for newly created tags
-      toast.success('Tag created successfully');
     } catch (error) {
       console.error('Error handling tag click:', error);
       toast.error('Failed to add tag');
