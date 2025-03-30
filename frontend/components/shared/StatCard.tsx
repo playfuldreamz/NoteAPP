@@ -24,7 +24,7 @@ const StatCard: React.FC<StatCardProps> = ({
       className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 flex flex-col"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay }}
+      transition={{ duration: 0.2, delay }}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">

@@ -128,6 +128,8 @@ export default function HomePage() {
   const [noteInsights, setNoteInsights] = useState<NoteInsightsData | null>(null);
   const [isLoadingNoteInsights, setIsLoadingNoteInsights] = useState<boolean>(false);
   const [isRegeneratingTitle, setIsRegeneratingTitle] = useState<boolean>(false);
+  const [notesLimit, setNotesLimit] = useState(10);
+  const [transcriptsLimit, setTranscriptsLimit] = useState(10);
   // Sample data for mini charts
   const [statChartData, setStatChartData] = useState({
     notes: [4, 6, 8, 5, 9, 7, 10],
@@ -144,7 +146,7 @@ export default function HomePage() {
       // Fetch all notes for stats
       const [notesResponse, allNotesResponse, transcriptsResponse, allTranscriptsResponse] = await Promise.all([
         // Recent notes (limited to 5)
-        fetch('http://localhost:5000/api/notes?limit=5', {
+        fetch(`http://localhost:5000/api/notes?limit=${notesLimit}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -158,7 +160,7 @@ export default function HomePage() {
           }
         }),
         // Recent transcripts (limited to 5)
-        fetch('http://localhost:5000/api/transcripts?limit=5', {
+        fetch(`http://localhost:5000/api/transcripts?limit=${transcriptsLimit}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -199,7 +201,7 @@ export default function HomePage() {
       console.error('Error fetching recent activity:', error);
       toast.error('Failed to fetch recent activity');
     }
-  }, []);
+  }, [notesLimit, transcriptsLimit]);
 
   useEffect(() => {
     fetchRecentActivity();
@@ -323,6 +325,14 @@ export default function HomePage() {
     }
   };
 
+  const handleLoadMore = (type: 'notes' | 'transcripts') => {
+    if (type === 'notes') {
+      setNotesLimit(prev => prev + 10);
+    } else {
+      setTranscriptsLimit(prev => prev + 10);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Stats Cards Row */}
@@ -368,7 +378,7 @@ export default function HomePage() {
           className="h-full flex flex-col"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: 0.2 }}
         >
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -397,7 +407,7 @@ export default function HomePage() {
           className="h-full flex flex-col"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
+          transition={{ duration: 0.2, delay: 0.1 }}
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -412,31 +422,41 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1">
-            <div className="space-y-3 h-[180px] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-              {recentNotes.length > 0 ? (
-                recentNotes.map(note => (
-                  <div 
-                    key={note.id} 
-                    onClick={() => handleItemClick(note, 'note')}
-                    className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
-                  >
-                    <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
-                        {note.title || 'Untitled Note'}
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {new Date(note.timestamp).toLocaleDateString()}
-                      </p>
+            <div className="flex flex-col h-full">
+              <div className="overflow-y-auto h-[180px] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+                {recentNotes.length > 0 ? (
+                  recentNotes.map(note => (
+                    <div 
+                      key={note.id} 
+                      onClick={() => handleItemClick(note, 'note')}
+                      className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
+                    >
+                      <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
+                          {note.title || 'Untitled Note'}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {new Date(note.timestamp).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
+                    <Activity className="w-4 h-4" />
+                    <span>Start by creating your first note!</span>
                   </div>
-                ))
-              ) : (
-                <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
-                  <Activity className="w-4 h-4" />
-                  <span>Start by creating your first note!</span>
-                </div>
-              )}
+                )}
+              </div>
+              <div className="sticky bottom-0">
+                <button
+                  onClick={() => handleLoadMore('notes')}
+                  className="float-right text-xs px-2 py-1 text-blue-500 hover:text-blue-700 bg-transparent"
+                >
+                  Load More
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -446,7 +466,7 @@ export default function HomePage() {
           className="h-full flex flex-col"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
+          transition={{ duration: 0.2, delay: 0.2 }}
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -461,31 +481,41 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex-1">
-            <div className="space-y-3 h-[180px] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-              {recentTranscripts.length > 0 ? (
-                recentTranscripts.map(transcript => (
-                  <div 
-                    key={transcript.id} 
-                    onClick={() => handleItemClick(transcript, 'transcript')}
-                    className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
-                  >
-                    <Mic className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
-                        {transcript.title || 'Untitled Recording'}
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {new Date(transcript.date).toLocaleString()} • {transcript.duration ? `${Math.floor(transcript.duration / 60)}:${(transcript.duration % 60).toString().padStart(2, '0')}` : '0:00'}
-                      </p>
+            <div className="flex flex-col h-full">
+              <div className="overflow-y-auto h-[180px] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+                {recentTranscripts.length > 0 ? (
+                  recentTranscripts.map(transcript => (
+                    <div 
+                      key={transcript.id} 
+                      onClick={() => handleItemClick(transcript, 'transcript')}
+                      className="flex items-center space-x-3 text-sm p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer group"
+                    >
+                      <Mic className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
+                          {transcript.title || 'Untitled Recording'}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {new Date(transcript.date).toLocaleString()} • {transcript.duration ? `${Math.floor(transcript.duration / 60)}:${(transcript.duration % 60).toString().padStart(2, '0')}` : '0:00'}
+                        </p>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
+                    <Star className="w-4 h-4" />
+                    <span>Record your first voice note!</span>
                   </div>
-                ))
-              ) : (
-                <div className="flex items-center space-x-3 text-sm text-gray-600 dark:text-gray-400 h-full justify-center">
-                  <Star className="w-4 h-4" />
-                  <span>Record your first voice note!</span>
-                </div>
-              )}
+                )}
+              </div>
+              <div className="sticky bottom-0">
+                <button
+                  onClick={() => handleLoadMore('transcripts')}
+                  className="float-right text-xs px-2 py-1 text-blue-500 hover:text-blue-700 bg-transparent"
+                >
+                  Load More
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -495,7 +525,7 @@ export default function HomePage() {
           className="h-full flex flex-col"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
+          transition={{ duration: 0.2, delay: 0.3 }}
         >
           <div className="flex items-center gap-2 mb-4">
             <Target className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -515,7 +545,7 @@ export default function HomePage() {
           className="col-span-full mt-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.4 }}
+          transition={{ duration: 0.2, delay: 0.4 }}
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -565,7 +595,7 @@ export default function HomePage() {
           className="col-span-full mt-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.5 }}
+          transition={{ duration: 0.2, delay: 0.5 }}
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">

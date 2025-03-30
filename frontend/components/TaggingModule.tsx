@@ -145,7 +145,8 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
           )
         );
 
-        setSuggestedTags(filteredSuggestions);
+        // Limit to maximum 10 suggested tags
+        setSuggestedTags(filteredSuggestions.slice(0, 10));
         lastAnalyzedContent.current = contentToAnalyze;
       }
     } catch (error) {
@@ -446,16 +447,21 @@ const TaggingModule: React.FC<TaggingModuleProps> = ({
   const parseSuggestedTags = (suggestions: string[]): string[] => {
     if (suggestions.length === 0) return [];
 
+    let parsedTags: string[] = [];
+    
     // Handle the case where the first item contains delimiters
     if (typeof suggestions[0] === 'string' && suggestions[0].match(/[,*\n]/)) {
-      return suggestions[0]
+      parsedTags = suggestions[0]
         .replace(/^Tags:\s*/, '')
         .split(/[,*\n]+/)
         .map(tag => tag.trim().replace(/^-/, '').trim())
         .filter(tag => tag.length > 0);
+    } else {
+      parsedTags = suggestions;
     }
 
-    return suggestions;
+    // Limit to maximum 10 tags
+    return parsedTags.slice(0, 10);
   };
 
   const getErrorMessage = (error: unknown): string => {
