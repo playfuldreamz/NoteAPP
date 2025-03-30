@@ -128,8 +128,18 @@ export default function HomePage() {
   const [noteInsights, setNoteInsights] = useState<NoteInsightsData | null>(null);
   const [isLoadingNoteInsights, setIsLoadingNoteInsights] = useState<boolean>(false);
   const [isRegeneratingTitle, setIsRegeneratingTitle] = useState<boolean>(false);
-  const [notesLimit, setNotesLimit] = useState(10);
-  const [transcriptsLimit, setTranscriptsLimit] = useState(10);
+  
+  // Pagination state
+  const [notesLimit] = useState(5);
+  const [notesOffset, setNotesOffset] = useState(0);
+  const [hasMoreNotes, setHasMoreNotes] = useState(true);
+  const [isLoadingMoreNotes, setIsLoadingMoreNotes] = useState(false);
+  
+  const [transcriptsLimit] = useState(5);
+  const [transcriptsOffset, setTranscriptsOffset] = useState(0);
+  const [hasMoreTranscripts, setHasMoreTranscripts] = useState(true);
+  const [isLoadingMoreTranscripts, setIsLoadingMoreTranscripts] = useState(false);
+  
   // Sample data for mini charts
   const [statChartData, setStatChartData] = useState({
     notes: [4, 6, 8, 5, 9, 7, 10],
@@ -143,24 +153,10 @@ export default function HomePage() {
     if (!token) return;
 
     try {
-      // Fetch all notes for stats
-      const [notesResponse, allNotesResponse, transcriptsResponse, allTranscriptsResponse] = await Promise.all([
-        // Recent notes (limited to 5)
-        fetch(`http://localhost:5000/api/notes?limit=${notesLimit}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }),
+      // Fetch all notes and transcripts for stats
+      const [allNotesResponse, allTranscriptsResponse] = await Promise.all([
         // All notes for stats
         fetch('http://localhost:5000/api/notes', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }),
-        // Recent transcripts (limited to 5)
-        fetch(`http://localhost:5000/api/transcripts?limit=${transcriptsLimit}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -175,33 +171,129 @@ export default function HomePage() {
         })
       ]);
 
-      if (!notesResponse.ok || !transcriptsResponse.ok || !allNotesResponse.ok || !allTranscriptsResponse.ok) {
-        throw new Error('Failed to fetch recent activity');
+      if (!allNotesResponse.ok || !allTranscriptsResponse.ok) {
+        throw new Error('Failed to fetch activity stats');
       }
       
-      const [recentNotesData, allNotesData, recentTranscriptsData, allTranscriptsData] = await Promise.all([
-        notesResponse.json(),
+      const [allNotesData, allTranscriptsData] = await Promise.all([
         allNotesResponse.json(),
-        transcriptsResponse.json(),
         allTranscriptsResponse.json()
       ]);
 
-      setRecentNotes(recentNotesData);
-      setRecentTranscripts(recentTranscriptsData);
-
       // Calculate stats using the full data
       setStats({
-        totalNotes: allNotesData.length,
-        totalRecordings: allTranscriptsData.length,
-        totalTags: new Set(allNotesData.flatMap((note: Note) => note.tags.map((tag: { id: number; name: string }) => tag.name))).size,
-        recordingTime: allTranscriptsData.reduce((acc: number, curr: Transcript) => acc + (curr.duration || 0), 0)
+        totalNotes: allNotesData.data ? allNotesData.data.length : 0,
+        totalRecordings: allTranscriptsData.data ? allTranscriptsData.data.length : 0,
+        totalTags: new Set(
+          (allNotesData.data || []).flatMap((note: Note) => 
+            (note.tags || []).map((tag: { id: number; name: string }) => tag.name)
+          )
+        ).size,
+        recordingTime: (allTranscriptsData.data || []).reduce(
+          (acc: number, curr: Transcript) => acc + (curr.duration || 0), 0
+        )
       });
 
+      // Fetch initial paginated notes and transcripts
+      await Promise.all([
+        fetchNotes(true),
+        fetchTranscripts(true)
+      ]);
     } catch (error) {
-      console.error('Error fetching recent activity:', error);
-      toast.error('Failed to fetch recent activity');
+      console.error('Error fetching activity stats:', error);
+      toast.error('Failed to fetch activity stats');
     }
-  }, [notesLimit, transcriptsLimit]);
+  }, []);
+
+  const fetchNotes = useCallback(async (isInitial = false) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    if (isInitial) {
+      setNotesOffset(0);
+    }
+
+    const offset = isInitial ? 0 : notesOffset;
+    
+    try {
+      setIsLoadingMoreNotes(true);
+      
+      const response = await fetch(
+        `http://localhost:5000/api/notes?limit=${notesLimit}&offset=${offset}`, 
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch notes');
+      }
+
+      const result = await response.json();
+      
+      if (isInitial) {
+        setRecentNotes(result.data || []);
+      } else {
+        setRecentNotes(prev => [...prev, ...(result.data || [])]);
+      }
+      
+      setHasMoreNotes(result.pagination?.hasMore || false);
+      setNotesOffset(prev => isInitial ? notesLimit : prev + notesLimit);
+    } catch (error) {
+      console.error('Error fetching notes:', error);
+      toast.error('Failed to fetch notes');
+    } finally {
+      setIsLoadingMoreNotes(false);
+    }
+  }, [notesLimit, notesOffset]);
+
+  const fetchTranscripts = useCallback(async (isInitial = false) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    if (isInitial) {
+      setTranscriptsOffset(0);
+    }
+
+    const offset = isInitial ? 0 : transcriptsOffset;
+    
+    try {
+      setIsLoadingMoreTranscripts(true);
+      
+      const response = await fetch(
+        `http://localhost:5000/api/transcripts?limit=${transcriptsLimit}&offset=${offset}`, 
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch transcripts');
+      }
+
+      const result = await response.json();
+      
+      if (isInitial) {
+        setRecentTranscripts(result.data || []);
+      } else {
+        setRecentTranscripts(prev => [...prev, ...(result.data || [])]);
+      }
+      
+      setHasMoreTranscripts(result.pagination?.hasMore || false);
+      setTranscriptsOffset(prev => isInitial ? transcriptsLimit : prev + transcriptsLimit);
+    } catch (error) {
+      console.error('Error fetching transcripts:', error);
+      toast.error('Failed to fetch transcripts');
+    } finally {
+      setIsLoadingMoreTranscripts(false);
+    }
+  }, [transcriptsLimit, transcriptsOffset]);
 
   useEffect(() => {
     fetchRecentActivity();
@@ -327,9 +419,11 @@ export default function HomePage() {
 
   const handleLoadMore = (type: 'notes' | 'transcripts') => {
     if (type === 'notes') {
-      setNotesLimit(prev => prev + 10);
+      if (!hasMoreNotes || isLoadingMoreNotes) return;
+      fetchNotes();
     } else {
-      setTranscriptsLimit(prev => prev + 10);
+      if (!hasMoreTranscripts || isLoadingMoreTranscripts) return;
+      fetchTranscripts();
     }
   };
 
@@ -449,13 +543,26 @@ export default function HomePage() {
                   </div>
                 )}
               </div>
-              <div className="sticky bottom-0">
-                <button
-                  onClick={() => handleLoadMore('notes')}
-                  className="float-right text-xs px-2 py-1 text-blue-500 hover:text-blue-700 bg-transparent"
-                >
-                  Load More
-                </button>
+              <div className="sticky bottom-0 mt-2 flex justify-end">
+                {hasMoreNotes && (
+                  <button
+                    onClick={() => handleLoadMore('notes')}
+                    disabled={isLoadingMoreNotes}
+                    className={`text-sm px-2 py-1 text-blue-500 hover:text-blue-700 bg-transparent flex items-center ${isLoadingMoreNotes ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isLoadingMoreNotes ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More'
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -508,13 +615,26 @@ export default function HomePage() {
                   </div>
                 )}
               </div>
-              <div className="sticky bottom-0">
-                <button
-                  onClick={() => handleLoadMore('transcripts')}
-                  className="float-right text-xs px-2 py-1 text-blue-500 hover:text-blue-700 bg-transparent"
-                >
-                  Load More
-                </button>
+              <div className="sticky bottom-0 mt-2 flex justify-end">
+                {hasMoreTranscripts && (
+                  <button
+                    onClick={() => handleLoadMore('transcripts')}
+                    disabled={isLoadingMoreTranscripts}
+                    className={`text-sm px-2 py-1 text-blue-500 hover:text-blue-700 bg-transparent flex items-center ${isLoadingMoreTranscripts ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isLoadingMoreTranscripts ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More'
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -36,8 +36,9 @@ export default function NotesHubPage() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!response.ok) throw new Error('Failed to fetch');
-        const data = await response.json();
-        setTranscripts(data);
+        const result = await response.json();
+        // Handle both the new format (with data property) and the old format (direct array)
+        setTranscripts(result.data || result);
      } catch (error) {
          console.error('Error fetching transcripts:', error);
          toast.error('Failed to fetch transcripts');
@@ -52,8 +53,9 @@ export default function NotesHubPage() {
              headers: { 'Authorization': `Bearer ${token}` }
          });
          if (!response.ok) throw new Error('Failed to fetch');
-         const data = await response.json();
-         setNotes(data);
+         const result = await response.json();
+         // Handle both the new format (with data property) and the old format (direct array)
+         setNotes(result.data || result);
       } catch (error) {
           console.error('Error fetching notes:', error);
           toast.error('Failed to fetch notes');

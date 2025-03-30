@@ -31,7 +31,7 @@ interface NoteListProps {
   onTitleUpdate: () => void;
 }
 
-const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) => {
+const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<string>('');
   const [selectedNoteTitle, setSelectedNoteTitle] = useState<string>('');
@@ -157,6 +157,14 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
   }, []);
 
   useEffect(() => {
+    // Ensure notes is an array before spreading
+    if (!notes || !Array.isArray(notes)) {
+      setFilteredNotes([]);
+      setVisibleNotes([]);
+      setShowLoadMore(false);
+      return;
+    }
+    
     const sortedNotes = [...notes].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     setFilteredNotes(sortedNotes);
     setVisibleNotes(sortedNotes.slice(0, 5));
@@ -164,6 +172,8 @@ const NoteList: React.FC<NoteListProps> = ({ notes, onDelete, onTitleUpdate }) =
   }, [notes]);
 
   useEffect(() => {
+    if (!notes || !Array.isArray(notes)) return;
+    
     if (searchQuery) {
       const filtered = notes.filter(note =>
         note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

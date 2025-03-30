@@ -322,7 +322,10 @@ router.put('/:id/content', authenticateToken, (req, res) => {
 
 // Get all transcripts with tags
 router.get('/', authenticateToken, (req, res) => {
-  const query = `
+  const limit = req.query.limit ? parseInt(req.query.limit) : null;
+  const offset = req.query.offset ? parseInt(req.query.offset) : 0;
+  
+  let query = `
     SELECT
       t.id,
       t.text,
@@ -338,6 +341,11 @@ router.get('/', authenticateToken, (req, res) => {
     ORDER BY t.date DESC
   `;
   
+  // Add pagination if limit is specified
+  if (limit !== null) {
+    query += ` LIMIT ${limit} OFFSET ${offset}`;
+  }
+  
   db.all(query, [req.user.id], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
@@ -349,7 +357,22 @@ router.get('/', authenticateToken, (req, res) => {
       tags: JSON.parse(row.tags).filter(tag => tag.id !== null)
     }));
     
-    res.json(transcripts);
+    // Get total count for pagination info
+    db.get('SELECT COUNT(*) as total FROM transcripts WHERE user_id = ?', [req.user.id], (countErr, countRow) => {
+      if (countErr) {
+        return res.status(500).json({ error: countErr.message });
+      }
+      
+      res.json({
+        data: transcripts,
+        pagination: {
+          total: countRow.total,
+          limit: limit,
+          offset: offset,
+          hasMore: limit !== null && offset + limit < countRow.total
+        }
+      });
+    });
   });
 });
 

@@ -29,7 +29,7 @@ interface TranscriptsListProps {
   onTitleUpdate?: () => void; // Add this line
 }
 
-const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialTranscripts, updateTranscripts, onTitleUpdate }) => {
+const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialTranscripts = [], updateTranscripts, onTitleUpdate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
   const [selectedTranscriptTitle, setSelectedTranscriptTitle] = useState<string>('');
@@ -113,7 +113,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
 
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
   const applyFilters = (transcripts: Transcript[], filters: TranscriptFilters) => {
-    let filtered = [...transcripts];
+    // Ensure transcripts is an array before spreading
+    let filtered = transcripts ? [...transcripts] : [];
 
     // Keyword filter
     if (filters.keyword) {
@@ -180,6 +181,8 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   }, [initialTranscripts]);
 
   useEffect(() => {
+    if (!initialTranscripts || !Array.isArray(initialTranscripts)) return;
+    
     if (searchQuery) {
       const filtered = initialTranscripts.filter(transcript =>
         transcript.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
