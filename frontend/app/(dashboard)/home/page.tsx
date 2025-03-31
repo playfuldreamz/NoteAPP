@@ -341,7 +341,6 @@ export default function HomePage() {
       }
 
       const data = await response.json();
-      console.log('Voice insights data received:', data);
       setVoiceInsights(data);
     } catch (error) {
       console.error('Error fetching voice insights:', error);
@@ -373,7 +372,6 @@ export default function HomePage() {
       }
 
       const data = await response.json();
-      console.log('Note insights data received:', data);
       setNoteInsights(data);
     } catch (error) {
       console.error('Error fetching note insights:', error);

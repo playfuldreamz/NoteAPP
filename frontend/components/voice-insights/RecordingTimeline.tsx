@@ -55,9 +55,6 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
     );
   }
 
-  console.log('RecordingTimeline data:', data);
-  console.log('RecordingTimeline tagsData:', tagsData);
-
   if ((!data || data.length === 0) && (!tagsData || tagsData.length === 0)) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-64 flex items-center justify-center">
@@ -77,13 +74,11 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
       // For other formats, use Date object
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) {
-        console.error(`Invalid date: ${dateStr}`);
         return dateStr; // Return original if invalid
       }
       
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     } catch (error) {
-      console.error(`Error normalizing date ${dateStr}:`, error);
       return dateStr;
     }
   };
@@ -99,9 +94,6 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
     date: normalizeDate(item.date)
   }));
 
-  console.log('Normalized recording data:', normalizedData);
-  console.log('Normalized tags data:', normalizedTagsData);
-
   // Create a combined set of dates from both datasets
   const allDates = new Set([
     ...normalizedData.map(item => item.date),
@@ -111,14 +103,11 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
   // Get today's date in YYYY-MM-DD format
   const today = new Date();
   const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  console.log('Today formatted:', todayFormatted);
   
   // Sort dates chronologically and filter out future dates
   const sortedDates = Array.from(allDates)
     .sort()
     .filter(date => date <= todayFormatted);
-  
-  console.log('Sorted and filtered dates:', sortedDates);
 
   // Format dates for display with timezone handling
   const formattedDates = sortedDates.map(date => {
@@ -126,10 +115,7 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
     const [year, month, day] = date.split('-').map(Number);
     // Months are 0-indexed in JavaScript Date
     const dateObj = new Date(year, month - 1, day);
-    
-    const formattedDate = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    console.log(`Formatting date: ${date} -> ${formattedDate} (year: ${year}, month: ${month}, day: ${day})`);
-    return formattedDate;
+    return dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   });
 
   // Create datasets with 0 counts for missing dates
@@ -140,13 +126,8 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
 
   const tagsCreatedData = sortedDates.map(date => {
     const found = normalizedTagsData.find(item => item.date === date);
-    const count = found ? found.count : 0;
-    console.log(`Date: ${date}, Tags count: ${count}`);
-    return count;
+    return found ? found.count : 0;
   });
-
-  console.log('Final recording data (minutes):', recordingData);
-  console.log('Final tags created data:', tagsCreatedData);
 
   const chartData = {
     labels: formattedDates,
@@ -199,53 +180,55 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
           title: function(context: any) {
             // Get the original date from sortedDates using the index
             const index = context[0].dataIndex;
-            const originalDate = sortedDates[index];
-            // Format it manually to ensure consistency
-            const [year, month, day] = originalDate.split('-').map(Number);
-            const dateObj = new Date(year, month - 1, day);
-            return dateObj.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+            return sortedDates[index];
           },
           label: function(context: any) {
-            const label = context.dataset.label || '';
-            const value = context.parsed.y;
-            if (label === 'Tags Created') {
-              return `${label}: ${value}`;
+            const value = context.raw;
+            if (context.datasetIndex === 0) {
+              return `${value} minutes`;
+            } else {
+              return `${value} tags`;
             }
-            return `${label}: ${value}m`;
           }
         }
       }
     },
     scales: {
+      x: {
+        grid: {
+          display: false
+        }
+      },
       y: {
-        type: 'linear' as const,
+        type: 'linear',
         display: true,
         position: 'left',
-        beginAtZero: true,
-        ticks: {
-          callback: function(this: Scale<any>, value: number | string) {
-            return `${value}m`;
-          },
+        title: {
+          display: true,
+          text: 'Recording Duration (minutes)'
         },
-        suggestedMax: Math.max(...recordingData, 1) * 1.2,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)',
+        }
       },
       y1: {
-        type: 'linear' as const,
+        type: 'linear',
         display: true,
         position: 'right',
-        beginAtZero: true,
-        suggestedMax: Math.max(...tagsCreatedData, 10) * 1.2,
-        grid: {
-          drawOnChartArea: false,
+        title: {
+          display: true,
+          text: 'Tags Created'
         },
-      },
-    },
+        grid: {
+          display: false,
+        }
+      }
+    }
   };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
       <div className="h-64">
-        <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-4">Recording Timeline</h3>
         <Line data={chartData} options={options} />
       </div>
     </div>
