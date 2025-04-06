@@ -78,10 +78,6 @@ export default function HomePage() {
       const notesData: { totalItems: number; data: Note[] } = await notesRes.json();
       const transcriptsData: { totalItems: number; data: Transcript[] } = await transcriptsRes.json();
 
-      // Add debugging logs to inspect API responses
-      console.log('Notes API Response:', notesData);
-      console.log('Transcripts API Response:', transcriptsData);
-
       // Update totalNotes and totalRecordings calculations
       const totalNotes = notesData.data.length || 0;
       const totalRecordings = transcriptsData.data.length || 0;

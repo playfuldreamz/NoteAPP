@@ -1,17 +1,15 @@
 import React from 'react';
-import { Line } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
-  Filler,
-  ChartOptions,
-  Scale,
 } from 'chart.js';
 
 ChartJS.register(
@@ -19,10 +17,10 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
-  Legend,
-  Filler
+  Legend
 );
 
 interface TimelineData {
@@ -42,11 +40,7 @@ interface RecordingTimelineProps {
   isLoading?: boolean;
 }
 
-const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ 
-  data = [], 
-  tagsData = [], 
-  isLoading = false 
-}) => {
+const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], tagsData = [], isLoading = false }) => {
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-64 flex items-center justify-center">
@@ -63,35 +57,35 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
     );
   }
 
-  // Normalize dates to ensure consistent format (YYYY-MM-DD)
-  const normalizeDate = (dateStr: string) => {
+  const normalizeRecordingDate = (dateStr: string) => {
     try {
-      // Handle dates in format YYYY-MM-DD directly
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        return dateStr;
-      }
-      
-      // For other formats, use Date object
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) {
         return dateStr; // Return original if invalid
       }
-      
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+      // Convert to local timezone
+      const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      return `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
     } catch (error) {
       return dateStr;
     }
   };
 
+  const normalizeTagsDate = (dateStr: string) => {
+    // Skip timezone adjustment for dates already in YYYY-MM-DD format
+    return dateStr;
+  };
+
   // Normalize all dates in both datasets
   const normalizedData = data.map(item => ({
     ...item,
-    date: normalizeDate(item.date)
+    date: normalizeRecordingDate(item.date)
   }));
 
   const normalizedTagsData = tagsData.map(item => ({
     ...item,
-    date: normalizeDate(item.date)
+    date: normalizeTagsDate(item.date)
   }));
 
   // Create a combined set of dates from both datasets
@@ -129,45 +123,39 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
     return found ? found.count : 0;
   });
 
-  const chartData = {
+  const labels = sortedDates;
+
+  const recordingDurations = recordingData;
+  const tagsCounts = tagsCreatedData;
+
+  const durationChartData = {
     labels: formattedDates,
     datasets: [
       {
-        label: 'Recording Duration',
-        data: recordingData,
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        label: 'Recording Duration (minutes)',
+        data: recordingDurations,
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
         tension: 0.4,
-        fill: true,
-        yAxisID: 'y',
-        borderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        pointBackgroundColor: 'rgb(59, 130, 246)',
-        pointBorderColor: 'white',
-        pointBorderWidth: 2,
       },
-      {
-        label: 'Tags Created',
-        data: tagsCreatedData,
-        borderColor: 'rgb(139, 92, 246)',
-        backgroundColor: 'rgba(139, 92, 246, 0.5)',
-        tension: 0.4,
-        fill: true,
-        yAxisID: 'y1',
-        borderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        pointBackgroundColor: 'rgb(139, 92, 246)',
-        pointBorderColor: 'white',
-        pointBorderWidth: 2,
-      }
     ],
   };
 
-  const options: ChartOptions<'line'> = {
+  const tagsChartData = {
+    labels: formattedDates,
+    datasets: [
+      {
+        label: 'Tags Created',
+        data: tagsCounts,
+        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+        borderColor: 'rgb(255, 99, 132)',
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const options = {
     responsive: true,
-    maintainAspectRatio: false,
     plugins: {
       legend: {
         position: 'top' as const,
@@ -175,61 +163,23 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({
       title: {
         display: false,
       },
-      tooltip: {
-        callbacks: {
-          title: function(context: any) {
-            // Get the original date from sortedDates using the index
-            const index = context[0].dataIndex;
-            return sortedDates[index];
-          },
-          label: function(context: any) {
-            const value = context.raw;
-            if (context.datasetIndex === 0) {
-              return `${value} minutes`;
-            } else {
-              return `${value} tags`;
-            }
-          }
-        }
-      }
     },
     scales: {
-      x: {
-        grid: {
-          display: false
-        }
-      },
       y: {
-        type: 'linear',
-        display: true,
-        position: 'left',
-        title: {
-          display: true,
-          text: 'Recording Duration (minutes)'
-        },
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)',
-        }
+        beginAtZero: true,
       },
-      y1: {
-        type: 'linear',
-        display: true,
-        position: 'right',
-        title: {
-          display: true,
-          text: 'Tags Created'
-        },
-        grid: {
-          display: false,
-        }
-      }
-    }
+    },
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-      <div className="h-64">
-        <Line data={chartData} options={options} />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+        <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-4">Recording Duration</h3>
+        <Line data={durationChartData} options={options} />
+      </div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+        <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-4">Tags Created</h3>
+        <Bar data={tagsChartData} options={options} />
       </div>
     </div>
   );
