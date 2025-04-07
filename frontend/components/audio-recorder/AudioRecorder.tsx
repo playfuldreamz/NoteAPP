@@ -40,7 +40,8 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
     saveTranscript,
     enhanceTranscript,
     resetRecording,
-    setIsMaximized
+    setIsMaximized,
+    enhancedTranscript
   } = useRecording();
 
   // Handle successful save
@@ -133,7 +134,7 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
           <TranscriptionDisplay
             originalTranscript={transcript}
             interimTranscript=""
-            enhancedTranscript={transcript}
+            enhancedTranscript={enhancedTranscript} // Corrected to use the enhanced transcript state
             showEnhanced={showEnhanced}
             isEnhancing={isEnhancing}
             enhancementProgress={0}

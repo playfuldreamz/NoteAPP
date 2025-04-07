@@ -16,6 +16,7 @@ interface RecordingContextType {
   isSaving: boolean;
   showEnhanced: boolean;
   isMaximized: boolean;
+  enhancedTranscript: string;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   pauseRecording: () => void;
@@ -99,6 +100,7 @@ export function RecordingProvider({ children }: { children: React.ReactNode }) {
     isSaving: transcriptSaver.isSaving,
     showEnhanced: transcription.showEnhanced,
     isMaximized,
+    enhancedTranscript: transcription.enhancedTranscript,
     startRecording,
     stopRecording: recorder.stopRecording,
     pauseRecording: recorder.pauseRecording,
