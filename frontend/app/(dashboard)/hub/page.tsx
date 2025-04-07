@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { toast } from "react-toastify";
 import { Mic, ListMusic, Save, FileText } from 'lucide-react';
+import { debounce } from 'lodash';
 import AudioRecorderContainer from "../../../components/audio-recorder/AudioRecorder";
 import TranscriptsList from "../../../components/TranscriptsList";
 import NoteSaver from "../../../components/NoteSaver";
@@ -37,7 +38,6 @@ export default function NotesHubPage() {
         });
         if (!response.ok) throw new Error('Failed to fetch');
         const result = await response.json();
-        // Handle both the new format (with data property) and the old format (direct array)
         setTranscripts(result.data || result);
      } catch (error) {
          console.error('Error fetching transcripts:', error);
@@ -54,7 +54,6 @@ export default function NotesHubPage() {
          });
          if (!response.ok) throw new Error('Failed to fetch');
          const result = await response.json();
-         // Handle both the new format (with data property) and the old format (direct array)
          setNotes(result.data || result);
       } catch (error) {
           console.error('Error fetching notes:', error);
@@ -62,10 +61,11 @@ export default function NotesHubPage() {
       }
   }, []);
 
+  // Only fetch on mount
   useEffect(() => {
     fetchTranscripts();
     fetchNotes();
-  }, [fetchTranscripts, fetchNotes]);
+  }, []); // Empty dependency array as we only want this to run once
 
   const handleDeleteNote = async (id: number) => {
      const token = localStorage.getItem('token');
@@ -84,9 +84,13 @@ export default function NotesHubPage() {
      }
   };
 
-  const handleTranscriptSaved = () => {
-    fetchTranscripts(); 
-  };
+  // Create a debounced version of fetchTranscripts to prevent rapid updates
+  const debouncedFetchTranscripts = useCallback(
+    debounce(() => {
+      fetchTranscripts();
+    }, 1000),
+    [fetchTranscripts]
+  );
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -107,7 +111,7 @@ export default function NotesHubPage() {
           </div>
           <AudioRecorderContainer
             setTranscript={setTranscript} 
-            updateTranscripts={handleTranscriptSaved} 
+            updateTranscripts={debouncedFetchTranscripts} 
             transcript={transcript} 
           />
         </motion.div>
@@ -122,8 +126,8 @@ export default function NotesHubPage() {
           </div>
           <TranscriptsList
             transcripts={transcripts}
-            updateTranscripts={fetchTranscripts}
-            onTitleUpdate={fetchTranscripts} 
+            updateTranscripts={debouncedFetchTranscripts}
+            onTitleUpdate={debouncedFetchTranscripts} 
           />
         </motion.div>
       </motion.div>
@@ -136,7 +140,7 @@ export default function NotesHubPage() {
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
         >
           <div className="flex items-center gap-3 mb-4">
             <Save className="w-6 h-6 text-blue-600 dark:text-blue-400" />

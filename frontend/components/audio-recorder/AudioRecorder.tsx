@@ -13,10 +13,14 @@ import { useTranscription } from '../../context/TranscriptionContext';
 
 interface AudioRecorderContainerProps {
   updateTranscripts?: () => void;
+  setTranscript?: (transcript: string) => void;
+  transcript?: string;
 }
 
 const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
-  updateTranscripts
+  updateTranscripts,
+  setTranscript,
+  transcript: externalTranscript
 }) => {
   const [showSettings, setShowSettings] = React.useState(false);
   const { activeProvider, provider } = useTranscription();
@@ -41,10 +45,17 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
 
   // Handle successful save
   React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
     if (!isSaving && updateTranscripts) {
-      updateTranscripts();
+      // Add a small delay to ensure the backend has processed the save
+      timeoutId = setTimeout(() => {
+        updateTranscripts();
+      }, 500);
     }
-  }, [isSaving, updateTranscripts]);
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isSaving]);  // Only depend on isSaving since updateTranscripts is optional and stable
 
   return (
     <div className="space-y-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
