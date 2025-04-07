@@ -48,7 +48,7 @@ const MaximizedRecorderModal: React.FC = () => {
         >
           <div className="p-6 space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold dark:text-gray-100">Voice Recorder</h2>
+              <h2 className="text-xl font-semibold dark:text-gray-100">Audio Recorder</h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsMaximized(false)}
@@ -56,13 +56,6 @@ const MaximizedRecorderModal: React.FC = () => {
                   title="Minimize Recorder"
                 >
                   <Minimize2 className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={stopRecording}
-                  className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                  title="Close Recorder"
-                >
-                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
