@@ -1,107 +1,50 @@
 'use client'; // Ensure this is a Client Component
 
-import React, { useState, useEffect } from 'react';
-import { useRecorder } from '../../hooks/useRecorder';
-import { useTranscriptionManager } from '../../hooks/useTranscriptionManager';
-import { useTranscriptSaver } from '../../hooks/useTranscriptSaver';
-import { useTranscription } from '../../context/TranscriptionContext';
-
-// Import the modular components
+import React from 'react';
+import { Maximize2 } from 'lucide-react';
+import { useRecording } from '../../context/RecordingContext';
 import RecordingControls from './RecordingControls';
 import RecorderSettings from './RecorderSettings';
 import TranscriptionDisplay from './TranscriptionDisplay';
 import RecorderActions from './RecorderActions';
 import ProviderIndicator from './ProviderIndicator';
 import WaveformVisualizer from './WaveformVisualizer';
+import { useTranscription } from '../../context/TranscriptionContext';
 
 interface AudioRecorderContainerProps {
-  setTranscript: React.Dispatch<React.SetStateAction<string>>; // Keep if parent needs final transcript
-  updateTranscripts?: () => void; // Callback to refresh transcript list
-  transcript?: string; // Existing transcript if any
+  updateTranscripts?: () => void;
 }
 
 const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
-  setTranscript,
-  updateTranscripts,
-  transcript: initialTranscript
+  updateTranscripts
 }) => {
-  // State for UI
-  const [showSettings, setShowSettings] = useState(false);
-  
-  // Get the current transcription provider and selected provider
+  const [showSettings, setShowSettings] = React.useState(false);
   const { activeProvider, provider } = useTranscription();
   
-  // Use our custom hooks
-  const recorder = useRecorder({
-    onRecordingStart: () => {
-      // Reset any existing transcript when starting a new recording
-      if (!transcription.originalTranscript) {
-        transcription.resetTranscript();
-      }
-    },
-    onRecordingStop: () => {
-      transcription.stopTranscription();
-    },
-    onRecordingPause: () => {
-      transcription.pauseTranscription();
-    },
-    onRecordingResume: () => {
-      transcription.resumeTranscription(transcription.originalTranscript);
-    }
-  });
-  
-  const transcription = useTranscriptionManager({
-    initialTranscript,
-    onTranscriptUpdate: (transcript) => {
-      setTranscript(transcript);
-    }
-  });
-  
-  const transcriptSaver = useTranscriptSaver({
-    onSaveSuccess: () => {
-      // Reset states after saving
-      transcription.resetTranscript();
-      if (updateTranscripts) {
-        updateTranscripts();
-      }
-    },
-    onReset: () => {
-      transcription.resetTranscript();
-    }
-  });
+  const {
+    isRecording,
+    isPaused,
+    elapsedTime,
+    audioStream,
+    transcript,
+    isEnhancing,
+    isSaving,
+    showEnhanced,
+    startRecording,
+    stopRecording,
+    pauseRecording,
+    saveTranscript,
+    enhanceTranscript,
+    resetRecording,
+    setIsMaximized
+  } = useRecording();
 
-  // Coordinate starting recording with transcription
-  const handleStartRecording = async () => {
-    if (recorder.isRecording && recorder.isPaused) {
-      // Resume recording
-      recorder.resumeRecording();
-      return;
+  // Handle successful save
+  React.useEffect(() => {
+    if (!isSaving && updateTranscripts) {
+      updateTranscripts();
     }
-    
-    // Start speech recognition and recording
-    const started = await transcription.startTranscription();
-    if (started) {
-      recorder.startRecording();
-    }
-  };
-
-  // Handle saving transcript
-  const handleSaveTranscript = async () => {
-    try {
-      await transcriptSaver.saveTranscript(
-        transcription.originalTranscript,
-        recorder.elapsedTime,
-        transcription.showEnhanced,
-        transcription.enhancedTranscript
-      );
-      
-      // Only reset the recorder after successful save
-      recorder.resetRecording();
-    } catch (error) {
-      console.error('Error saving transcript:', error);
-      // Don't reset if there was an error saving
-    }
-  };
+  }, [isSaving, updateTranscripts]);
 
   return (
     <div className="space-y-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
@@ -110,48 +53,56 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-2">
             <RecordingControls 
-              isRecording={recorder.isRecording}
-              isPaused={recorder.isPaused}
-              elapsedTime={recorder.elapsedTime}
-              onStart={handleStartRecording}
-              onStop={recorder.stopRecording}
-              onPause={recorder.pauseRecording}
+              isRecording={isRecording}
+              isPaused={isPaused}
+              elapsedTime={elapsedTime}
+              onStart={startRecording}
+              onStop={stopRecording}
+              onPause={pauseRecording}
             />
             <ProviderIndicator 
               toggleSettings={() => setShowSettings(!showSettings)} 
             />
           </div>
+          <button
+            onClick={() => setIsMaximized(true)}
+            className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            title="Maximize Recorder"
+          >
+            <Maximize2 className="w-5 h-5" />
+          </button>
         </div>
         
-        {/* Waveform Visualizer - Only visible when actively recording (not paused) */}
+        {/* Waveform Visualizer */}
         <div 
           style={{ 
-            height: recorder.isRecording && !recorder.isPaused ? 'auto' : '0',
+            height: isRecording && !isPaused ? 'auto' : '0',
             overflow: 'hidden',
-            marginBottom: recorder.isRecording && !recorder.isPaused ? '16px' : '0',
+            marginBottom: isRecording && !isPaused ? '16px' : '0',
             transition: 'all 0.3s ease-in-out'
           }}
         >
           <div 
-            className={`transition-all duration-300 ease-in-out ${recorder.isRecording && !recorder.isPaused ? 'opacity-100' : 'opacity-0'}`}
-            style={{ 
-              height: recorder.isRecording && !recorder.isPaused ? '75px' : '0',
-              overflow: 'hidden'
-            }}
+            className={`transition-all duration-300 ease-in-out ${
+              isRecording && !isPaused ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ height: isRecording && !isPaused ? '75px' : '0' }}
           >
             <WaveformVisualizer 
-              isRecording={recorder.isRecording}
-              isPaused={recorder.isPaused}
-              audioStream={recorder.audioStream}
+              isRecording={isRecording}
+              isPaused={isPaused}
+              audioStream={audioStream}
               height={75}
-              theme={typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'}
+              theme="dark"
             />
           </div>
         </div>
         
         {/* Settings dropdown */}
         <div 
-          className={`transition-all duration-300 ease-in-out overflow-hidden ${showSettings ? 'opacity-100' : 'opacity-0'}`}
+          className={`transition-all duration-300 ease-in-out overflow-hidden ${
+            showSettings ? 'opacity-100' : 'opacity-0'
+          }`}
           style={{
             height: showSettings ? 'auto' : '0',
             marginBottom: showSettings ? '16px' : '0',
@@ -169,11 +120,11 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
         {/* Transcription Display */}
         <div className="mb-4">
           <TranscriptionDisplay
-            originalTranscript={transcription.originalTranscript}
+            originalTranscript={transcript}
             interimTranscript=""
-            enhancedTranscript={transcription.enhancedTranscript}
-            showEnhanced={transcription.showEnhanced}
-            isEnhancing={transcription.isEnhancing}
+            enhancedTranscript={transcript}
+            showEnhanced={showEnhanced}
+            isEnhancing={isEnhancing}
             enhancementProgress={0}
           />
         </div>
@@ -181,14 +132,14 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
         {/* Recorder Actions */}
         <div>
           <RecorderActions
-            transcript={transcription.originalTranscript}
-            isRecording={recorder.isRecording}
-            isEnhancing={transcription.isEnhancing}
-            isSaving={transcriptSaver.isSaving}
+            transcript={transcript}
+            isRecording={isRecording}
+            isEnhancing={isEnhancing}
+            isSaving={isSaving}
             canEnhance={activeProvider === 'webspeech' && provider === 'webspeech'}
-            onEnhance={transcription.enhanceTranscript}
-            onSave={handleSaveTranscript}
-            onReset={transcriptSaver.resetTranscript}
+            onEnhance={enhanceTranscript}
+            onSave={saveTranscript}
+            onReset={resetRecording}
           />
         </div>
       </div>
