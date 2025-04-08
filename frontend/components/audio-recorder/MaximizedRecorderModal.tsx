@@ -94,7 +94,7 @@ const MaximizedRecorderModal: React.FC = () => {
 
               {/* Waveform Visualizer */}
               <div 
-                className={`transition-all duration-300 ease-in-out overflow-hidden rounded-lg bg-gray-50 dark:bg-gray-800/50 ${
+                className={`transition-all duration-300 ease-in-out overflow-hidden rounded-lg ${
                   isRecording && !isPaused ? 'h-[75px] opacity-100' : 'h-0 opacity-0'
                 }`}
               >

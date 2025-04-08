@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useTranscription } from '../../context/TranscriptionContext';
+import { useRecording } from '../../context/RecordingContext';
 import { TranscriptionProviderFactory } from '../../services/transcription/providerFactory';
 import type { ProviderType } from '../../services/transcription/types';
 
@@ -29,6 +30,8 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
     updateProviderSettings,
     activeProvider,
   } = useTranscription();
+
+  const { isRecording } = useRecording(); // Add this to get recording state
 
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [isValidatingKey, setIsValidatingKey] = useState(false);
@@ -142,7 +145,10 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
             id="provider-select"
             value={selectedProvider}
             onChange={(e) => handleProviderChange(e.target.value as ProviderType)}
-            className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+            className={`w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm ${
+              isRecording ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            disabled={isRecording}
           >
             {availableProviders.map((p) => (
               <option key={p} value={p}>
@@ -191,17 +197,20 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
                   setApiKeyInput(e.target.value);
                   setIsKeyValid(null); // Reset validation status on change
                 }}
-                className="flex-1 p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+                className={`flex-1 p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm ${
+                  isRecording ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
                 placeholder={`Enter ${PROVIDER_DISPLAY_NAMES[selectedProvider]} API Key`}
+                disabled={isRecording}
               />
               <button
                 onClick={handleApplyKey}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                  isValidatingKey
+                  isValidatingKey || !apiKeyInput || isRecording
                     ? 'bg-gray-400 cursor-not-allowed text-white'
                     : 'bg-blue-500 hover:bg-blue-600 text-white'
                 }`}
-                disabled={isValidatingKey || !apiKeyInput}
+                disabled={isValidatingKey || !apiKeyInput || isRecording}
               >
                 {isValidatingKey ? (
                   <Loader className="w-4 h-4 animate-spin" />
@@ -214,6 +223,12 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
         )}
         {/* Placeholder for other settings like language, etc. */}
       </div>
+      {isRecording && (
+        <div className="mt-4 text-sm text-yellow-500 dark:text-yellow-400 flex items-center">
+          <AlertCircle className="w-4 h-4 mr-2" />
+          Provider settings cannot be changed while recording
+        </div>
+      )}
     </div>
   );
 };
