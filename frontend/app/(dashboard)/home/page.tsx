@@ -121,7 +121,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="grid grid-flow-row gap-8">
       <StatsRow stats={stats} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
