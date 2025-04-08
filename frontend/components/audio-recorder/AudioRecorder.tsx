@@ -56,7 +56,7 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isSaving]);  // Only depend on isSaving since updateTranscripts is optional and stable
+  }, [isSaving, updateTranscripts]);
 
   return (
     <div className="space-y-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
@@ -72,9 +72,7 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
               onStop={stopRecording}
               onPause={pauseRecording}
             />
-            <ProviderIndicator 
-              toggleSettings={() => setShowSettings(!showSettings)} 
-            />
+            <ProviderIndicator />
           </div>
           <button
             onClick={() => setIsMaximized(true)}
