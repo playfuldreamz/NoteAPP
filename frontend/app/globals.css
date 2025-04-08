@@ -19,6 +19,8 @@
 @layer base {
   * {
     border-color: var(--border);
+    scrollbar-width: thin;
+    scrollbar-color: rgb(156 163 175) transparent;
   }
   body {
     @apply bg-background text-foreground;
@@ -74,4 +76,19 @@
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: theme('colors.gray.600');
+}
+
+/* For Webkit browsers (Chrome, Safari, etc.) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgb(156 163 175);
+  border-radius: 4px;
 }
