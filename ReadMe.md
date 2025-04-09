@@ -80,6 +80,50 @@ This repository contains a full-stack web application for taking and organizing 
    npm run dev
    ```
 
+## Database Migrations
+
+The application includes a database migration system to manage schema changes:
+
+### Running Migrations
+
+```bash
+cd backend/database/migrations
+node runner.js
+```
+
+### How Migrations Work
+
+- The system tracks applied migrations in a database table
+- Only runs migrations that haven't been applied yet
+- Migrations are applied in sequential order based on filename
+- Each migration is idempotent (safe to run multiple times)
+
+### Available Migrations
+
+- `001_add_summary_fields.js`: Adds summary columns to notes and transcripts tables
+
+### Creating New Migrations
+
+To create a new migration, add a file to the migrations folder following the naming pattern:
+```
+NNN_descriptive_name.js
+```
+
+Each migration should export:
+```javascript
+module.exports = {
+  up: function() {
+    // Code to apply the change
+    return Promise...
+  },
+  down: function() {
+    // Code to reverse the change
+    return Promise...
+  },
+  description: 'Brief description'
+};
+```
+
 ## Usage
 
 1. Register a new user or log in
