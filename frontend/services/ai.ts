@@ -485,3 +485,39 @@ export async function enhanceTranscript(
 
   return await response.json();
 }
+
+export interface SummaryResponse {
+  success: boolean;
+  summary: string;
+}
+
+/**
+ * Generates and saves a summary for a note or transcript
+ * 
+ * @param type - The item type ('note' or 'transcript')
+ * @param itemId - The ID of the item
+ * @returns A promise containing the generated summary
+ * @throws {InvalidAPIKeyError} If the API key is invalid or missing
+ * @throws {Error} For other errors
+ */
+export async function generateAndSaveSummary(
+  type: 'note' | 'transcript', 
+  itemId: number
+): Promise<SummaryResponse> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/summary/summarize-item/${type}/${itemId}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    await handleAPIError(response);
+  }
+
+  return await response.json();
+}

@@ -16,6 +16,7 @@ router.get('/', authenticateToken, (req, res) => {
       n.content,
       n.title,
       n.transcript,
+      n.summary,
       n.timestamp,
       n.user_id,
       json_group_array(json_object('id', t.id, 'name', t.name)) AS tags

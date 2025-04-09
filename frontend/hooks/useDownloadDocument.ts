@@ -12,11 +12,13 @@ interface Note extends BaseDocument {
   type: 'note';
   content: string;
   transcript?: string;
+  summary?: string | null;
 }
 
 interface Transcript extends BaseDocument {
   type: 'transcript';
   content: string;
+  summary?: string | null;
 }
 
 type DownloadableDocument = Note | Transcript;
@@ -42,6 +44,11 @@ const useDownloadDocument = () => {
         // Add tags at the top if they exist
         if (documentData.tags && documentData.tags.length > 0) {
           text += `Tags: ${documentData.tags.map(tag => tag.name).join(', ')}\n\n`;
+        }
+          
+        // Add summary if it exists
+        if (documentData.summary) {
+          text += `Summary:\n${documentData.summary}\n\n`;
         }
           
         if (documentData.type === 'note') {
@@ -75,6 +82,7 @@ const useDownloadDocument = () => {
             timestamp: documentData.timestamp,
             title: documentData.title,
             tags: documentData.tags || [],
+            summary: documentData.summary || null,
             ...(documentData.type === 'note' && documentData.transcript ? { transcript: documentData.transcript } : {})
           };
           blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });

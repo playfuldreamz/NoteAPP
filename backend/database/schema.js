@@ -16,6 +16,7 @@ const createTables = () => {
       content TEXT,
       title TEXT,
       transcript TEXT,
+      summary TEXT DEFAULT NULL,
       user_id INTEGER,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(user_id) REFERENCES users(id)
@@ -85,6 +86,7 @@ const createTables = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       text TEXT,
       title TEXT,
+      summary TEXT DEFAULT NULL,
       user_id INTEGER,
       date DATETIME DEFAULT CURRENT_TIMESTAMP,
       duration INTEGER,

@@ -330,6 +330,7 @@ router.get('/', authenticateToken, (req, res) => {
       t.id,
       t.text,
       t.title,
+      t.summary,
       t.date,
       t.duration,
       json_group_array(json_object('id', tg.id, 'name', tg.name)) AS tags

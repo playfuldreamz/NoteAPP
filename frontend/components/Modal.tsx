@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import TaggingModule from './TaggingModule';
 import ActionItemsModule from './ActionItemsModule';
+import SummaryModule from './summary/SummaryModule';
 import { Tag, updateNoteTitle, updateTranscriptTitle, updateNoteContent, updateTranscriptContent } from '../services/ai';
-import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check, Edit3, Save } from 'lucide-react';
+import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check, Edit3, Save, FileText } from 'lucide-react';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import { toast } from 'react-toastify';
 import EditorToolbar from './notes/editor/EditorToolbar';
@@ -18,7 +19,9 @@ interface ModalProps {
   type?: 'note' | 'transcript';
   children?: React.ReactNode;
   initialTags?: Tag[];
+  initialSummary?: string | null;
   onTagsUpdate?: (tags: Tag[]) => void;
+  onSummaryUpdate?: (summary: string | null) => void;
   onRegenerateTitle?: () => void;
   isRegeneratingTitle?: boolean;
   onTitleUpdate?: () => void;
@@ -34,14 +37,17 @@ const Modal: React.FC<ModalProps> = ({
   type,
   children,
   initialTags = [],
+  initialSummary = null,
   onTagsUpdate,
+  onSummaryUpdate,
   onRegenerateTitle,
   isRegeneratingTitle = false,
   onTitleUpdate,
   onContentUpdate
 }) => {
   const [tags, setTags] = useState<Tag[]>(initialTags);
-  const [activeTab, setActiveTab] = useState('tags');
+  const [currentSummary, setCurrentSummary] = useState<string | null>(initialSummary);
+  const [activeTab, setActiveTab] = useState('summary'); // Make summary the default tab
   const [isScrolled, setIsScrolled] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>({
     format: 'txt',
@@ -79,6 +85,14 @@ const Modal: React.FC<ModalProps> = ({
   useEffect(() => {
     setContent(initialContent);
   }, [initialContent]);
+
+  // Reset state when a new item is being shown
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab('summary');
+      setCurrentSummary(initialSummary);
+    }
+  }, [isOpen, itemId, initialSummary]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setIsScrolled(e.currentTarget.scrollTop > 0);
@@ -247,6 +261,15 @@ const Modal: React.FC<ModalProps> = ({
     } catch (error) {
       console.error('Failed to copy content:', error);
       toast.error('Failed to copy content');
+    }
+  };
+
+  // Handle summary generation from SummaryModule
+  const handleSummaryGenerated = (newSummary: string) => {
+    setCurrentSummary(newSummary);
+    // Call the parent component's callback if provided
+    if (onSummaryUpdate) {
+      onSummaryUpdate(newSummary);
     }
   };
 
@@ -470,6 +493,17 @@ const Modal: React.FC<ModalProps> = ({
             {/* Tabs navigation */}
             <div className="flex items-center px-4 sm:px-6 py-2 gap-1 border-b border-gray-200 dark:border-gray-700">
               <button
+                onClick={() => setActiveTab('summary')}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  activeTab === 'summary'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                <FileText size={16} />
+                Summary
+              </button>
+              <button
                 onClick={() => setActiveTab('tags')}
                 className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
                   activeTab === 'tags'
@@ -500,6 +534,15 @@ const Modal: React.FC<ModalProps> = ({
                 scrollbarColor: 'rgb(156 163 175) transparent'
               }}
             >
+              {activeTab === 'summary' && (
+                <SummaryModule
+                  itemId={itemId}
+                  itemType={normalizedType}
+                  content={content}
+                  initialSummary={currentSummary}
+                  onSummaryGenerated={handleSummaryGenerated}
+                />
+              )}
               {activeTab === 'tags' && (
                 <TaggingModule
                   type={normalizedType}
