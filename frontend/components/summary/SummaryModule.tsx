@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, RefreshCw } from 'lucide-react';
 import { generateAndSaveSummary, InvalidAPIKeyError, SummaryResponse } from '../../services/ai';
 
 interface SummaryModuleProps {
@@ -75,7 +75,17 @@ const SummaryModule: React.FC<SummaryModuleProps> = ({
         </div>
       ) : displayedSummary ? (
         <div>
-          <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{displayedSummary}</p>
+          <div className="flex justify-between items-start">
+            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed flex-grow">{displayedSummary}</p>
+            <button
+              onClick={handleGenerateSummary}
+              disabled={isLoading}
+              title="Regenerate summary"
+              className="ml-2 p-1.5 flex-shrink-0 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            >
+              <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+            </button>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-6 space-y-3">
