@@ -20,6 +20,7 @@ interface Transcript {
   text: string;
   title: string;
   date: string;
+  summary?: string | null;
   tags?: Tag[];
 }
 
@@ -34,6 +35,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [selectedTranscript, setSelectedTranscript] = useState<string>('');
   const [selectedTranscriptTitle, setSelectedTranscriptTitle] = useState<string>('');
   const [selectedTranscriptId, setSelectedTranscriptId] = useState<number>(0);
+  const [selectedTranscriptSummary, setSelectedTranscriptSummary] = useState<string | null>(null);
   const [isRegeneratingTitle, setIsRegeneratingTitle] = useState(false);
   const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
@@ -243,9 +245,13 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   };
 
   const handleSeeMore = (content: string, title: string, id: number) => {
+    // Find the transcript to get its summary
+    const transcript = filteredTranscripts.find(t => t.id === id);
+    
     setSelectedTranscript(content);
     setSelectedTranscriptTitle(title);
     setSelectedTranscriptId(id);
+    setSelectedTranscriptSummary(transcript?.summary || null);
     setIsModalOpen(true);
   };
 
@@ -596,10 +602,21 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
           title={selectedTranscriptTitle}
           itemId={selectedTranscriptId}
           type="transcript"
+          initialSummary={selectedTranscriptSummary}
           onTagsUpdate={handleTagsUpdate}
           onRegenerateTitle={handleRegenerateTitle}
           isRegeneratingTitle={isRegeneratingTitle}
           onTitleUpdate={updateTranscripts} // Pass updateTranscripts as onTitleUpdate
+          onSummaryUpdate={(summary) => {
+            // Update the summary in the transcripts list when it changes
+            setSelectedTranscriptSummary(summary);
+            setFilteredTranscripts(prev => prev.map(t => 
+              t.id === selectedTranscriptId ? { ...t, summary } : t
+            ));
+            setVisibleTranscripts(prev => prev.map(t => 
+              t.id === selectedTranscriptId ? { ...t, summary } : t  
+            ));
+          }}
         >
           <div className="mt-4">
             <h4 className="text-lg font-semibold mb-4 dark:text-gray-200">Modules</h4>

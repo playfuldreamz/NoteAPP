@@ -74,8 +74,8 @@ const SummaryModule: React.FC<SummaryModuleProps> = ({
           <p className="text-sm text-muted-foreground">Generating summary...</p>
         </div>
       ) : displayedSummary ? (
-        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-700">
-          <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayedSummary}</p>
+        <div>
+          <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{displayedSummary}</p>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-6 space-y-3">

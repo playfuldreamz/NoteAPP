@@ -10,6 +10,7 @@ interface Transcript {
   text: string;
   date: string;
   duration: number;
+  summary?: string | null;
 }
 
 interface RecentRecordingsWidgetProps {
@@ -93,6 +94,11 @@ const RecentRecordingsWidget: React.FC<RecentRecordingsWidgetProps> = ({ onItemC
                   <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
                     {transcript.title || 'Untitled Recording'}
                   </p>
+                  {transcript.summary && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate italic text-[10px] mt-0.5">
+                      {transcript.summary}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-400 dark:text-gray-500">
                     {new Date(transcript.date).toLocaleString()} • {transcript.duration ? `${Math.floor(transcript.duration / 60)}:${(transcript.duration % 60).toString().padStart(2, '0')}` : '0:00'}
                   </p>

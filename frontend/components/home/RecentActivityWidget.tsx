@@ -9,6 +9,7 @@ interface Note {
   title: string;
   content: string;
   timestamp: string;
+  summary?: string | null;
   tags: Array<{ id: number; name: string; }>;
 }
 
@@ -93,6 +94,11 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({ onItemClick
                   <p className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-900 dark:group-hover:text-gray-200">
                     {note.title || 'Untitled Note'}
                   </p>
+                  {note.summary && (
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate italic mt-0.5">
+                      {note.summary}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-400 dark:text-gray-500">
                     {new Date(note.timestamp).toLocaleDateString()}
                   </p>

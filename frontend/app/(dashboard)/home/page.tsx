@@ -16,6 +16,7 @@ interface Note {
   id: number;
   title: string;
   content: string;
+  summary?: string | null;
   tags: Array<{ id: number; name: string }>;
 }
 
@@ -24,6 +25,7 @@ interface Transcript {
   title: string;
   text: string;
   duration: number;
+  summary?: string | null;
   tags?: Array<{ id: number; name: string }>;
 }
 
@@ -35,7 +37,7 @@ export default function HomePage() {
     recordingTime: 0
   });
 
-  // Update modalState type to include 'tags'
+  // Update modalState type to include 'tags' and 'summary'
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     content: string;
@@ -43,12 +45,14 @@ export default function HomePage() {
     itemId: number;
     type: 'note' | 'transcript';
     tags?: Array<{ id: number; name: string }>;
+    summary?: string | null;
   }>({
     isOpen: false,
     content: '',
     title: '',
     itemId: 0,
-    type: 'note'
+    type: 'note',
+    summary: null
   });
 
   // Update state definitions
@@ -112,7 +116,13 @@ export default function HomePage() {
   const handleItemClick = (item: Note | Transcript, type: 'note' | 'transcript') => {
     const content = type === 'note' ? (item as Note).content : (item as Transcript).text;
     setModalState({
-      isOpen: true, content, title: item.title || 'Untitled', itemId: item.id, type, tags: 'tags' in item ? item.tags : undefined
+      isOpen: true,
+      content,
+      title: item.title || 'Untitled',
+      itemId: item.id,
+      type,
+      tags: 'tags' in item ? item.tags : undefined,
+      summary: item.summary || null
     });
   };
 
@@ -145,6 +155,11 @@ export default function HomePage() {
         title={modalState.title}
         itemId={modalState.itemId}
         type={modalState.type as 'note' | 'transcript'}
+        initialTags={modalState.tags}
+        initialSummary={modalState.summary}
+        onSummaryUpdate={(summary) => {
+          setModalState(prev => ({ ...prev, summary }));
+        }}
       />
     </div>
   );

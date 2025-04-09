@@ -22,6 +22,7 @@ interface Note {
   timestamp: string;
   title: string;
   user_id: number;
+  summary?: string | null;
   tags: Tag[];
 }
 
@@ -36,6 +37,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate
   const [selectedNote, setSelectedNote] = useState<string>('');
   const [selectedNoteTitle, setSelectedNoteTitle] = useState<string>('');
   const [selectedNoteId, setSelectedNoteId] = useState<number>(0);
+  const [selectedNoteSummary, setSelectedNoteSummary] = useState<string | null>(null);
   const [visibleNotes, setVisibleNotes] = useState<Note[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,9 +235,13 @@ const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate
   };
 
   const handleSeeMore = (content: string, title: string, id: number) => {
+    // Find the note to get its summary
+    const note = filteredNotes.find(n => n.id === id);
+    
     setSelectedNote(content);
     setSelectedNoteTitle(title);
     setSelectedNoteId(id);
+    setSelectedNoteSummary(note?.summary || null);
     setIsModalOpen(true);
   };
 
@@ -625,10 +631,21 @@ const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate
           title={selectedNoteTitle}
           itemId={selectedNoteId}
           type="note"
+          initialSummary={selectedNoteSummary}
           onTagsUpdate={handleTagsUpdate}
           onRegenerateTitle={handleRegenerateTitle}
           isRegeneratingTitle={isRegeneratingTitle}
           onTitleUpdate={onTitleUpdate} // Ensure the callback is passed to the Modal
+          onSummaryUpdate={(summary) => {
+            // Update the summary in the notes list when it changes
+            setSelectedNoteSummary(summary);
+            setFilteredNotes(prev => prev.map(n => 
+              n.id === selectedNoteId ? { ...n, summary } : n
+            ));
+            setVisibleNotes(prev => prev.map(n => 
+              n.id === selectedNoteId ? { ...n, summary } : n  
+            ));
+          }}
         >
           <div className="mt-4">
           </div>
