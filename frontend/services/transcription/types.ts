@@ -5,10 +5,14 @@ export interface TranscriptionResult {
 }
 
 export interface TranscriptionOptions {
-  language?: string;
   continuous?: boolean;
   interimResults?: boolean;
+  language?: string;
   maxAlternatives?: number;
+  audioStream?: MediaStream;
+  
+  // New option - defaults to true
+  automaticEnhancement?: boolean;
 }
 
 export interface TranscriptionProvider {

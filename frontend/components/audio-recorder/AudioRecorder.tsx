@@ -58,6 +58,14 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
     };
   }, [isSaving, updateTranscripts]);
 
+  // Automatically enhance audio when recording starts
+  React.useEffect(() => {
+    if (isRecording && audioStream) {
+      // The WebSpeechProvider will automatically enhance the audio
+      // No UI or user interaction needed
+    }
+  }, [isRecording, audioStream]);
+
   return (
     <div className="space-y-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
       <div className="flex flex-col">
