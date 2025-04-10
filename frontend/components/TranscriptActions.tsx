@@ -222,6 +222,7 @@ export default function TranscriptActions({
             <div className="grid grid-cols-2 gap-3">
               <input
                 type="date"
+                title="Start date"
                 value={filters.dateRange.start}
                 onChange={(e) => setFilters(prev => ({
                   ...prev,
@@ -231,6 +232,7 @@ export default function TranscriptActions({
               />
               <input
                 type="date"
+                title="End date"
                 value={filters.dateRange.end}
                 onChange={(e) => setFilters(prev => ({
                   ...prev,
@@ -259,6 +261,7 @@ export default function TranscriptActions({
               Length
             </label>
             <select
+              title="Length filter"
               value={filters.length || ''}
               onChange={(e) => setFilters(prev => ({
                 ...prev,
