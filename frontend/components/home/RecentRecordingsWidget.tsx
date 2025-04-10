@@ -95,7 +95,7 @@ const RecentRecordingsWidget: React.FC<RecentRecordingsWidgetProps> = ({ onItemC
                     {transcript.title || 'Untitled Recording'}
                   </p>
                   {transcript.summary && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate italic text-[10px] mt-0.5">
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate italic mt-0.5">
                       {transcript.summary}
                     </p>
                   )}
