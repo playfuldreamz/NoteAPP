@@ -123,6 +123,18 @@ const deleteResource = async (resourceType, resourceId, userId, options = {}) =>
       [resourceType, resourceId, userId]
     );
 
+    // Delete links where this resource is the source
+    await run(
+      'DELETE FROM links WHERE source_id = ? AND source_type = ?',
+      [resourceId, resourceType]
+    );
+
+    // Delete links where this resource is the target
+    await run(
+      'DELETE FROM links WHERE target_id = ? AND target_type = ?',
+      [resourceId, resourceType]
+    );
+
     // Get all tag IDs associated with this resource
     const tagRows = await all(
       'SELECT tag_id FROM item_tags WHERE item_id = ? AND item_type = ?',
@@ -202,6 +214,18 @@ const bulkDeleteResources = async (resourceType, resourceIds, userId, options = 
     await run(
       `DELETE FROM action_items WHERE source_type = ? AND source_id IN (${placeholders}) AND user_id = ?`,
       [resourceType, ...resourceIds, userId]
+    );
+
+    // Delete links where these resources are the source
+    await run(
+      `DELETE FROM links WHERE source_id IN (${placeholders}) AND source_type = ?`,
+      [...resourceIds, resourceType]
+    );
+
+    // Delete links where these resources are the target
+    await run(
+      `DELETE FROM links WHERE target_id IN (${placeholders}) AND target_type = ?`,
+      [...resourceIds, resourceType]
     );
 
     // Get all tags associated with these resources

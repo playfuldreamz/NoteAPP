@@ -2,8 +2,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import TaggingModule from './TaggingModule';
 import ActionItemsModule from './ActionItemsModule';
 import SummaryModule from './summary/SummaryModule';
+import BacklinksDisplay from './backlinks/BacklinksDisplay';
+import LinkRenderer from './shared/LinkRenderer';
 import { Tag, updateNoteTitle, updateTranscriptTitle, updateNoteContent, updateTranscriptContent } from '../services/ai';
-import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check, Edit3, Save, FileText } from 'lucide-react';
+import { API_BASE } from '../services/userTags';
+import { RotateCw, X, TagIcon, CheckSquare, Download, Copy, Check, Edit3, Save, FileText, Link2 } from 'lucide-react';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import { toast } from 'react-toastify';
 import EditorToolbar from './notes/editor/EditorToolbar';
@@ -479,16 +482,49 @@ const Modal: React.FC<ModalProps> = ({
                     <Copy size={16} />
                   )}
                 </button>
-                <div className={`max-w-none pt-10 font-mono text-sm`}>
-                  <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed bg-transparent p-0 m-0 border-0">
-                    {content}
-                  </pre>
+                <div className={`max-w-none pt-10 font-mono text-sm`}>                  <LinkRenderer 
+                    content={content}
+                    onLinkClick={async (title) => {
+                      try {
+                        // Call backend to find the item by title
+                        const token = localStorage.getItem('token');
+                        if (!token) {
+                          toast.error('Authentication required');
+                          return;
+                        }
+
+                        const response = await fetch(`${API_BASE}/api/links/find-by-title?title=${encodeURIComponent(title)}`, {
+                          headers: {
+                            'Authorization': `Bearer ${token}`
+                          }
+                        });
+
+                        if (!response.ok) {
+                          throw new Error('Failed to find linked item');
+                        }
+
+                        const data = await response.json();
+                        
+                        if (data && data.found) {
+                          // Update modal to show the linked item
+                          if (onClose) onClose(); // Close current modal first
+                          
+                          // We need to implement a modal navigation system that preserves history
+                          // For now, we'll just load the target item directly
+                          window.location.href = `/${data.type === 'note' ? 'notes' : 'transcripts'}/${data.id}`;
+                        } else {
+                          toast.info(`No item found with title "${title}"`);
+                        }
+                      } catch (error) {
+                        console.error('Error navigating to linked item:', error);
+                        toast.error('Failed to navigate to linked item');
+                      }
+                    }}
+                  />
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Right panel - Tabs and modules */}
+          </div>          {/* Right panel - Tabs and modules */}
           <div className="flex-1 min-w-0 lg:max-w-[45%] xl:max-w-[40%] overflow-hidden flex flex-col border-t border-gray-200 dark:border-gray-700 lg:border-t-0">
             {/* Tabs navigation */}
             <div className="flex items-center px-4 sm:px-6 py-2 gap-1 border-b border-gray-200 dark:border-gray-700">
@@ -515,6 +551,17 @@ const Modal: React.FC<ModalProps> = ({
                 Tags
               </button>
               <button
+                onClick={() => setActiveTab('backlinks')}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  activeTab === 'backlinks'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                <Link2 size={16} />
+                Backlinks
+              </button>
+              <button
                 onClick={() => setActiveTab('actions')}
                 className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
                   activeTab === 'actions'
@@ -533,8 +580,7 @@ const Modal: React.FC<ModalProps> = ({
                 scrollbarWidth: 'thin',
                 scrollbarColor: 'rgb(156 163 175) transparent'
               }}
-            >
-              {activeTab === 'summary' && (
+            >              {activeTab === 'summary' && (
                 <SummaryModule
                   itemId={itemId}
                   itemType={normalizedType}
@@ -550,6 +596,12 @@ const Modal: React.FC<ModalProps> = ({
                   content={content}
                   initialTags={tags}
                   onTagsUpdate={onTagsUpdate}
+                />
+              )}
+              {activeTab === 'backlinks' && (
+                <BacklinksDisplay
+                  itemId={itemId}
+                  itemType={normalizedType}
                 />
               )}
               {activeTab === 'actions' && (

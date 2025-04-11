@@ -120,6 +120,22 @@ const createTables = () => {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`);
 
+    // Create links table for bi-directional linking between notes and transcripts
+    db.run(`CREATE TABLE IF NOT EXISTS links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_id INTEGER NOT NULL,
+      source_type TEXT NOT NULL CHECK(source_type IN ('note', 'transcript')),
+      target_id INTEGER NOT NULL,
+      target_type TEXT NOT NULL CHECK(target_type IN ('note', 'transcript')),
+      link_text TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(source_id, source_type, target_id, target_type)
+    )`);
+
+    // Add indexes for efficient lookups in links table
+    db.run(`CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id, source_type)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id, target_type)`);
+
     // Insert default app settings if none exist
     db.get('SELECT COUNT(*) as count FROM app_settings', (err, row) => {
       if (err) {

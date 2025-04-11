@@ -31,6 +31,7 @@ const transcriptsRoutes = require('./routes/transcripts');
 const notesRoutes = require('./routes/notes');
 const voiceInsightsRoutes = require('./routes/voiceInsights');
 const noteInsightsRoutes = require('./routes/noteInsights');
+const linksRoutes = require('./routes/links');
 const PORT = process.env.PORT || 5000;
 
 // JWT secret key - in production, use an environment variable
@@ -62,6 +63,7 @@ app.use('/api/transcripts', transcriptsRoutes);  // No auth required for token v
 app.use('/api/notes', authenticateToken, notesRoutes);
 app.use('/api/voice-insights', authenticateToken, voiceInsightsRoutes);
 app.use('/api/note-insights', authenticateToken, noteInsightsRoutes);
+app.use('/api/links', linksRoutes);
 
 // Initialize database
 createTables();

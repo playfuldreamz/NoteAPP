@@ -4,6 +4,7 @@ const { deleteResource, bulkDeleteResources } = require('../services/deleteServi
 const { authenticateToken } = require('../middleware/auth');
 const db = require('../database/connection');
 const { isTagReferenced } = require('../utils/dbUtils');
+const linkService = require('../services/linkService');
 
 // Get all notes with tags
 router.get('/', authenticateToken, (req, res) => {
@@ -66,17 +67,35 @@ router.get('/', authenticateToken, (req, res) => {
 });
 
 // Create new note
-router.post('/', authenticateToken, (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   const { content, title, transcript } = req.body;
-  db.run('INSERT INTO notes (content, title, transcript, user_id) VALUES (?, ?, ?, ?)', 
-    [content, title, transcript, req.user.id], 
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      res.status(201).json({ id: this.lastID, content, title, transcript });
+  
+  try {
+    // Insert the note using a Promise for cleaner async flow
+    const insertResult = await new Promise((resolve, reject) => {
+      db.run('INSERT INTO notes (content, title, transcript, user_id) VALUES (?, ?, ?, ?)', 
+        [content, title, transcript, req.user.id], 
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        });
     });
+    
+    // Process links if content exists
+    if (content) {
+      try {
+        await linkService.processLinks(insertResult.id, 'note', content, req.user.id);
+      } catch (linkErr) {
+        console.error('Error processing links:', linkErr);
+        // Continue despite link processing errors - don't fail the whole request
+      }
+    }
+    
+    res.status(201).json({ id: insertResult.id, content, title, transcript });
+  } catch (err) {
+    console.error('Error creating note:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Bulk delete notes
@@ -172,7 +191,7 @@ router.put('/:id/title', authenticateToken, (req, res) => {
 });
 
 // Update note content
-router.put('/:id/content', authenticateToken, (req, res) => {
+router.put('/:id/content', authenticateToken, async (req, res) => {
   const noteId = req.params.id;
   const { content } = req.body;
 
@@ -180,19 +199,36 @@ router.put('/:id/content', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'Content is required' });
   }
 
-  db.run(
-    'UPDATE notes SET content = ? WHERE id = ? AND user_id = ?',
-    [content, noteId, req.user.id],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ error: 'Note not found or unauthorized' });
-      }
-      res.json({ message: 'Note content updated successfully' });
+  try {
+    // Update the note using a Promise
+    const updateResult = await new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE notes SET content = ? WHERE id = ? AND user_id = ?',
+        [content, noteId, req.user.id],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ changes: this.changes });
+        }
+      );
+    });
+
+    if (updateResult.changes === 0) {
+      return res.status(404).json({ error: 'Note not found or unauthorized' });
     }
-  );
+
+    // Process links in the updated content
+    try {
+      await linkService.processLinks(parseInt(noteId), 'note', content, req.user.id);
+    } catch (linkErr) {
+      console.error('Error processing links:', linkErr);
+      // Continue despite link processing errors
+    }
+
+    res.json({ message: 'Note content updated successfully' });
+  } catch (err) {
+    console.error('Error updating note content:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

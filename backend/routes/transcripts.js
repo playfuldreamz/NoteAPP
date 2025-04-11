@@ -5,6 +5,7 @@ const fetch = require('node-fetch');
 const { authenticateToken } = require('../middleware/auth');
 const db = require('../database/connection');
 const { isTagReferenced } = require('../utils/dbUtils');
+const linkService = require('../services/linkService');
 
 // AssemblyAI token endpoint
 router.post('/assemblyai-token', async (req, res) => {
@@ -297,7 +298,7 @@ router.put('/:id/title', authenticateToken, (req, res) => {
 });
 
 // Update transcript content
-router.put('/:id/content', authenticateToken, (req, res) => {
+router.put('/:id/content', authenticateToken, async (req, res) => {
   const transcriptId = req.params.id;
   const { content } = req.body;
 
@@ -305,19 +306,36 @@ router.put('/:id/content', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'Content is required' });
   }
 
-  db.run(
-    'UPDATE transcripts SET text = ? WHERE id = ? AND user_id = ?',
-    [content, transcriptId, req.user.id],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ error: 'Transcript not found or unauthorized' });
-      }
-      res.json({ message: 'Transcript content updated successfully' });
+  try {
+    // Update the transcript using a Promise
+    const updateResult = await new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE transcripts SET text = ? WHERE id = ? AND user_id = ?',
+        [content, transcriptId, req.user.id],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ changes: this.changes });
+        }
+      );
+    });
+
+    if (updateResult.changes === 0) {
+      return res.status(404).json({ error: 'Transcript not found or unauthorized' });
     }
-  );
+
+    // Process links in the updated content
+    try {
+      await linkService.processLinks(parseInt(transcriptId), 'transcript', content, req.user.id);
+    } catch (linkErr) {
+      console.error('Error processing links in transcript update:', linkErr);
+      // Continue despite link processing errors
+    }
+
+    res.json({ message: 'Transcript content updated successfully' });
+  } catch (err) {
+    console.error('Error updating transcript content:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Get all transcripts with tags
@@ -404,12 +422,20 @@ router.post('/', authenticateToken, async (req, res) => {
     const query = 'INSERT INTO transcripts (text, title, user_id, duration) VALUES (?, ?, ?, ?)'; // Updated query
     const params = [text, finalTitle, req.user.id, duration]; // Added duration to params
 
-    db.run(query, params, function(err) {
+    db.run(query, params, async function(err) {
       if (err) {
         return res.status(500).json({ error: 'Failed to save transcript' });
       }
 
       const transcriptId = this.lastID;
+      
+      // Process links in transcript text if any
+      try {
+        await linkService.processLinks(transcriptId, 'transcript', text, req.user.id);
+      } catch (linkErr) {
+        console.error('Error processing links in transcript:', linkErr);
+        // Continue despite link processing errors
+      }
       
       // Process tags if any
       if (tags.length > 0) {
