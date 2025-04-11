@@ -20,7 +20,7 @@ import SettingsModal from './settings/SettingsModal';
 import { useTagsContext } from '../context/TagsContext';
 
 interface TaggingModuleProps {
-  type?: string;
+  type?: 'note' | 'transcript' | string;
   itemId: number;
   content: string;
   initialTags?: Tag[];
@@ -35,7 +35,7 @@ const normalizeType = (type?: string): 'note' | 'transcript' => {
   }
 
   const normalized = type.toLowerCase();
-  if (['note', 'transcript'].includes(normalized)) {
+  if (normalized === 'note' || normalized === 'transcript') {
     return normalized as 'note' | 'transcript';
   }
 

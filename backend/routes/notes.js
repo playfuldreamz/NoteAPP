@@ -66,6 +66,47 @@ router.get('/', authenticateToken, (req, res) => {
   });
 });
 
+// Get a single note by ID
+router.get('/:id', authenticateToken, (req, res) => {
+  const noteId = req.params.id;
+  const userId = req.user.id;
+
+  const query = `
+    SELECT
+      n.id,
+      n.content,
+      n.title,
+      n.transcript,
+      n.summary,
+      n.timestamp,
+      n.user_id,
+      json_group_array(json_object('id', t.id, 'name', t.name)) AS tags
+    FROM notes n
+    LEFT JOIN item_tags it ON n.id = it.item_id AND it.item_type = 'note'
+    LEFT JOIN tags t ON it.tag_id = t.id
+    WHERE n.id = ? AND n.user_id = ?
+    GROUP BY n.id
+  `;
+
+  db.get(query, [noteId, userId], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (!row) {
+      return res.status(404).json({ error: 'Note not found or unauthorized' });
+    }
+    
+    // Parse the JSON tags array
+    const note = {
+      ...row,
+      tags: JSON.parse(row.tags).filter(tag => tag.id !== null)
+    };
+    
+    res.json(note);
+  });
+});
+
 // Create new note
 router.post('/', authenticateToken, async (req, res) => {
   const { content, title, transcript } = req.body;

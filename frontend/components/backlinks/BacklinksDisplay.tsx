@@ -5,9 +5,10 @@ import BacklinkItemComponent from './BacklinkItem';
 interface BacklinksDisplayProps {
   itemId: number;
   itemType: 'note' | 'transcript';
+  onBacklinkClick?: (backlink: BacklinkItemType) => void;
 }
 
-const BacklinksDisplay: React.FC<BacklinksDisplayProps> = ({ itemId, itemType }) => {
+const BacklinksDisplay: React.FC<BacklinksDisplayProps> = ({ itemId, itemType, onBacklinkClick }) => {
   const [backlinks, setBacklinks] = useState<BacklinkItemType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,12 +60,12 @@ const BacklinksDisplay: React.FC<BacklinksDisplayProps> = ({ itemId, itemType })
     <div className="space-y-4 p-4">
       <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
         {backlinks.length} {backlinks.length === 1 ? 'item links' : 'items link'} to this
-      </h3>
-      <div className="space-y-2">
+      </h3>      <div className="space-y-2">
         {backlinks.map((backlink) => (
           <BacklinkItemComponent 
             key={`${backlink.sourceType}-${backlink.sourceId}`}
             backlink={backlink}
+            onClick={onBacklinkClick}
           />
         ))}
       </div>

@@ -3,12 +3,13 @@ import { BacklinkItem as BacklinkItemType } from '../../services/linkService';
 
 interface BacklinkItemProps {
   backlink: BacklinkItemType;
-  onClick?: () => void;
+  onClick?: (backlink: BacklinkItemType) => void;
 }
 
-const BacklinkItemComponent: React.FC<BacklinkItemProps> = ({ backlink, onClick }) => {  const handleClick = () => {
+const BacklinkItemComponent: React.FC<BacklinkItemProps> = ({ backlink, onClick }) => {
+  const handleClick = () => {
     if (onClick) {
-      onClick();
+      onClick(backlink);
     } else {
       // Navigate to the source item
       window.location.href = `/${backlink.sourceType === 'note' ? 'notes' : 'transcripts'}/${backlink.sourceId}`;

@@ -66,8 +66,8 @@ const Modal: React.FC<ModalProps> = ({
   const [editableTitle, setEditableTitle] = useState(initialTitle || '');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableContent, setEditableContent] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [content, setContent] = useState(initialContent);
+  const [isSaving, setIsSaving] = useState(false);  const [content, setContent] = useState(initialContent);
+  const [selectedNoteId, setSelectedNoteId] = useState<number>(itemId);
   const contentEditableRef = useRef<HTMLDivElement>(null);
 
   // Initialize editable content when entering edit mode
@@ -486,6 +486,11 @@ const Modal: React.FC<ModalProps> = ({
                     content={content}
                     onLinkClick={async (title) => {
                       try {
+                        // Set up loading state
+                        toast.info(`Loading "${title}"...`, {
+                          autoClose: 1000
+                        });
+                        
                         // Call backend to find the item by title
                         const token = localStorage.getItem('token');
                         if (!token) {
@@ -506,12 +511,41 @@ const Modal: React.FC<ModalProps> = ({
                         const data = await response.json();
                         
                         if (data && data.found) {
-                          // Update modal to show the linked item
-                          if (onClose) onClose(); // Close current modal first
+                          // Fetch the linked item content and update the current modal
+                          const itemEndpoint = data.type === 'note' ? 'notes' : 'transcripts';
+                          const linkedItemResponse = await fetch(`${API_BASE}/api/${itemEndpoint}/${data.id}`, {
+                            headers: {
+                              'Authorization': `Bearer ${token}`
+                            }
+                          });
                           
-                          // We need to implement a modal navigation system that preserves history
-                          // For now, we'll just load the target item directly
-                          window.location.href = `/${data.type === 'note' ? 'notes' : 'transcripts'}/${data.id}`;
+                          if (!linkedItemResponse.ok) {
+                            throw new Error('Failed to fetch linked item content');
+                          }
+                          
+                          // Extract content based on item type
+                          const linkedItem = await linkedItemResponse.json();
+                          const linkedContent = data.type === 'note' ? linkedItem.content : linkedItem.text;
+                          const linkedSummary = linkedItem.summary || null;
+                          const linkedTags = linkedItem.tags || [];
+                          
+                          // Update current modal with new content
+                          setContent(linkedContent);
+                          setEditableTitle(data.title || 'Untitled');
+                          setSelectedNoteId(data.id);
+                          setCurrentSummary(linkedSummary);
+                          setTags(linkedTags);
+                          
+                          // Update editable content if in edit mode
+                          if (isEditMode) {
+                            const htmlContent = linkedContent.startsWith('<') ? linkedContent : textToHtml(linkedContent);
+                            setEditableContent(htmlContent);
+                          }
+                          
+                          // Reset active tab to summary
+                          setActiveTab('summary');
+                          
+                          toast.success(`Navigated to: ${data.title || 'linked item'}`);
                         } else {
                           toast.info(`No item found with title "${title}"`);
                         }
@@ -597,11 +631,62 @@ const Modal: React.FC<ModalProps> = ({
                   initialTags={tags}
                   onTagsUpdate={onTagsUpdate}
                 />
-              )}
-              {activeTab === 'backlinks' && (
+              )}              {activeTab === 'backlinks' && (
                 <BacklinksDisplay
                   itemId={itemId}
                   itemType={normalizedType}
+                  onBacklinkClick={async (backlink) => {
+                    try {
+                      // Set up loading state
+                      toast.info(`Loading ${backlink.sourceTitle || 'linked item'}...`, {
+                        autoClose: 1000
+                      });
+                      
+                      const token = localStorage.getItem('token');
+                      if (!token) {
+                        toast.error('Authentication required');
+                        return;
+                      }
+                      
+                      // Fetch the source item content
+                      const endpoint = backlink.sourceType === 'note' ? 'notes' : 'transcripts';
+                      const response = await fetch(`${API_BASE}/api/${endpoint}/${backlink.sourceId}`, {
+                        headers: {
+                          'Authorization': `Bearer ${token}`
+                        }
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error(`Failed to fetch ${backlink.sourceType}`);
+                      }
+                      
+                      const item = await response.json();
+                      const linkedContent = backlink.sourceType === 'note' ? item.content : item.text;
+                      const linkedSummary = item.summary || null;
+                      const linkedTags = item.tags || [];
+                      
+                      // Update modal content with the backlink source
+                      setContent(linkedContent);
+                      setEditableTitle(backlink.sourceTitle || 'Untitled');
+                      setSelectedNoteId(backlink.sourceId);
+                      setCurrentSummary(linkedSummary);
+                      setTags(linkedTags);
+                      
+                      // Update editable content if in edit mode
+                      if (isEditMode) {
+                        const htmlContent = linkedContent.startsWith('<') ? linkedContent : textToHtml(linkedContent);
+                        setEditableContent(htmlContent);
+                      }
+                      
+                      // Reset active tab to summary
+                      setActiveTab('summary');
+                      
+                      toast.success(`Navigated to: ${backlink.sourceTitle || 'linked item'}`);
+                    } catch (error) {
+                      console.error('Error navigating to backlink:', error);
+                      toast.error('Failed to navigate to backlink');
+                    }
+                  }}
                 />
               )}
               {activeTab === 'actions' && (

@@ -210,6 +210,47 @@ router.post('/deepgram-token', async (req, res) => {
   }
 });
 
+// Get a single transcript by ID
+router.get('/:id', authenticateToken, (req, res) => {
+  const transcriptId = req.params.id;
+  const userId = req.user.id;
+
+  const query = `
+    SELECT
+      t.id,
+      t.title,
+      t.text,
+      t.summary,
+      t.date,
+      t.duration,
+      t.user_id,
+      json_group_array(json_object('id', tag.id, 'name', tag.name)) AS tags
+    FROM transcripts t
+    LEFT JOIN item_tags it ON t.id = it.item_id AND it.item_type = 'transcript'
+    LEFT JOIN tags tag ON it.tag_id = tag.id
+    WHERE t.id = ? AND t.user_id = ?
+    GROUP BY t.id
+  `;
+
+  db.get(query, [transcriptId, userId], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (!row) {
+      return res.status(404).json({ error: 'Transcript not found or unauthorized' });
+    }
+    
+    // Parse the JSON tags array
+    const transcript = {
+      ...row,
+      tags: JSON.parse(row.tags).filter(tag => tag.id !== null)
+    };
+    
+    res.json(transcript);
+  });
+});
+
 // Delete transcript tags with cleanup
 router.delete('/:id/tags', authenticateToken, (req, res) => {
   const transcriptId = req.params.id;

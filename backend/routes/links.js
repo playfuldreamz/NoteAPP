@@ -68,12 +68,10 @@ router.get('/find-by-title', authenticateToken, async (req, res) => {
     }
     
     // Get user ID from auth middleware
-    const userId = req.user.id;
-    
-    // First check notes table
+    const userId = req.user.id;    // First check notes table with case-insensitive search
     let note = await new Promise((resolve, reject) => {
       db.get(
-        'SELECT id, title, updated_at FROM notes WHERE title = ? AND user_id = ?',
+        'SELECT id, title, timestamp as updated_at FROM notes WHERE LOWER(title) = LOWER(?) AND user_id = ?',
         [title, userId],
         (err, row) => {
           if (err) return reject(err);
@@ -82,10 +80,23 @@ router.get('/find-by-title', authenticateToken, async (req, res) => {
       );
     });
     
-    // Then check transcripts table
+    // If no exact match found, try looking for partial matches
+    if (!note) {
+      note = await new Promise((resolve, reject) => {
+        db.get(
+          "SELECT id, title, timestamp as updated_at FROM notes WHERE title LIKE ? AND user_id = ?",
+          [`%${title}%`, userId],
+          (err, row) => {
+            if (err) return reject(err);
+            resolve(row);
+          }
+        );
+      });
+    }
+      // Then check transcripts table with case-insensitive search
     let transcript = await new Promise((resolve, reject) => {
       db.get(
-        'SELECT id, title, date as updated_at FROM transcripts WHERE title = ? AND user_id = ?',
+        'SELECT id, title, date as updated_at FROM transcripts WHERE LOWER(title) = LOWER(?) AND user_id = ?',
         [title, userId],
         (err, row) => {
           if (err) return reject(err);
@@ -93,6 +104,20 @@ router.get('/find-by-title', authenticateToken, async (req, res) => {
         }
       );
     });
+    
+    // If no exact match found, try looking for partial matches
+    if (!transcript) {
+      transcript = await new Promise((resolve, reject) => {
+        db.get(
+          "SELECT id, title, date as updated_at FROM transcripts WHERE title LIKE ? AND user_id = ?",
+          [`%${title}%`, userId],
+          (err, row) => {
+            if (err) return reject(err);
+            resolve(row);
+          }
+        );
+      });
+    }
     
     // Determine which to return if both exist (choose the most recently updated)
     let result = null;
