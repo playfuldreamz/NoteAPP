@@ -69,6 +69,10 @@ const Modal: React.FC<ModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);  const [content, setContent] = useState(initialContent);
   const [selectedNoteId, setSelectedNoteId] = useState<number>(itemId);
   const contentEditableRef = useRef<HTMLDivElement>(null);
+  const [normalizedType, setNormalizedType] = useState(type === 'note' || type === 'transcript' ? type : 'note');
+
+  // Add a breadcrumb stack to track navigation history
+  const [breadcrumbStack, setBreadcrumbStack] = useState<Array<{ id: number; type: string; title: string; content: string; summary: string | null; tags: Tag[] }>>([]);
 
   // Initialize editable content when entering edit mode
   useEffect(() => {
@@ -275,18 +279,139 @@ const Modal: React.FC<ModalProps> = ({
       onSummaryUpdate(newSummary);
     }
   };
-
   if (!isOpen) return null;
 
-  // Validate and normalize type
-  const normalizedType = type === 'note' || type === 'transcript' ? type : 'note';
+  // Function to handle navigation to a new item
+  const navigateToItem = (
+    id: number, 
+    type: string, 
+    title: string, 
+    content: string, 
+    tags: Tag[] = [], 
+    summary: string | null = null
+  ) => {
+    // Store current item in breadcrumb stack
+    setBreadcrumbStack(prev => [...prev, {
+      id: itemId,
+      type: normalizedType,
+      title: editableTitle,
+      content,
+      summary: currentSummary,
+      tags
+    }]);
+
+    // Update all modal state for the new item
+    setContent(content);
+    setEditableTitle(title);
+    setSelectedNoteId(id);
+    setTags(tags);
+    setCurrentSummary(summary);
+    // Reset all states
+    setIsEditMode(false);
+    setIsEditingTitle(false);
+    setEditableContent(content);
+    setIsCopied(false);
+    // Update the normalized type for the new item
+    const newNormalizedType = type === 'note' || type === 'transcript' ? type : 'note';
+    setNormalizedType(newNormalizedType);
+    // Reset active tab to summary
+    setActiveTab('summary');
+  };
+
+  // Function to handle back navigation to a specific item in the breadcrumb
+  const handleBackNavigation = async (targetItem?: typeof breadcrumbStack[0]) => {
+    if (breadcrumbStack.length > 0) {
+      const itemToNavigateTo = targetItem || breadcrumbStack[breadcrumbStack.length - 1];
+      
+      try {
+        // Fetch the previous item's content and data
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Authentication required');
+          return;
+        }
+
+        // Get the item from the API
+        const newNormalizedType = itemToNavigateTo.type === 'note' || itemToNavigateTo.type === 'transcript' 
+          ? itemToNavigateTo.type 
+          : 'note';
+        const itemEndpoint = newNormalizedType === 'note' ? 'notes' : 'transcripts';
+        const response = await fetch(`${API_BASE}/api/${itemEndpoint}/${itemToNavigateTo.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${itemToNavigateTo.type}`);
+        }
+        
+        // Get the full item data
+        const item = await response.json();
+        const linkedContent = newNormalizedType === 'note' ? item.content : item.text;
+        const linkedSummary = item.summary || null;
+        const linkedTags = item.tags || [];
+
+        // Remove all items after the target item from the stack
+        if (targetItem) {
+          const targetIndex = breadcrumbStack.findIndex(item => item.id === targetItem.id);
+          if (targetIndex !== -1) {
+            setBreadcrumbStack(prev => prev.slice(0, targetIndex));
+          }
+        } else {
+          setBreadcrumbStack(prev => prev.slice(0, -1));
+        }
+
+        // Update all modal state for the previous item
+        setContent(linkedContent);
+        setEditableTitle(itemToNavigateTo.title);
+        setSelectedNoteId(itemToNavigateTo.id);
+        setTags(linkedTags);
+        setCurrentSummary(linkedSummary);
+        setActiveTab('summary');
+        // Update type state
+        setNormalizedType(newNormalizedType);
+        // Reset edit states
+        setIsEditMode(false);
+        setIsEditingTitle(false);
+        setEditableContent(linkedContent);
+        // Reset copy state
+        setIsCopied(false);
+
+        toast.success(`Returned to: ${itemToNavigateTo.title || 'previous item'}`);
+      } catch (error) {
+        console.error('Error navigating back:', error);
+        toast.error('Failed to navigate back to previous item');
+      }
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-sm">
       <div className="fixed inset-4 lg:inset-8 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col max-h-[calc(100vh-2rem)] lg:max-h-[calc(100vh-4rem)]">
         {/* Header */}
-        <div className={`sticky top-0 z-10 px-4 sm:px-6 py-4 flex items-center gap-4 transition-shadow ${isScrolled ? 'shadow-md dark:shadow-gray-800' : ''}`}>
-          <div className="flex-1 min-w-0">
+        <div className={`sticky top-0 z-10 px-4 sm:px-6 py-4 flex flex-col gap-2 transition-shadow ${isScrolled ? 'shadow-md dark:shadow-gray-800' : ''}`}>
+          {/* Breadcrumb navigation */}
+          {breadcrumbStack.length > 0 && (
+            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              {breadcrumbStack.map((item, index) => (
+                <React.Fragment key={index}>
+                  {index > 0 && <span>/</span>}
+                  <button
+                    onClick={() => handleBackNavigation(item)}
+                    className="hover:text-blue-500 hover:underline truncate max-w-[200px]"
+                  >
+                    {item.title || 'Untitled'}
+                  </button>
+                </React.Fragment>
+              ))}
+              <span>/</span>
+              <span className="text-gray-900 dark:text-gray-100 truncate">{editableTitle || 'Untitled'}</span>
+            </div>
+          )}
+
+          {/* Title and actions */}
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               {isEditingTitle ? (
                 <input
@@ -304,6 +429,8 @@ const Modal: React.FC<ModalProps> = ({
                   {editableTitle || 'Content'}
                 </h3>
               )}
+              
+              {/* Title editing controls */}
               {isEditingTitle ? (
                 <>
                   <button
@@ -330,6 +457,8 @@ const Modal: React.FC<ModalProps> = ({
                   <Edit3 size={20} className="text-gray-500 dark:text-gray-400" />
                 </button>
               )}
+
+              {/* Regenerate title button */}
               {onRegenerateTitle && !isEditingTitle && (
                 <button
                   onClick={onRegenerateTitle}
@@ -346,60 +475,58 @@ const Modal: React.FC<ModalProps> = ({
                 </button>
               )}
             </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <select
-              title="Select download format"
-              value={perItemDownloadOptions.format}
-              onChange={handlePerItemDownloadOptionsChange}
-              className="text-sm text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors p-2 border border-gray-200 dark:border-gray-700"
-            >
-              <option value="txt">TXT</option>
-              <option value="md">MD</option>
-              <option value="html">HTML</option>
-              <option value="pdf">PDF</option>
-            </select>
-            
-            <button
-              onClick={() => downloadDocument({
-                id: itemId,
-                type: type === 'note' ? 'note' : 'transcript',
-                content,
-                timestamp: new Date().toISOString(),
-                title: initialTitle || 'Untitled',
-                tags,
-                ...(type === 'note' ? { transcript: '' } : {})
-              }, perItemDownloadOptions)}
-              disabled={isDownloading}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Download content"
-            >
-              <Download size={20} className={isDownloading ? 'opacity-50' : ''} />
-            </button>
 
-            <button
-              onClick={() => setIsEditMode(!isEditMode)}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              title={isEditMode ? "Cancel editing" : "Edit content"}
-            >
-              <Edit3 size={20} className={isEditMode ? 'text-blue-500' : ''} />
-            </button>
-            
-            <button 
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              aria-label="Close modal"
-            >
-              <X size={20} />
-            </button>
+            {/* Action buttons */}
+            <div className="flex items-center gap-2">
+              <select
+                title="Select download format"
+                value={perItemDownloadOptions.format}
+                onChange={handlePerItemDownloadOptionsChange}
+                className="text-sm text-gray-500 dark:text-gray-400 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors p-2 border border-gray-200 dark:border-gray-700"
+              >
+                <option value="txt">TXT</option>
+                <option value="md">MD</option>
+                <option value="html">HTML</option>
+                <option value="pdf">PDF</option>
+              </select>
+              
+              <button
+                onClick={() => downloadDocument({
+                  id: selectedNoteId,
+                  type: normalizedType,
+                  content,
+                  timestamp: new Date().toISOString(),
+                  title: editableTitle || 'Untitled',
+                  tags,
+                }, perItemDownloadOptions)}
+                disabled={isDownloading}
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Download content"
+              >
+                <Download size={20} className={isDownloading ? 'opacity-50' : ''} />
+              </button>
+
+              <button
+                onClick={() => setIsEditMode(!isEditMode)}
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                title={isEditMode ? "Cancel editing" : "Edit content"}
+              >
+                <Edit3 size={20} className={isEditMode ? 'text-blue-500' : ''} />
+              </button>
+              
+              <button 
+                onClick={onClose}
+                className="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                aria-label="Close modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Content area with custom scrollbar */}
-        <div 
-          className="flex-1 overflow-hidden flex flex-col lg:flex-row"
-        >
+        {/* Content area */}
+        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
           {/* Left panel - Content */}
           <div className={`flex-1 min-w-0 ${isEditMode ? '' : 'overflow-y-auto'} px-4 sm:px-6 py-4 lg:border-r border-gray-200 dark:border-gray-700 flex flex-col`}
             style={{
@@ -530,17 +657,7 @@ const Modal: React.FC<ModalProps> = ({
                           const linkedTags = linkedItem.tags || [];
                           
                           // Update current modal with new content
-                          setContent(linkedContent);
-                          setEditableTitle(data.title || 'Untitled');
-                          setSelectedNoteId(data.id);
-                          setCurrentSummary(linkedSummary);
-                          setTags(linkedTags);
-                          
-                          // Update editable content if in edit mode
-                          if (isEditMode) {
-                            const htmlContent = linkedContent.startsWith('<') ? linkedContent : textToHtml(linkedContent);
-                            setEditableContent(htmlContent);
-                          }
+                          navigateToItem(data.id, data.type, data.title || 'Untitled', linkedContent, linkedTags, linkedSummary);
                           
                           // Reset active tab to summary
                           setActiveTab('summary');
@@ -633,7 +750,7 @@ const Modal: React.FC<ModalProps> = ({
                 />
               )}              {activeTab === 'backlinks' && (
                 <BacklinksDisplay
-                  itemId={itemId}
+                  itemId={selectedNoteId}
                   itemType={normalizedType}
                   onBacklinkClick={async (backlink) => {
                     try {
@@ -666,17 +783,7 @@ const Modal: React.FC<ModalProps> = ({
                       const linkedTags = item.tags || [];
                       
                       // Update modal content with the backlink source
-                      setContent(linkedContent);
-                      setEditableTitle(backlink.sourceTitle || 'Untitled');
-                      setSelectedNoteId(backlink.sourceId);
-                      setCurrentSummary(linkedSummary);
-                      setTags(linkedTags);
-                      
-                      // Update editable content if in edit mode
-                      if (isEditMode) {
-                        const htmlContent = linkedContent.startsWith('<') ? linkedContent : textToHtml(linkedContent);
-                        setEditableContent(htmlContent);
-                      }
+                      navigateToItem(backlink.sourceId, backlink.sourceType, backlink.sourceTitle || 'Untitled', linkedContent, linkedTags, linkedSummary);
                       
                       // Reset active tab to summary
                       setActiveTab('summary');
