@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchBacklinks, BacklinkItem as BacklinkItemType } from '../../services/linkService';
-import BacklinkItemComponent from './BacklinkItem.tsx';
+import BacklinkItemComponent from './BacklinkItem';
 
 interface BacklinksDisplayProps {
   itemId: number;
