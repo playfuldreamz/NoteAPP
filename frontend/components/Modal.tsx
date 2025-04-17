@@ -71,6 +71,17 @@ const Modal: React.FC<ModalProps> = ({
   const contentEditableRef = useRef<HTMLDivElement>(null);
   const [normalizedType, setNormalizedType] = useState(type === 'note' || type === 'transcript' ? type : 'note');
 
+  // Synchronize selectedNoteId with itemId prop
+  useEffect(() => {
+    setSelectedNoteId(itemId);
+  }, [itemId]);
+
+  // Synchronize normalizedType with type prop
+  useEffect(() => {
+    const newNormalizedType = type === 'note' || type === 'transcript' ? type : 'note';
+    setNormalizedType(newNormalizedType);
+  }, [type]);
+
   // Add a breadcrumb stack to track navigation history
   const [breadcrumbStack, setBreadcrumbStack] = useState<Array<{ id: number; type: string; title: string; content: string; summary: string | null; tags: Tag[] }>>([]);
 
@@ -748,7 +759,8 @@ const Modal: React.FC<ModalProps> = ({
                   initialTags={tags}
                   onTagsUpdate={onTagsUpdate}
                 />
-              )}              {activeTab === 'backlinks' && (
+              )}
+              {activeTab === 'backlinks' && (
                 <BacklinksDisplay
                   itemId={selectedNoteId}
                   itemType={normalizedType}
