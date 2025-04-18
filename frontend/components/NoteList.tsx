@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Modal from './ModalWrapper';
+import Modal from './modal/index';
 import { ChevronUp, Trash2, Eye, Search, Sparkles, Download } from 'lucide-react';
 import TranscriptActions from './TranscriptActions';
 import { generateTranscriptTitle, updateNoteTitle } from '../services/ai';

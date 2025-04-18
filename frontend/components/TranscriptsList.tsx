@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import Modal from './ModalWrapper';
+import Modal from './modal/index';
 import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
 import TranscriptActions from './TranscriptActions';
 import type { TranscriptFilters } from './TranscriptActions';
