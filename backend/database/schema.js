@@ -1,6 +1,15 @@
+/**
+ * Schema creation for Supabase/SQLite
+ * 
+ * This module handles database schema initialization for both Supabase and SQLite.
+ * It checks if required tables exist and ensures default settings are created.
+ */
+
+const supabase = require('./supabase');
 const db = require('./connection');
 
-const createTables = () => {
+// SQLite schema creation function (original implementation)
+const createSQLiteTables = () => {
   db.serialize(() => {
     // Create users table
     db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -170,6 +179,95 @@ const createTables = () => {
       }
     });
   });
+};
+
+// Supabase schema initialization function
+const createSupabaseTables = async () => {
+  try {
+    console.log('Checking Supabase database schema...');
+    
+    // Check if app_settings table has default values
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('*')
+      .maybeSingle();
+      
+    if (error) {
+      console.error('Error checking app_settings:', error);
+      return;
+    }
+    
+    if (!data) {
+      // Get API keys from environment
+      const geminiKey = process.env.GEMINI_API_KEY;
+      const openaiKey = process.env.OPENAI_API_KEY;
+      
+      // Only insert default settings if we have a valid API key
+      if (geminiKey || openaiKey) {
+        const defaultProvider = geminiKey ? 'gemini' : 'openai';
+        const defaultApiKey = defaultProvider === 'gemini' ? geminiKey : openaiKey;
+        
+        const { error: insertError } = await supabase
+          .from('app_settings')
+          .insert([{
+            provider: defaultProvider,
+            api_key: defaultApiKey,
+            is_active: true
+          }]);
+          
+        if (insertError) {
+          console.error('Error inserting default app settings:', insertError);
+        } else {
+          console.log('Default app settings created successfully with', defaultProvider);
+        }
+      } else {
+        console.log('No API keys found in environment variables. Default settings not created.');
+      }
+    }
+    
+    console.log('Supabase database schema check completed');
+  } catch (error) {
+    console.error('Error in Supabase schema initialization:', error);
+  }
+};
+
+/**
+ * Initialize the database schema
+ * Checks if tables exist and creates default settings
+ */
+const createTables = async () => {
+  try {
+    console.log('Initializing database schema...');
+    
+    // Check if Supabase is configured
+    const isSupabaseConfigured = process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY;
+    
+    if (isSupabaseConfigured) {
+      // Try to initialize Supabase schema
+      try {
+        await createSupabaseTables();
+      } catch (supabaseError) {
+        console.error('Error initializing Supabase schema:', supabaseError);
+        console.warn('Falling back to SQLite schema...');
+        createSQLiteTables();
+      }
+    } else {
+      // Use SQLite schema
+      console.log('Using SQLite schema...');
+      createSQLiteTables();
+    }
+    
+    console.log('Database schema initialization completed');
+  } catch (error) {
+    console.error('Error in database schema initialization:', error);
+    // Fallback to SQLite in case of any errors
+    try {
+      console.warn('Attempting SQLite schema as fallback...');
+      createSQLiteTables();
+    } catch (sqliteError) {
+      console.error('SQLite fallback also failed:', sqliteError);
+    }
+  }
 };
 
 module.exports = createTables;

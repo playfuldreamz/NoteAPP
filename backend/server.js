@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const { authenticateToken, generateToken } = require('./middleware/auth');
 const { OpenAI } = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const supabase = require('./database/supabase');
 const db = require('./database/connection');
 const createTables = require('./database/schema');
 const authRoutes = require('./routes/auth');
@@ -66,7 +67,31 @@ app.use('/api/note-insights', authenticateToken, noteInsightsRoutes);
 app.use('/api/links', linksRoutes);
 
 // Initialize database
-createTables();
+(async () => {
+  try {
+    // Check if Supabase is configured
+    const isSupabaseConfigured = process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY;
+    
+    if (isSupabaseConfigured) {
+      // Check Supabase connection
+      const { data, error } = await supabase.from('app_settings').select('count');
+      if (error) {
+        console.error('Error connecting to Supabase:', error.message);
+        console.error('Please check your SUPABASE_URL and SUPABASE_ANON_KEY environment variables');
+        console.warn('Falling back to SQLite database...');
+      } else {
+        console.log('Successfully connected to Supabase');
+      }
+    } else {
+      console.log('Supabase not configured. Using SQLite database.');
+    }
+    
+    // Initialize database schema (works with both Supabase and SQLite)
+    await createTables();
+  } catch (error) {
+    console.error('Error initializing database:', error);
+  }
+})();
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
