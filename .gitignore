@@ -24,3 +24,6 @@ logs/
 .DS_Store
 Thumbs.db
 *.sqlite
+
+# Documentation
+docs/
