@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import Modal from '../../../components/Modal';
+import Modal from '../../../components/ModalWrapper';
 import StatsRow from '../../../components/home/StatsRow';
 import QuickActionsWidget from '../../../components/home/QuickActionsWidget';
 import RecentActivityWidget from '../../../components/home/RecentActivityWidget';
