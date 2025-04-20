@@ -10,6 +10,7 @@ interface BreadcrumbItem {
   content: string;
   summary: string | null;
   tags: Tag[];
+  breadcrumbId: string; // Unique identifier for each breadcrumb item
 }
 
 interface UseModalNavigationProps {
@@ -60,6 +61,11 @@ export const useModalNavigation = ({
     setNormalizedType(newNormalizedType);
   }, [type, setNormalizedType]);
 
+  // Function to generate a unique identifier for breadcrumb items
+  const generateBreadcrumbId = () => {
+    return Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
+  };
+
   // Function to handle navigation to a new item
   const navigateToItem = async (
     id: number, 
@@ -69,14 +75,15 @@ export const useModalNavigation = ({
     tags: Tag[] = [], 
     summary: string | null = null
   ) => {
-    // Store current item in breadcrumb stack
+    // Store current item in breadcrumb stack with a unique identifier
     setBreadcrumbStack(prev => [...prev, {
       id: itemId,
       type: normalizedType,
       title: editableTitle,
       content,
       summary: currentSummary,
-      tags
+      tags,
+      breadcrumbId: generateBreadcrumbId()
     }]);
 
     // Update all modal state for the new item
@@ -133,8 +140,10 @@ export const useModalNavigation = ({
 
         // Remove all items after the target item from the stack
         if (targetItem) {
-          const targetIndex = breadcrumbStack.findIndex(item => item.id === targetItem.id);
+          // Use breadcrumbId for exact matching instead of just the item ID
+          const targetIndex = breadcrumbStack.findIndex(item => item.breadcrumbId === targetItem.breadcrumbId);
           if (targetIndex !== -1) {
+            // Keep items up to but NOT including the target index (since we're now AT that item)
             setBreadcrumbStack(prev => prev.slice(0, targetIndex));
           }
         } else {
