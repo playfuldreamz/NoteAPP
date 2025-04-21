@@ -11,6 +11,7 @@ import RecentRecordingsWidget from '../../../components/home/RecentRecordingsWid
 import FocusAreasWidget from '../../../components/home/FocusAreasWidget';
 import VoiceInsightsSection from '../../../components/home/VoiceInsightsSection';
 import NoteInsightsSection from '../../../components/home/NoteInsightsSection';
+import useTitleGeneration from '../../../hooks/useTitleGeneration';
 
 // Define types for Note and Transcript directly in this file
 interface Note {
@@ -55,6 +56,9 @@ export default function HomePage() {
     type: 'note',
     summary: null
   });
+
+  // Add title generation functionality
+  const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
 
   // Update state definitions
   const [focusNoteTags, setFocusNoteTags] = useState<Array<{ tag: string; count: number }>>([]);
@@ -131,6 +135,29 @@ export default function HomePage() {
     setModalState(prev => ({ ...prev, isOpen: false }));
   };
 
+  // Handle title regeneration
+  const handleRegenerateTitle = async () => {
+    if (modalState.itemId && modalState.type) {
+      try {
+        // Create an update function to update the modal state with the new title
+        const updateModalTitle = (id: number, title: string) => {
+          setModalState(prev => ({ ...prev, title }));
+        };
+        
+        // Call handleGenerateTitle with the correct parameters
+        await handleGenerateTitle(
+          modalState.itemId, 
+          modalState.content, 
+          updateModalTitle,
+          modalState.type
+        );
+      } catch (error) {
+        console.error('Error regenerating title:', error);
+        toast.error('Failed to regenerate title');
+      }
+    }
+  };
+
   return (
     <div className="grid grid-flow-row gap-8">
       <StatsRow stats={stats} />
@@ -160,6 +187,12 @@ export default function HomePage() {
         initialSummary={modalState.summary}
         onSummaryUpdate={(summary) => {
           setModalState(prev => ({ ...prev, summary }));
+        }}
+        onRegenerateTitle={handleRegenerateTitle}
+        isRegeneratingTitle={loadingTitles[modalState.itemId] || false}
+        onTitleUpdate={() => {
+          // Refresh data if needed after title update
+          fetchHomePageData();
         }}
       />
     </div>
