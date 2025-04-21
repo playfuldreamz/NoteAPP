@@ -144,12 +144,13 @@ export default function HomePage() {
           setModalState(prev => ({ ...prev, title }));
         };
         
-        // Call handleGenerateTitle with the correct parameters
+        // Call handleGenerateTitle with the correct parameters, including current title
         await handleGenerateTitle(
           modalState.itemId, 
           modalState.content, 
           updateModalTitle,
-          modalState.type
+          modalState.type,
+          modalState.title // Pass current title to ensure we get a different one
         );
       } catch (error) {
         console.error('Error regenerating title:', error);

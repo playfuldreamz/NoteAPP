@@ -248,29 +248,44 @@ const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate
   const handleRegenerateTitle = async () => {
     if (!selectedNote || !selectedNoteId) return;
     
+    // Set loading state to true before starting title generation
     setIsRegeneratingTitle(true);
+    
     try {
-      const newTitle = await generateTranscriptTitle(selectedNote);
-      await updateNoteTitle(selectedNoteId, newTitle);
-      setSelectedNoteTitle(newTitle);
-      
-      // Update the title in the notes list
-      const updateNote = (note: Note) => {
-        if (note.id === selectedNoteId) {
-          return { ...note, title: newTitle };
+      // Create an update function to update the note title in the UI
+      const updateNoteTitle = (id: number, title: string) => {
+        setSelectedNoteTitle(title);
+        
+        // Update the title in the notes list
+        const updateNote = (note: Note) => {
+          if (note.id === id) {
+            return { ...note, title };
+          }
+          return note;
+        };
+        
+        setFilteredNotes(prev => prev.map(updateNote));
+        setVisibleNotes(prev => prev.map(updateNote));
+        
+        // Call the parent's onTitleUpdate callback
+        if (onTitleUpdate) {
+          onTitleUpdate();
         }
-        return note;
       };
       
-      setFilteredNotes(prev => prev.map(updateNote));
-      setVisibleNotes(prev => prev.map(updateNote));
-      
-      toast.success('Title regenerated successfully');
-      onTitleUpdate();
+      // Use the useTitleGeneration hook to handle title generation
+      await handleGenerateTitle(
+        selectedNoteId,
+        selectedNote,
+        updateNoteTitle,
+        'note',
+        selectedNoteTitle // Pass current title to ensure we get a different one
+      );
     } catch (error) {
       console.error('Error regenerating title:', error);
       toast.error('Failed to regenerate title');
     } finally {
+      // Set loading state to false after title generation completes
       setIsRegeneratingTitle(false);
     }
   };

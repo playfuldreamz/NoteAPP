@@ -301,28 +301,44 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const handleRegenerateTitle = async () => {
     if (!selectedTranscript || !selectedTranscriptId) return;
     
+    // Set loading state to true before starting title generation
     setIsRegeneratingTitle(true);
+    
     try {
-      const newTitle = await generateTranscriptTitle(selectedTranscript);
-      await updateTranscriptTitle(selectedTranscriptId, newTitle);
-      setSelectedTranscriptTitle(newTitle);
-      
-      // Update the title in the transcripts list
-      const updateTranscript = (transcript: Transcript) => {
-        if (transcript.id === selectedTranscriptId) {
-          return { ...transcript, title: newTitle };
+      // Create an update function to update the transcript title in the UI
+      const updateTranscriptTitle = (id: number, title: string) => {
+        setSelectedTranscriptTitle(title);
+        
+        // Update the title in the transcripts list
+        const updateTranscript = (transcript: Transcript) => {
+          if (transcript.id === id) {
+            return { ...transcript, title };
+          }
+          return transcript;
+        };
+        
+        setFilteredTranscripts(prev => prev.map(updateTranscript));
+        setVisibleTranscripts(prev => prev.map(updateTranscript));
+        
+        // Call the parent's onTitleUpdate callback if provided
+        if (onTitleUpdate) {
+          onTitleUpdate();
         }
-        return transcript;
       };
       
-      setFilteredTranscripts(prev => prev.map(updateTranscript));
-      setVisibleTranscripts(prev => prev.map(updateTranscript));
-      
-      toast.success('Title regenerated successfully');
+      // Use the useTitleGeneration hook to handle title generation
+      await handleGenerateTitle(
+        selectedTranscriptId,
+        selectedTranscript,
+        updateTranscriptTitle,
+        'transcript',
+        selectedTranscriptTitle // Pass current title to ensure we get a different one
+      );
     } catch (error) {
       console.error('Error regenerating title:', error);
       toast.error('Failed to regenerate title');
     } finally {
+      // Set loading state to false after title generation completes
       setIsRegeneratingTitle(false);
     }
   };
