@@ -40,6 +40,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [visibleTranscripts, setVisibleTranscripts] = useState<Transcript[]>([]);
   const [showLoadMore, setShowLoadMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [itemsToShow, setItemsToShow] = useState<number>(5);
   const { downloadDocument, isDownloading } = useDownloadDocument();
   const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
   const [downloadOptions, setDownloadOptions] = useState<Record<number, DownloadOptions>>({});
@@ -114,6 +115,13 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   }, [selectedTranscriptId]);
 
   const [filteredTranscripts, setFilteredTranscripts] = useState<Transcript[]>([]);
+  
+  // This effect updates the visible transcripts whenever filteredTranscripts or itemsToShow changes
+  useEffect(() => {
+    setVisibleTranscripts(filteredTranscripts.slice(0, itemsToShow));
+    setShowLoadMore(filteredTranscripts.length > itemsToShow);
+  }, [filteredTranscripts, itemsToShow]);
+
   const applyFilters = (transcripts: Transcript[], filters: TranscriptFilters) => {
     // Ensure transcripts is an array before spreading
     let filtered = transcripts ? [...transcripts] : [];
@@ -174,8 +182,6 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const handleFilter = (filters: TranscriptFilters) => {
     const filtered = applyFilters(initialTranscripts, filters);
     setFilteredTranscripts(filtered);
-    setVisibleTranscripts(filtered.slice(0, 5));
-    setShowLoadMore(filtered.length > 5);
   };
 
   useEffect(() => {
@@ -183,8 +189,16 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   }, [initialTranscripts]);
 
   useEffect(() => {
-    if (!initialTranscripts || !Array.isArray(initialTranscripts)) return;
+    if (!initialTranscripts || !Array.isArray(initialTranscripts)) {
+      setFilteredTranscripts([]);
+      return;
+    }
     
+    const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setFilteredTranscripts(sortedTranscripts);
+  }, [initialTranscripts]);
+
+  useEffect(() => {
     if (searchQuery) {
       const filtered = initialTranscripts.filter(transcript =>
         transcript.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -192,23 +206,18 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
       );
       const sortedFiltered = filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setFilteredTranscripts(sortedFiltered);
-      setVisibleTranscripts(sortedFiltered.slice(0, 5));
-      setShowLoadMore(sortedFiltered.length > 5);
+      setVisibleTranscripts(sortedFiltered.slice(0, itemsToShow));
+      setShowLoadMore(sortedFiltered.length > itemsToShow);
     } else {
-      const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setFilteredTranscripts(sortedTranscripts);
-      setVisibleTranscripts(sortedTranscripts.slice(0, 5));
-      setShowLoadMore(sortedTranscripts.length > 5);
+      setVisibleTranscripts(filteredTranscripts.slice(0, itemsToShow));
+      setShowLoadMore(filteredTranscripts.length > itemsToShow);
     }
-  }, [searchQuery, initialTranscripts]);
+  }, [searchQuery, filteredTranscripts, itemsToShow]);
 
+  // This effect updates the visible transcripts whenever filteredTranscripts or itemsToShow changes
   useEffect(() => {
-    initialTranscripts.forEach(transcript => {
-      if (transcript.tags) {
-        updateItemTags(transcript.id, 'transcript', transcript.tags);
-      }
-    });
-  }, [initialTranscripts, updateItemTags]);
+    setVisibleTranscripts(filteredTranscripts.slice(0, itemsToShow));
+  }, [filteredTranscripts, itemsToShow]);
 
   const handleDeleteTranscript = async (id: number) => {
     try {
@@ -406,15 +415,11 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   }, [isModalOpen, onTitleUpdate]);
 
   const handleLoadMore = () => {
-    const currentLength = visibleTranscripts.length;
-    const newVisibleTranscripts = filteredTranscripts.slice(0, currentLength + 5);
-    setVisibleTranscripts(newVisibleTranscripts);
-    setShowLoadMore(newVisibleTranscripts.length < filteredTranscripts.length);
+    setItemsToShow(prevCount => prevCount + 5);
   };
 
   const handleShowLess = () => {
-    setVisibleTranscripts(filteredTranscripts.slice(0, 5));
-    setShowLoadMore(filteredTranscripts.length > 5);
+    setItemsToShow(5);
   };
 
   return (
