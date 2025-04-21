@@ -92,14 +92,15 @@ const ModalHeader: React.FC<ModalHeaderProps> = ({
 
       {/* Title and actions */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-w-[85%]">
           {isEditingTitle ? (
             <input
               type="text"
               value={editableTitle}
               onChange={(e) => setEditableTitle(e.target.value)}
               placeholder="Enter title"
-              className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500"
+              className="text-xl font-semibold text-gray-900 dark:text-gray-100 bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500"
+              style={{ width: `${Math.max(editableTitle.length * 0.8, 20)}ch` }}
             />
           ) : (
             <h3
