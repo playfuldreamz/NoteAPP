@@ -40,22 +40,19 @@ router.get('/all', async (req, res) => {
       return res.status(401).json({ error: 'User authentication required' });
     }
 
-    // Get all active settings for this user
-    const userSettings = await new Promise((resolve, reject) => {
-      db.all(
-        `SELECT provider, api_key FROM user_settings 
-         WHERE user_id = ? AND api_key IS NOT NULL AND api_key != ''`,
-        [userId],
-        (err, rows) => {
-          if (err) return reject(err);
-          resolve(rows.map(row => ({
-            provider: row.provider,
-            apiKey: row.api_key,
-            source: 'user'
-          })));
-        }
-      );
-    });
+    // Get all active settings for this user using better-sqlite3 API
+    const stmt = db.prepare(`
+      SELECT provider, api_key FROM user_settings 
+      WHERE user_id = ? AND api_key IS NOT NULL AND api_key != ''
+    `);
+    
+    const rows = stmt.all(userId);
+    
+    const userSettings = rows.map(row => ({
+      provider: row.provider,
+      apiKey: row.api_key,
+      source: 'user'
+    }));
 
     // Add environment keys for providers that don't have user settings
     const settings = [...userSettings];

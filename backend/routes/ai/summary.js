@@ -40,93 +40,89 @@ router.post(
         WHERE id = ? AND user_id = ?
       `;
       
-      db.get(fetchQuery, [itemId, userId], async (err, item) => {
-        if (err) {
-          console.error(`Error fetching ${type}:`, err);
-          return res.status(500).json({
-            success: false,
-            error: 'Database error',
-          });
-        }
+      // Use better-sqlite3 API
+      const stmt = db.prepare(fetchQuery);
+      const item = stmt.get(itemId, userId);
+      
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          error: `${type.charAt(0).toUpperCase() + type.slice(1)} not found`,
+        });
+      }
 
-        if (!item) {
-          return res.status(404).json({
-            success: false,
-            error: `${type.charAt(0).toUpperCase() + type.slice(1)} not found`,
-          });
-        }
+      const content = item[contentColumn];
+      
+      // Check if content exists
+      if (!content || content.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: `${type} content is empty`,
+        });
+      }
 
-        const content = item[contentColumn];
+      try {
+        // Get AI provider for this user
+        const provider = await AIProviderFactory.getProvider(userId);
         
-        // Check if content exists
-        if (!content || content.trim() === '') {
-          return res.status(400).json({
-            success: false,
-            error: `${type} content is empty`,
-          });
-        }
-
+        // Initialize summarization task
+        const summarizationTask = new ItemSummarizationTask(provider);
+        
+        // Generate summary
+        const summary = await summarizationTask.generateSummary(content);
+        
+        // Store the summary in database
+        const updateQuery = `
+          UPDATE ${table}
+          SET summary = ?
+          WHERE id = ? AND user_id = ?
+        `;
+        
+        // Use better-sqlite3 API for update
         try {
-          // Get AI provider for this user
-          const provider = await AIProviderFactory.getProvider(userId);
+          const updateStmt = db.prepare(updateQuery);
+          const result = updateStmt.run(summary, itemId, userId);
           
-          // Initialize summarization task
-          const summarizationTask = new ItemSummarizationTask(provider);
-          
-          // Generate summary
-          const summary = await summarizationTask.generateSummary(content);
-          
-          // Store the summary in database
-          const updateQuery = `
-            UPDATE ${table}
-            SET summary = ?
-            WHERE id = ? AND user_id = ?
-          `;
-          
-          db.run(updateQuery, [summary, itemId, userId], function(updateErr) {
-            if (updateErr) {
-              console.error(`Error updating ${type} summary:`, updateErr);
-              return res.status(500).json({
-                success: false,
-                error: 'Failed to save summary',
-              });
-            }
-
-            if (this.changes !== 1) {
-              return res.status(404).json({
-                success: false,
-                error: `${type.charAt(0).toUpperCase() + type.slice(1)} not found or not updated`,
-              });
-            }
-
-            // Return the generated summary
-            return res.status(200).json({
-              success: true,
-              summary,
-            });
-          });
-        } catch (error) {
-          console.error('AI summary generation error:', error);
-          
-          // Check if it's an API key error
-          if (error.message && (
-            error.message.includes('API key') || 
-            error.message.includes('authentication') || 
-            error.message.includes('auth')
-          )) {
-            return res.status(401).json({
+          if (result.changes !== 1) {
+            return res.status(404).json({
               success: false,
-              error: 'Invalid or missing API key',
-              code: 'INVALID_API_KEY',
+              error: `${type.charAt(0).toUpperCase() + type.slice(1)} not found or not updated`,
             });
           }
-          
+
+          // Return the generated summary
+          return res.status(200).json({
+            success: true,
+            summary,
+          });
+        } catch (updateErr) {
+          console.error(`Error updating ${type} summary:`, updateErr);
           return res.status(500).json({
             success: false,
-            error: `Error generating summary: ${error.message}`,
+            error: 'Failed to save summary',
           });
         }
-      });
+      } catch (error) {
+        console.error('AI summary generation error:', error);
+        
+        // Check if it's an API key error
+        if (error.message && (
+          error.message.includes('API key') || 
+          error.message.includes('authentication') || 
+          error.message.includes('auth')
+        )) {
+          return res.status(401).json({
+            success: false,
+            error: 'Invalid or missing API key',
+            code: 'INVALID_API_KEY',
+          });
+        }
+        
+        return res.status(500).json({
+          success: false,
+          error: `Error generating summary: ${error.message}`,
+        });
+      }
     } catch (error) {
       console.error(`Error in summarization endpoint:`, error);
       return res.status(500).json({

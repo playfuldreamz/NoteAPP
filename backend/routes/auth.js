@@ -17,21 +17,20 @@ router.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Insert the user
-    db.run('INSERT INTO users (username, password) VALUES (?, ?)', 
-      [username, hashedPassword], 
-      function(err) {
-        if (err) {
-          if (err.message.includes('UNIQUE constraint failed')) {
-            return res.status(400).json({ error: 'Username already exists' });
-          }
-          return res.status(500).json({ error: err.message });
-        }
-
-        // Create token
-        const token = generateToken({ id: this.lastID, username });
-        res.status(201).json({ token, username });
-    });
+    // Insert the user using better-sqlite3 API
+    try {
+      const stmt = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)');
+      const result = stmt.run(username, hashedPassword);
+      
+      // Create token
+      const token = generateToken({ id: result.lastInsertRowid, username });
+      res.status(201).json({ token, username });
+    } catch (err) {
+      if (err.message.includes('UNIQUE constraint failed')) {
+        return res.status(400).json({ error: 'Username already exists' });
+      }
+      throw err;
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -39,16 +38,16 @@ router.post('/register', async (req, res) => {
 
 // Login endpoint
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  try {
+    const { username, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
-
-  db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
     }
+
+    // Use better-sqlite3 API to get user
+    const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
+    const user = stmt.get(username);
 
     if (!user) {
       return res.status(400).json({ error: 'User not found' });
@@ -63,7 +62,9 @@ router.post('/login', async (req, res) => {
     // Create token
     const token = generateToken({ id: user.id, username: user.username });
     res.json({ token, username: user.username });
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Change password endpoint
@@ -75,13 +76,9 @@ router.put('/change-password', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Verify current password
-    const user = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM users WHERE id = ?', [req.user.id], (err, row) => {
-        if (err) return reject(err);
-        resolve(row);
-      });
-    });
+    // Verify current password using better-sqlite3 API
+    const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+    const user = stmt.get(req.user.id);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -96,13 +93,9 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    // Update password
-    await new Promise((resolve, reject) => {
-      db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.user.id], function(err) {
-        if (err) return reject(err);
-        resolve(this);
-      });
-    });
+    // Update password using better-sqlite3 API
+    const updateStmt = db.prepare('UPDATE users SET password = ? WHERE id = ?');
+    updateStmt.run(hashedPassword, req.user.id);
 
     res.json({ message: 'Password updated successfully' });
   } catch (err) {
@@ -119,13 +112,9 @@ router.put('/change-username', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Get current user
-    const user = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM users WHERE id = ?', [req.user.id], (err, row) => {
-        if (err) return reject(err);
-        resolve(row);
-      });
-    });
+    // Get current user using better-sqlite3 API
+    const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+    const user = stmt.get(req.user.id);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -137,25 +126,18 @@ router.put('/change-username', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: 'Invalid password' });
     }
 
-    // Check if new username is available
-    const usernameExists = await new Promise((resolve, reject) => {
-      db.get('SELECT id FROM users WHERE username = ? AND id != ?', [newUsername, user.id], (err, row) => {
-        if (err) return reject(err);
-        resolve(!!row);
-      });
-    });
+    // Check if new username is available using better-sqlite3 API
+    const checkStmt = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?');
+    const existingUser = checkStmt.get(newUsername, user.id);
+    const usernameExists = !!existingUser;
 
     if (usernameExists) {
       return res.status(400).json({ error: 'Username already taken' });
     }
 
-    // Update username
-    await new Promise((resolve, reject) => {
-      db.run('UPDATE users SET username = ? WHERE id = ?', [newUsername, user.id], function(err) {
-        if (err) return reject(err);
-        resolve(this);
-      });
-    });
+    // Update username using better-sqlite3 API
+    const updateStmt = db.prepare('UPDATE users SET username = ? WHERE id = ?');
+    updateStmt.run(newUsername, user.id);
 
     // Generate new token with updated username
     const token = generateToken({ id: user.id, username: newUsername });

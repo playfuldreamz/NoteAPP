@@ -57,7 +57,9 @@ router.get('/backlinks', authenticateToken, validateItemType, async (req, res) =
  */
 router.get('/find-by-title', authenticateToken, async (req, res) => {
   try {
-    const { title } = req.query;
+    let { title } = req.query;
+    
+    console.log('Original title query:', title);
     
     // Validate required parameter
     if (!title) {
@@ -67,85 +69,77 @@ router.get('/find-by-title', authenticateToken, async (req, res) => {
       });
     }
     
+    // Remove quotes if they exist (handle URL-encoded quotes)
+    if (title.startsWith('"') || title.startsWith('%22')) {
+      title = title.replace(/^"|^%22|"$|%22$/g, '');
+    }
+    
+    // Decode URI component to handle special characters
+    title = decodeURIComponent(title);
+    
+    console.log('Processed title:', title);
+    
     // Get user ID from auth middleware
-    const userId = req.user.id;    // First check notes table with case-insensitive search
-    let note = await new Promise((resolve, reject) => {
-      db.get(
-        'SELECT id, title, timestamp as updated_at FROM notes WHERE LOWER(title) = LOWER(?) AND user_id = ?',
-        [title, userId],
-        (err, row) => {
-          if (err) return reject(err);
-          resolve(row);
-        }
-      );
-    });
+    const userId = req.user.id;
     
-    // If no exact match found, try looking for partial matches
-    if (!note) {
-      note = await new Promise((resolve, reject) => {
-        db.get(
-          "SELECT id, title, timestamp as updated_at FROM notes WHERE title LIKE ? AND user_id = ?",
-          [`%${title}%`, userId],
-          (err, row) => {
-            if (err) return reject(err);
-            resolve(row);
-          }
-        );
-      });
-    }
-      // Then check transcripts table with case-insensitive search
-    let transcript = await new Promise((resolve, reject) => {
-      db.get(
-        'SELECT id, title, date as updated_at FROM transcripts WHERE LOWER(title) = LOWER(?) AND user_id = ?',
-        [title, userId],
-        (err, row) => {
-          if (err) return reject(err);
-          resolve(row);
-        }
-      );
-    });
+    // Use the linkService to resolve the item by title
+    const linkService = require('../services/linkService');
+    const result = await linkService.resolveItemByTitle(title, userId);
     
-    // If no exact match found, try looking for partial matches
-    if (!transcript) {
-      transcript = await new Promise((resolve, reject) => {
-        db.get(
-          "SELECT id, title, date as updated_at FROM transcripts WHERE title LIKE ? AND user_id = ?",
-          [`%${title}%`, userId],
-          (err, row) => {
-            if (err) return reject(err);
-            resolve(row);
-          }
-        );
-      });
-    }
+    console.log('Link service result:', result);
     
-    // Determine which to return if both exist (choose the most recently updated)
-    let result = null;
-    
-    if (note && transcript) {
-      // Compare update timestamps and pick the most recent
-      const noteDate = new Date(note.updated_at);
-      const transcriptDate = new Date(transcript.updated_at);
+    // If no result found, try a more flexible search
+    if (!result) {
+      // Try case-insensitive search in notes
+      const noteStmt = db.prepare("SELECT id, title FROM notes WHERE LOWER(title) LIKE LOWER(?) AND user_id = ? LIMIT 1");
+      const note = noteStmt.get(`%${title}%`, userId);
       
-      result = noteDate > transcriptDate ? 
-        { id: note.id, title: note.title, type: 'note' } : 
-        { id: transcript.id, title: transcript.title, type: 'transcript' };
-    } else if (note) {
-      result = { id: note.id, title: note.title, type: 'note' };
-    } else if (transcript) {
-      result = { id: transcript.id, title: transcript.title, type: 'transcript' };
+      // Try case-insensitive search in transcripts
+      const transcriptStmt = db.prepare("SELECT id, title FROM transcripts WHERE LOWER(title) LIKE LOWER(?) AND user_id = ? LIMIT 1");
+      const transcript = transcriptStmt.get(`%${title}%`, userId);
+      
+      if (note) {
+        res.status(200).json({
+          success: true,
+          found: true,
+          id: note.id,
+          title: note.title,
+          type: 'note'
+        });
+        return;
+      } else if (transcript) {
+        res.status(200).json({
+          success: true,
+          found: true,
+          id: transcript.id,
+          title: transcript.title,
+          type: 'transcript'
+        });
+        return;
+      }
+      
+      // No matches found
+      res.status(200).json({
+        success: true,
+        found: false
+      });
+      return;
     }
     
+    // Result found by linkService
     res.status(200).json({
       success: true,
-      found: result !== null,
-      ...result
+      found: true,
+      id: result.id,
+      title: title,
+      type: result.type
     });
   } catch (error) {
     console.error('Error finding item by title:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Server error while searching for item' 
+      message: 'Server error while searching for item',
+      error: error.message
     });
   }
 });
