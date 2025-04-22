@@ -23,7 +23,11 @@ logs/
 # System files
 .DS_Store
 Thumbs.db
+
+# Database files
 *.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
 # Documentation
 docs/

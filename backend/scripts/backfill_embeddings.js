@@ -27,7 +27,7 @@ async function processItem(item, itemType) {
     // Skip if no content
     if (!content) {
       console.log(`Skipping ${itemType} ${item.id} - no content`);
-      return;
+      return { success: true, skipped: true };
     }
     
     // Generate embedding
@@ -44,8 +44,10 @@ async function processItem(item, itemType) {
     `).run(item.id, itemType, item.user_id, embeddingBuffer);
     
     console.log(`Successfully stored embedding for ${itemType} ${item.id}`);
+    return { success: true, skipped: false };
   } catch (error) {
     console.error(`Error processing ${itemType} ${item.id}:`, error.message);
+    return { success: false, error: error.message };
   }
 }
 
@@ -63,6 +65,10 @@ async function processAllItems(itemType) {
     
     // Process in batches
     let processed = 0;
+    let successful = 0;
+    let skipped = 0;
+    let failed = 0;
+    let failedIds = [];
     
     while (processed < totalItems) {
       // Get batch of items
@@ -77,16 +83,27 @@ async function processAllItems(itemType) {
       
       // Process each item in the batch
       for (const item of items) {
-        await processItem(item, itemType);
+        const result = await processItem(item, itemType);
+        if (result.success) {
+          if (result.skipped) {
+            skipped++;
+          } else {
+            successful++;
+          }
+        } else {
+          failed++;
+          failedIds.push(item.id);
+        }
       }
       
       processed += items.length;
-      console.log(`Progress: ${processed}/${totalItems} ${itemType}s processed`);
+      console.log(`Progress: ${processed}/${totalItems} ${itemType}s processed (${successful} successful, ${skipped} skipped, ${failed} failed)`);
     }
     
-    console.log(`Completed processing all ${itemType}s`);
+    return { totalItems, successful, skipped, failed, failedIds };
   } catch (error) {
     console.error(`Error processing ${itemType}s:`, error);
+    return { error: error.message };
   }
 }
 
@@ -94,6 +111,8 @@ async function processAllItems(itemType) {
  * Main function to run the backfill process
  */
 async function main() {
+  let hasErrors = false;
+  
   try {
     console.log('Starting embedding backfill process...');
     
@@ -105,18 +124,48 @@ async function main() {
       process.exit(1);
     }
     
+    // Verify API keys are set
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === '') {
+      console.error('ERROR: OpenAI API key is not set. Please set OPENAI_API_KEY in your .env file.');
+      process.exit(1);
+    }
+    
     // Process notes
-    await processAllItems('note');
+    console.log('\nProcessing notes:');
+    const noteResults = await processAllItems('note');
+    if (noteResults.failed > 0) {
+      hasErrors = true;
+      console.log(`\nFailed note IDs: ${noteResults.failedIds.join(', ')}`);
+    }
     
     // Process transcripts
-    await processAllItems('transcript');
+    console.log('\nProcessing transcripts:');
+    const transcriptResults = await processAllItems('transcript');
+    if (transcriptResults.failed > 0) {
+      hasErrors = true;
+      console.log(`\nFailed transcript IDs: ${transcriptResults.failedIds.join(', ')}`);
+    }
     
-    console.log('Embedding backfill completed successfully!');
+    // Summary
+    console.log('\n=== EMBEDDING BACKFILL SUMMARY ===');
+    console.log(`Notes: ${noteResults.successful} successful, ${noteResults.skipped} skipped, ${noteResults.failed} failed`);
+    console.log(`Transcripts: ${transcriptResults.successful} successful, ${transcriptResults.skipped} skipped, ${transcriptResults.failed} failed`);
+    
+    if (hasErrors) {
+      console.log('\nEmbedding backfill completed with errors. Some items could not be processed.');
+      console.log('Check the error messages above for details.');
+    } else {
+      console.log('\nEmbedding backfill completed successfully!');
+    }
   } catch (error) {
     console.error('Error during backfill process:', error);
+    hasErrors = true;
   } finally {
     // Close database connection
     db.close();
+    
+    // Exit with appropriate code
+    process.exit(hasErrors ? 1 : 0);
   }
 }
 
