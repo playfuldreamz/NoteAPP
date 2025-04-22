@@ -93,7 +93,7 @@ export default function NotesHubPage() {
   // Create a debounced version of fetchTranscripts to prevent rapid updates
   const debouncedFetchTranscripts = useCallback(
     debounce(() => {
-      fetchTranscripts(true); // Use fast mode for better performance
+      fetchTranscripts(false); // Fetch full data including tags
     }, 1000),
     [fetchTranscripts]
   );
