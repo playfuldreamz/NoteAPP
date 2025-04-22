@@ -8,6 +8,28 @@ const linkService = require('../services/linkService');
 const embeddingGenerationTask = require('../services/ai/tasks/embeddingGeneration');
 
 /**
+ * @route GET /api/notes/count
+ * @desc Get total count of notes for a user
+ * @access Private
+ */
+router.get('/count', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const stmt = db.prepare('SELECT COUNT(*) as count FROM notes WHERE user_id = ?');
+    const result = stmt.get(userId);
+    
+    res.json({ count: result.count });
+  } catch (error) {
+    console.error('Error getting notes count:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error while getting notes count' 
+    });
+  }
+});
+
+/**
  * @route PUT /api/notes/:id/title
  * @desc Update note title
  * @access Private

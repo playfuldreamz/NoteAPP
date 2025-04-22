@@ -71,6 +71,24 @@ export default function HomePage() {
     if (!token) return;
 
     try {
+      // First fetch just the counts for the stats
+      const [notesCountRes, transcriptsCountRes] = await Promise.all([
+        fetch(`http://localhost:5000/api/notes/count`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`http://localhost:5000/api/transcripts/count`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      if (!notesCountRes.ok || !transcriptsCountRes.ok) {
+        throw new Error('Failed to fetch counts for stats');
+      }
+
+      const notesCountData = await notesCountRes.json();
+      const transcriptsCountData = await transcriptsCountRes.json();
+
+      // Then fetch the data needed for tags and other details
       const [notesRes, transcriptsRes] = await Promise.all([
         fetch(`http://localhost:5000/api/notes?limit=50&offset=0`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -81,15 +99,17 @@ export default function HomePage() {
       ]);
 
       if (!notesRes.ok || !transcriptsRes.ok) {
-        throw new Error('Failed to fetch initial data for stats/focus');
+        throw new Error('Failed to fetch data for tags and focus areas');
       }
 
       const notesData: { totalItems: number; data: Note[] } = await notesRes.json();
       const transcriptsData: { totalItems: number; data: Transcript[] } = await transcriptsRes.json();
 
-      // Update totalNotes and totalRecordings calculations
-      const totalNotes = notesData.data.length || 0;
-      const totalRecordings = transcriptsData.data.length || 0;
+      // Use the count endpoints for stats
+      const totalNotes = notesCountData.count || 0;
+      const totalRecordings = transcriptsCountData.count || 0;
+      
+      // Use the fetched data for tags and other details
       const allNoteTags = (notesData.data || []).flatMap((note: Note) => note.tags.map((tag: { id: number; name: string }) => tag.name));
       const allTranscriptTags = (transcriptsData.data || []).flatMap((t: Transcript) => (t.tags || []).map((tag: { id: number; name: string }) => tag.name));
       const totalUniqueTags = new Set([...allNoteTags, ...allTranscriptTags]).size;
