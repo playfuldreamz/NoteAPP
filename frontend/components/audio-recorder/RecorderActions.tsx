@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { RefreshCw, Save, RotateCcw, Loader } from 'lucide-react';
+import ConfirmationPopover from '../shared/ConfirmationPopover';
 
 interface RecorderActionsProps {
   transcript: string;
@@ -23,6 +24,7 @@ const RecorderActions: React.FC<RecorderActionsProps> = ({
   onReset,
 }) => {
   const hasContent = transcript.trim().length > 0;
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
@@ -68,19 +70,31 @@ const RecorderActions: React.FC<RecorderActionsProps> = ({
         <span>{isSaving ? 'Saving...' : 'Save'}</span>
       </button>
 
-      <button
-        onClick={onReset}
-         className={`relative flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm shadow-sm transition-all ${
-          isRecording
-            ? 'bg-gray-200 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-[0.98]'
-         }`}
-        disabled={isRecording}
-         title="Reset transcript and timer"
-      >
-        <RotateCcw size={16} className="shrink-0" />
-        <span>Reset</span>
-      </button>
+      {showResetConfirm ? (
+        <ConfirmationPopover
+          isOpen={true}
+          message="This will clear your current transcript. Are you sure you want to reset?"
+          onConfirm={() => {
+            onReset();
+            setShowResetConfirm(false);
+          }}
+          onCancel={() => setShowResetConfirm(false)}
+        />
+      ) : (
+        <button
+          onClick={() => setShowResetConfirm(true)}
+          className={`relative flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm shadow-sm transition-all ${
+            isRecording
+              ? 'bg-gray-200 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-[0.98]'
+          }`}
+          disabled={isRecording}
+          title="Reset transcript and timer"
+        >
+          <RotateCcw size={16} className="shrink-0" />
+          <span>Reset</span>
+        </button>
+      )}
     </div>
   );
 };
