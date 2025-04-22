@@ -5,6 +5,7 @@ import { Save, Settings, Maximize2 } from 'lucide-react';
 import { summarizeContent, InvalidAPIKeyError } from '../services/ai';
 import SettingsModal from './settings/SettingsModal';
 import NoteEditorModal from './notes/NoteEditorModal';
+import eventBus from '../utils/eventBus';
 
 interface NoteSaverProps {
   transcript: string;
@@ -91,6 +92,12 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
         const data = await response.json();
         console.log('Attempting to show success toast');
         toast.success('Note saved successfully!');
+        
+        // Emit a note:saved event
+        setTimeout(() => {
+          eventBus.emit('note:saved');
+        }, 500);
+        
         setNoteContent(''); // Clear the input
         onSave(); // Refresh the notes list
       } catch (error) {
@@ -127,6 +134,12 @@ const NoteSaver: React.FC<NoteSaverProps> = ({ transcript, onSave }) => {
 
             console.log('Saved note with fallback approach');
             toast.success('Note saved successfully with simplified format!');
+            
+            // Emit a note:saved event even for fallback saves
+            setTimeout(() => {
+              eventBus.emit('note:saved');
+            }, 500);
+            
             setNoteContent(''); // Clear the input
             onSave(); // Refresh the notes list
           } catch (fallbackError) {

@@ -1,6 +1,7 @@
 import { toast } from 'react-toastify';
 import { generateTranscriptTitle } from '../../../services/ai';
 import { htmlToText, MAX_FALLBACK_CONTENT_SIZE } from './editorContentUtils';
+import eventBus from '../../../utils/eventBus';
 
 interface SaveNoteParams {
   noteContent: string;
@@ -74,6 +75,12 @@ export const saveNoteToServer = async ({
 
       await response.json();
       toast.success('Note saved successfully!');
+      
+      // Emit a note:saved event
+      setTimeout(() => {
+        eventBus.emit('note:saved');
+      }, 500);
+      
       onSuccess(); // Refresh the notes list
       onClose(); // Close the modal
       return;
@@ -110,7 +117,13 @@ export const saveNoteToServer = async ({
           }
 
           console.log('Saved note with fallback approach');
-          toast.success('Note saved successfully with simplified format!');
+          toast.success('Note saved with simplified format!');
+          
+          // Emit a note:saved event even for fallback saves
+          setTimeout(() => {
+            eventBus.emit('note:saved');
+          }, 500);
+          
           onSuccess(); // Refresh the notes list
           onClose(); // Close the modal
           return;

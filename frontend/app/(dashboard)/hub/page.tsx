@@ -69,7 +69,7 @@ export default function NotesHubPage() {
     fetchNotes();
   }, []); // Empty dependency array as we only want this to run once
   
-  // Listen for transcript:saved events
+  // Listen for transcript:saved and note:saved events
   useEffect(() => {
     // Handler function to fetch transcripts when a save event occurs
     const handleTranscriptSaved = () => {
@@ -77,14 +77,22 @@ export default function NotesHubPage() {
       fetchTranscripts(true); // Use fast mode for event-triggered updates
     };
     
-    // Register event listener
-    eventBus.on('transcript:saved', handleTranscriptSaved);
+    // Handler function to fetch notes when a save event occurs
+    const handleNoteSaved = () => {
+      console.log('Note saved event received, updating list...');
+      fetchNotes(); // Fetch updated notes
+    };
     
-    // Clean up event listener when component unmounts
+    // Register event listeners
+    eventBus.on('transcript:saved', handleTranscriptSaved);
+    eventBus.on('note:saved', handleNoteSaved);
+    
+    // Clean up event listeners when component unmounts
     return () => {
       eventBus.off('transcript:saved', handleTranscriptSaved);
+      eventBus.off('note:saved', handleNoteSaved);
     };
-  }, [fetchTranscripts]);
+  }, [fetchTranscripts, fetchNotes]);
 
   const handleDeleteNote = async (id: number) => {
      const token = localStorage.getItem('token');
