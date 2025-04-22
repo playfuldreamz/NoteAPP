@@ -15,6 +15,9 @@ class EmbeddingGenerationTask {
    */
   async generateAndStoreEmbedding(itemId, itemType, userId) {
     try {
+      console.log(`=== EMBEDDING GENERATION TASK STARTED ===`);
+      console.log(`Generating embedding for ${itemType} ID ${itemId} for user ${userId}`);
+      
       // Validate parameters
       if (!itemId || !['note', 'transcript'].includes(itemType) || !userId) {
         console.error('Invalid parameters for embedding generation:', { itemId, itemType, userId });
@@ -26,9 +29,11 @@ class EmbeddingGenerationTask {
       if (itemType === 'note') {
         const note = db.prepare('SELECT content FROM notes WHERE id = ?').get(itemId);
         content = note?.content || '';
+        console.log(`Retrieved content for note ID ${itemId}, content length: ${content.length} characters`);
       } else { // transcript
         const transcript = db.prepare('SELECT text FROM transcripts WHERE id = ?').get(itemId);
         content = transcript?.text || '';
+        console.log(`Retrieved content for transcript ID ${itemId}, content length: ${content.length} characters`);
       }
 
       // If no content, log and exit
@@ -37,17 +42,23 @@ class EmbeddingGenerationTask {
         return false;
       }
 
-      // Generate embedding
-      const embedding = await embeddingService.generateEmbedding(content);
+      console.log(`Calling embedding service to generate embedding for ${itemType} ID ${itemId} using user ${userId}'s preferred provider...`);
+      
+      // Generate embedding - this will use the user's preferred provider
+      const embedding = await embeddingService.generateEmbedding(content, userId);
       
       // Serialize embedding to Buffer
       const embeddingBuffer = Buffer.from(new Float32Array(embedding).buffer);
+      console.log(`Embedding generated successfully, dimensions: ${embedding.length}`);
 
       // Store embedding in database
       db.prepare(`
         INSERT OR REPLACE INTO embeddings (item_id, item_type, user_id, content_embedding)
         VALUES (?, ?, ?, ?)
       `).run(itemId, itemType, userId, embeddingBuffer);
+      
+      console.log(`Embedding stored in database for ${itemType} ID ${itemId}`);
+      console.log(`=== EMBEDDING GENERATION TASK COMPLETED ===`);
 
       console.log(`Successfully generated and stored embedding for ${itemType} ${itemId}`);
       return true;

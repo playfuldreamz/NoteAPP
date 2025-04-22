@@ -1,10 +1,16 @@
 // Types
 export type AIProvider = 'openai' | 'gemini' | 'deepseek';
+export type EmbeddingProvider = 'xenova' | 'openai';
 
 interface AIConfig {
   provider: AIProvider;
   source: 'user' | 'app' | 'env';
   apiKey: string;
+}
+
+interface EmbeddingConfig {
+  provider: EmbeddingProvider;
+  source: 'user' | 'default' | 'fallback';
 }
 
 interface SummarizeResponse {
@@ -48,6 +54,54 @@ export async function updateAIProvider(config: { provider: AIProvider, apiKey: s
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Failed to update AI provider');
+  }
+
+  return await response.json();
+}
+
+/**
+ * Get the current embedding provider configuration
+ * @returns Promise with the embedding configuration
+ */
+export async function getEmbeddingProvider(): Promise<EmbeddingConfig> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/embedding-config`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to get embedding provider');
+  }
+
+  return await response.json();
+}
+
+/**
+ * Update the embedding provider configuration
+ * @param config The new embedding provider configuration
+ * @returns Promise with the updated configuration
+ */
+export async function updateEmbeddingProvider(config: { provider: EmbeddingProvider }): Promise<EmbeddingConfig> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/embedding-config`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(config),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to update embedding provider');
   }
 
   return await response.json();

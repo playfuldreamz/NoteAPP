@@ -1,9 +1,11 @@
 /**
  * Embedding Service
  * Provides a unified interface for generating embeddings using different providers
+ * based on user preferences
  */
 const XenovaEmbeddingProvider = require('./providers/xenovaEmbeddingProvider');
 const OpenAIEmbeddingProvider = require('./providers/openAIEmbeddingProvider');
+const EmbeddingConfigService = require('./EmbeddingConfigService');
 const dotenv = require('dotenv');
 
 // Load environment variables
@@ -17,6 +19,7 @@ class EmbeddingService {
 
   /**
    * Initialize the embedding provider based on configuration
+   * This initializes with the default provider (Xenova)
    */
   initializeProvider() {
     // Use Xenova as the default provider (no API key required)
@@ -41,18 +44,74 @@ class EmbeddingService {
       console.error('No embedding provider could be initialized. Xenova failed and no OpenAI API key is available.');
     }
   }
+  
+  /**
+   * Initialize the embedding provider for a specific user
+   * @param {number} userId - The user ID
+   * @returns {Promise<void>}
+   */
+  async initializeProviderForUser(userId) {
+    try {
+      // Get user's embedding configuration
+      const config = await EmbeddingConfigService.getUserEmbeddingConfig(userId);
+      
+      console.log(`Initializing embedding provider for user ${userId}: ${config.provider}`);
+      
+      // Initialize provider based on user preference
+      if (config.provider === 'openai') {
+        const openaiApiKey = process.env.OPENAI_API_KEY;
+        if (openaiApiKey) {
+          this.provider = new OpenAIEmbeddingProvider(openaiApiKey);
+          console.log(`Successfully initialized OpenAI embedding provider for user ${userId}`);
+        } else {
+          console.warn(`OpenAI provider selected for user ${userId}, but no API key available. Falling back to Xenova.`);
+          this.provider = new XenovaEmbeddingProvider();
+        }
+      } else {
+        // Default to Xenova
+        this.provider = new XenovaEmbeddingProvider();
+        console.log(`Successfully initialized Xenova embedding provider for user ${userId}`);
+      }
+    } catch (error) {
+      console.error(`Error initializing provider for user ${userId}:`, error);
+      // Fall back to default provider
+      this.initializeProvider();
+    }
+  }
 
   /**
    * Generate an embedding for the given text
    * @param {string} text - The text to generate an embedding for
-   * @returns {Promise<number[]>} - A promise that resolves to an array of numbers representing the embedding
+   * @param {number} [userId] - Optional user ID to use their preferred provider
+   * @returns {Promise<number[]>} - A promise that resolves to the embedding vector
    */
-  async generateEmbedding(text) {
-    if (!this.provider) {
-      throw new Error('No embedding provider available. Please check your API keys.');
-    }
+  async generateEmbedding(text, userId) {
+    try {
+      // If userId is provided, initialize the provider for that user
+      if (userId) {
+        await this.initializeProviderForUser(userId);
+      }
 
-    return this.provider.generateEmbedding(text);
+      // Check if a provider is available
+      if (!this.provider) {
+        throw new Error('No embedding provider is available');
+      }
+
+      // Log which provider is being used
+      const providerName = this.provider.constructor.name;
+      console.log(`Generating embedding using ${providerName} for ${userId ? `user ${userId}` : 'default user'}`);
+      
+      // Generate the embedding using the current provider
+      const embedding = await this.provider.generateEmbedding(text);
+      
+      // Log success
+      console.log(`Successfully generated embedding with ${providerName}: ${embedding.length} dimensions`);
+      
+      return embedding;
+    } catch (error) {
+      console.error('Error generating embedding:', error);
+      throw error;
+    }
   }
 
   /**

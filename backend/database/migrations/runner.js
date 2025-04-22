@@ -79,7 +79,8 @@ function runMigrations() {
       }
       
       try {
-        migration.up();
+        // Pass the database connection to the migration
+        migration.up(db);
         recordMigration(file);
         console.log(`Successfully applied migration: ${file}`);
       } catch (err) {
