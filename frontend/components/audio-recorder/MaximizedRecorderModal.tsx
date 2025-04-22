@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Minimize2, Settings, Puzzle } from 'lucide-react';
+import { Minimize2, Settings, Puzzle, Edit3, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRecording } from '../../context/RecordingContext';
 import RecordingControls from './RecordingControls';
@@ -30,7 +30,14 @@ const MaximizedRecorderModal: React.FC = () => {
     enhanceTranscript,
     resetRecording,
     setIsMaximized,
-    enhancedTranscript // Add this to destructure enhancedTranscript
+    enhancedTranscript,
+    transcriptTitle,
+    isEditingTitle,
+    editableTitle,
+    setIsEditingTitle,
+    setEditableTitle,
+    handleSaveTitle,
+    handleCancelEdit
   } = useRecording();
 
   const { activeProvider, provider } = useTranscription();
@@ -56,7 +63,51 @@ const MaximizedRecorderModal: React.FC = () => {
           {/* Header */}
           <div className={`sticky top-0 z-10 px-4 sm:px-6 py-4 flex items-center gap-4 transition-shadow ${isScrolled ? 'shadow-md dark:shadow-gray-800' : ''}`}>
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-semibold dark:text-gray-100">Audio Recorder</h2>
+              <div className="flex items-center gap-2">
+                {isEditingTitle ? (
+                  <input
+                    type="text"
+                    value={editableTitle}
+                    onChange={(e) => setEditableTitle(e.target.value)}
+                    placeholder="Enter title"
+                    className="text-xl font-semibold text-gray-900 dark:text-gray-100 truncate bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none"
+                    autoFocus
+                  />
+                ) : (
+                  <h2
+                    className="text-xl font-semibold dark:text-gray-100 truncate cursor-pointer"
+                    onClick={() => setIsEditingTitle(true)}
+                  >
+                    {transcriptTitle}
+                  </h2>
+                )}
+                {isEditingTitle ? (
+                  <>
+                    <button
+                      onClick={handleSaveTitle}
+                      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none transition-colors"
+                      title="Save title"
+                    >
+                      <Check size={20} className="text-gray-500 dark:text-gray-400" />
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none transition-colors"
+                      title="Cancel edit"
+                    >
+                      <X size={20} className="text-gray-500 dark:text-gray-400" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setIsEditingTitle(true)}
+                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none transition-colors"
+                    title="Edit title"
+                  >
+                    <Edit3 size={20} className="text-gray-500 dark:text-gray-400" />
+                  </button>
+                )}
+              </div>
             </div>
             <button
               onClick={() => setIsMaximized(false)}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
+import eventBus from '../../../utils/eventBus';
 import { toast } from "react-toastify";
 import { Mic, ListMusic, Save, FileText } from 'lucide-react';
 import { debounce } from 'lodash';
@@ -67,6 +68,23 @@ export default function NotesHubPage() {
     fetchTranscripts();
     fetchNotes();
   }, []); // Empty dependency array as we only want this to run once
+  
+  // Listen for transcript:saved events
+  useEffect(() => {
+    // Handler function to fetch transcripts when a save event occurs
+    const handleTranscriptSaved = () => {
+      console.log('Transcript saved event received, updating list...');
+      fetchTranscripts(true); // Use fast mode for event-triggered updates
+    };
+    
+    // Register event listener
+    eventBus.on('transcript:saved', handleTranscriptSaved);
+    
+    // Clean up event listener when component unmounts
+    return () => {
+      eventBus.off('transcript:saved', handleTranscriptSaved);
+    };
+  }, [fetchTranscripts]);
 
   const handleDeleteNote = async (id: number) => {
      const token = localStorage.getItem('token');
@@ -117,7 +135,6 @@ export default function NotesHubPage() {
           </div>
           <AudioRecorderContainer
             setTranscript={setTranscript} 
-            updateTranscripts={fetchTranscripts} 
             transcript={transcript} 
           />
         </motion.div>

@@ -9,7 +9,7 @@ interface UseTranscriptSaverOptions {
 
 interface UseTranscriptSaverReturn {
   isSaving: boolean;
-  saveTranscript: (transcript: string, duration: number, useEnhanced?: boolean, enhancedTranscript?: string) => Promise<void>;
+  saveTranscript: (transcript: string, duration: number, useEnhanced?: boolean, enhancedTranscript?: string, customTitle?: string) => Promise<void>;
   resetTranscript: () => void;
 }
 
@@ -20,7 +20,8 @@ export function useTranscriptSaver(options: UseTranscriptSaverOptions = {}): Use
     transcript: string, 
     duration: number, 
     useEnhanced = false, 
-    enhancedTranscript = ''
+    enhancedTranscript = '',
+    customTitle?: string
   ): Promise<void> => {
     if (!transcript || transcript.trim() === '') {
       toast.info('No transcript to save');
@@ -30,8 +31,8 @@ export function useTranscriptSaver(options: UseTranscriptSaverOptions = {}): Use
     try {
       setIsSaving(true);
       
-      // Generate a title for the transcript
-      const title = await generateTranscriptTitle(transcript);
+      // Use custom title if provided, otherwise generate one
+      const title = customTitle || await generateTranscriptTitle(transcript);
       
       // Determine which transcript to save
       const transcriptToSave = useEnhanced && enhancedTranscript ? enhancedTranscript : transcript;
