@@ -22,12 +22,18 @@ class SemanticSearchService {
       const queryEmbeddingBuffer = Buffer.from(new Float32Array(queryEmbedding).buffer);
       
       // Search for matching embeddings using sqlite-vec's MATCH operator
+      // Force integer conversion for userId
+      const userIdInt = parseInt(userId);
+      const limitInt = parseInt(limit);
+      
+      console.log(`Performing semantic search for user ${userIdInt} with limit ${limitInt}`);
+      
       const matchingItems = db.prepare(`
         SELECT item_id, item_type, distance
         FROM embeddings
         WHERE content_embedding MATCH ? AND user_id = ?
         ORDER BY distance LIMIT ?
-      `).all(queryEmbeddingBuffer, userId, limit);
+      `).all(queryEmbeddingBuffer, userIdInt, limitInt);
       
       // If no results, return empty array
       if (!matchingItems || matchingItems.length === 0) {
@@ -47,22 +53,32 @@ class SemanticSearchService {
       let notes = [];
       if (noteIds.length > 0) {
         const placeholders = noteIds.map(() => '?').join(',');
+        console.log(`Searching for notes with IDs: ${noteIds.join(', ')}`);
+        // Force integer conversion for all IDs
+        const noteIdsInt = noteIds.map(id => parseInt(id));
+        const userIdInt = parseInt(userId);
+        
         notes = db.prepare(`
           SELECT id, title, content, summary, timestamp
           FROM notes
           WHERE id IN (${placeholders}) AND user_id = ?
-        `).all([...noteIds, userId]);
+        `).all([...noteIdsInt, userIdInt]);
       }
       
       // Fetch details for matching transcripts
       let transcripts = [];
       if (transcriptIds.length > 0) {
         const placeholders = transcriptIds.map(() => '?').join(',');
+        console.log(`Searching for transcripts with IDs: ${transcriptIds.join(', ')}`);
+        // Force integer conversion for all IDs
+        const transcriptIdsInt = transcriptIds.map(id => parseInt(id));
+        const userIdInt = parseInt(userId);
+        
         transcripts = db.prepare(`
           SELECT id, title, text, summary, date
           FROM transcripts
           WHERE id IN (${placeholders}) AND user_id = ?
-        `).all([...transcriptIds, userId]);
+        `).all([...transcriptIdsInt, userIdInt]);
       }
       
       // Combine results and add distance/relevance score

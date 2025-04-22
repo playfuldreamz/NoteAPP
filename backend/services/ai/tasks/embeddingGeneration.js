@@ -27,13 +27,17 @@ class EmbeddingGenerationTask {
       // Get the content based on item type
       let content;
       if (itemType === 'note') {
-        const note = db.prepare('SELECT content FROM notes WHERE id = ?').get(itemId);
-        content = note?.content || '';
-        console.log(`Retrieved content for note ID ${itemId}, content length: ${content.length} characters`);
+        // Include both title and content for notes to match how transcripts work
+        const note = db.prepare('SELECT title, content FROM notes WHERE id = ?').get(itemId);
+        // Combine title and content for better semantic search
+        content = note ? `${note.title}\n\n${note.content}` : '';
+        console.log(`Retrieved content for note ID ${itemId}, title + content length: ${content.length} characters`);
       } else { // transcript
-        const transcript = db.prepare('SELECT text FROM transcripts WHERE id = ?').get(itemId);
-        content = transcript?.text || '';
-        console.log(`Retrieved content for transcript ID ${itemId}, content length: ${content.length} characters`);
+        // For transcripts, get both title and text
+        const transcript = db.prepare('SELECT title, text FROM transcripts WHERE id = ?').get(itemId);
+        // Combine title and text for better semantic search
+        content = transcript ? `${transcript.title}\n\n${transcript.text}` : '';
+        console.log(`Retrieved content for transcript ID ${itemId}, title + content length: ${content.length} characters`);
       }
 
       // If no content, log and exit
@@ -52,16 +56,21 @@ class EmbeddingGenerationTask {
       console.log(`Embedding generated successfully, dimensions: ${embedding.length}`);
 
       // Store embedding in database
-      // Force integer conversion for itemId and userId using bitwise OR with 0
-      const itemIdInt = itemId | 0; // Force integer conversion
-      const userIdInt = userId | 0; // Force integer conversion
+      // Use direct SQL with integer literals to avoid type conversion issues
+      console.log(`Using direct SQL with integer literals for IDs: itemId ${itemId}, userId ${userId}`);
       
-      console.log(`Converting IDs to integers: itemId ${itemId} → ${itemIdInt}, userId ${userId} → ${userIdInt}`);
-      
-      db.prepare(`
+      // Convert IDs to integers and use them directly in the SQL statement
+      const sql = `
         INSERT OR REPLACE INTO embeddings (item_id, item_type, user_id, content_embedding)
-        VALUES (?, ?, ?, ?)
-      `).run(itemIdInt, itemType, userIdInt, embeddingBuffer);
+        VALUES (${parseInt(itemId)}, '${itemType}', ${parseInt(userId)}, ?)
+      `;
+      
+      try {
+        db.prepare(sql).run(embeddingBuffer);
+      } catch (error) {
+        console.error(`SQL error with statement: ${sql.trim()}`);
+        throw error;
+      }
       
       console.log(`Embedding stored in database for ${itemType} ID ${itemId}`);
       console.log(`=== EMBEDDING GENERATION TASK COMPLETED ===`);
