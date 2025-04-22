@@ -28,7 +28,7 @@ export default function Navbar({
             {isAuthenticated && (
               <>
                 <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <User className="w-4 h-4" />
+                  <User className="w-5 h-5" />
                   <span>Welcome, {username || 'User'}</span>
                 </div>
 
