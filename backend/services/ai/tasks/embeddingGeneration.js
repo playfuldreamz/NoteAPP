@@ -52,10 +52,16 @@ class EmbeddingGenerationTask {
       console.log(`Embedding generated successfully, dimensions: ${embedding.length}`);
 
       // Store embedding in database
+      // Force integer conversion for itemId and userId using bitwise OR with 0
+      const itemIdInt = itemId | 0; // Force integer conversion
+      const userIdInt = userId | 0; // Force integer conversion
+      
+      console.log(`Converting IDs to integers: itemId ${itemId} → ${itemIdInt}, userId ${userId} → ${userIdInt}`);
+      
       db.prepare(`
         INSERT OR REPLACE INTO embeddings (item_id, item_type, user_id, content_embedding)
         VALUES (?, ?, ?, ?)
-      `).run(itemId, itemType, userId, embeddingBuffer);
+      `).run(itemIdInt, itemType, userIdInt, embeddingBuffer);
       
       console.log(`Embedding stored in database for ${itemType} ID ${itemId}`);
       console.log(`=== EMBEDDING GENERATION TASK COMPLETED ===`);
