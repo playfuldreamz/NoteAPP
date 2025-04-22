@@ -12,53 +12,47 @@ const db = require('../connection');
 // Migration tracking table
 const MIGRATION_TABLE = 'migrations';
 
-async function setupMigrationTable() {
-  return new Promise((resolve, reject) => {
-    db.run(`CREATE TABLE IF NOT EXISTS ${MIGRATION_TABLE} (
+function setupMigrationTable() {
+  try {
+    db.prepare(`CREATE TABLE IF NOT EXISTS ${MIGRATION_TABLE} (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
       applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`, (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve();
-    });
-  });
+    )`).run();
+    return true;
+  } catch (err) {
+    console.error('Error creating migration table:', err.message);
+    throw err;
+  }
 }
 
-async function getAppliedMigrations() {
-  return new Promise((resolve, reject) => {
-    db.all(`SELECT name FROM ${MIGRATION_TABLE}`, (err, rows) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(rows.map(row => row.name));
-    });
-  });
+function getAppliedMigrations() {
+  try {
+    const rows = db.prepare(`SELECT name FROM ${MIGRATION_TABLE}`).all();
+    return rows.map(row => row.name);
+  } catch (err) {
+    console.error('Error fetching applied migrations:', err.message);
+    throw err;
+  }
 }
 
-async function recordMigration(name) {
-  return new Promise((resolve, reject) => {
-    db.run(`INSERT INTO ${MIGRATION_TABLE} (name) VALUES (?)`, [name], (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve();
-    });
-  });
+function recordMigration(name) {
+  try {
+    db.prepare(`INSERT INTO ${MIGRATION_TABLE} (name) VALUES (?)`).run(name);
+    return true;
+  } catch (err) {
+    console.error('Error recording migration:', err.message);
+    throw err;
+  }
 }
 
-async function runMigrations() {
+function runMigrations() {
   try {
     console.log('Setting up migration tracking table...');
-    await setupMigrationTable();
+    setupMigrationTable();
     
     console.log('Fetching applied migrations...');
-    const appliedMigrations = await getAppliedMigrations();
+    const appliedMigrations = getAppliedMigrations();
     
     // Get all migration files
     const migrationFiles = fs.readdirSync(__dirname)
@@ -66,6 +60,9 @@ async function runMigrations() {
       .sort(); // Sort to ensure order
     
     console.log(`Found ${migrationFiles.length} migration files`);
+    
+    // Use a transaction for all migrations
+    db.prepare('BEGIN TRANSACTION').run();
     
     for (const file of migrationFiles) {
       if (appliedMigrations.includes(file)) {
@@ -82,18 +79,23 @@ async function runMigrations() {
       }
       
       try {
-        await migration.up();
-        await recordMigration(file);
+        migration.up();
+        recordMigration(file);
         console.log(`Successfully applied migration: ${file}`);
       } catch (err) {
         console.error(`Failed to apply migration ${file}:`, err);
+        db.prepare('ROLLBACK').run();
         process.exit(1);
       }
     }
     
+    // Commit the transaction if all migrations succeeded
+    db.prepare('COMMIT').run();
     console.log('All migrations completed successfully!');
   } catch (err) {
     console.error('Error running migrations:', err);
+    // Ensure we rollback if there was an error
+    try { db.prepare('ROLLBACK').run(); } catch (e) { /* ignore */ }
     process.exit(1);
   } finally {
     db.close();
