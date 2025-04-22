@@ -12,13 +12,23 @@ const config = require('./config');
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 /**
- * Verify required API keys are set
+ * Verify embedding provider configuration
+ * @returns {boolean} - True if configuration is valid
  */
-function verifyApiKeys() {
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === '') {
-    console.error('ERROR: OpenAI API key is not set. Please set OPENAI_API_KEY in your .env file.');
+function verifyEmbeddingConfig() {
+  const embeddingService = require('../../services/ai/EmbeddingService');
+  
+  // Check if the embedding service has a provider initialized
+  if (!embeddingService.provider) {
+    console.error('ERROR: No embedding provider could be initialized.');
+    console.error('Xenova should be used by default, but if it failed, check your OpenAI API key as fallback.');
     return false;
   }
+  
+  // Log which provider is being used
+  const providerName = embeddingService.provider.constructor.name;
+  console.log(`Using ${providerName} for embeddings`);
+  
   return true;
 }
 
@@ -74,8 +84,8 @@ async function main() {
       process.exit(1);
     }
     
-    // Verify API keys are set
-    if (!verifyApiKeys()) {
+    // Verify embedding provider configuration
+    if (!verifyEmbeddingConfig()) {
       process.exit(1);
     }
     

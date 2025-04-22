@@ -24,7 +24,7 @@ class OpenAIEmbeddingProvider extends EmbeddingProviderBase {
    * @param {string} text - The text to generate an embedding for
    * @returns {Promise<number[]>} - A promise that resolves to an array of numbers representing the embedding
    */
-  async embed(text) {
+  async generateEmbedding(text) {
     try {
       // Truncate text if it's too long (OpenAI has token limits)
       const truncatedText = text.length > 8000 ? text.substring(0, 8000) : text;

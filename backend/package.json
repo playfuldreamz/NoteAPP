@@ -2,6 +2,7 @@
   "name": "backend",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
@@ -12,6 +13,7 @@
   "description": "",
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
+    "@xenova/transformers": "^2.14.0",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^9.5.1",

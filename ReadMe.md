@@ -29,6 +29,7 @@ This repository contains a full-stack web application for taking and organizing 
 * Better-SQLite3 (high-performance SQLite library)
 * JWT authentication
 * OpenAI/Gemini integration for AI features
+* Xenova local embedding model (no API key required)
 * Vector embeddings for semantic search
 
 ## Setup and Installation
@@ -120,6 +121,20 @@ The application includes semantic search functionality that allows you to find n
 - Results are ranked by semantic similarity (cosine similarity)
 - This enables finding content even when exact keywords aren't present
 
+### Embedding Providers
+
+The application supports multiple embedding providers:
+
+- **Xenova (Default)**: Uses the local Xenova/all-MiniLM-L6-v2 model
+  - Runs completely locally - no API key required
+  - Provides 384-dimensional embeddings
+  - Ideal for privacy and offline use
+
+- **OpenAI (Fallback)**: Uses OpenAI's text-embedding models
+  - Requires an OPENAI_API_KEY in your .env file
+  - Used only if the Xenova provider fails to initialize
+  - Provides high-quality embeddings but requires internet connection
+
 ### Backfilling Embeddings
 
 If you have existing notes and transcripts without embeddings (created before this feature was added), you can generate embeddings for them using the backfill script:
@@ -131,9 +146,11 @@ node backfill_embeddings.js
 
 This script:
 - Processes all notes and transcripts without existing embeddings
-- Generates vector embeddings using the configured AI provider
+- Generates vector embeddings using the configured embedding provider (Xenova by default)
 - Stores the embeddings in the database for future searches
 - Shows progress as it processes items
+- Handles errors gracefully and provides a detailed summary
+- Can be run multiple times to update embeddings if content changes
 
 ## Database Migrations
 

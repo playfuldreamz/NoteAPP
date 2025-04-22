@@ -2,6 +2,7 @@
  * Embedding Service
  * Provides a unified interface for generating embeddings using different providers
  */
+const XenovaEmbeddingProvider = require('./providers/xenovaEmbeddingProvider');
 const OpenAIEmbeddingProvider = require('./providers/openAIEmbeddingProvider');
 const dotenv = require('dotenv');
 
@@ -15,20 +16,29 @@ class EmbeddingService {
   }
 
   /**
-   * Initialize the embedding provider based on available API keys
+   * Initialize the embedding provider based on configuration
    */
   initializeProvider() {
-    // Try to use OpenAI first
+    // Use Xenova as the default provider (no API key required)
+    try {
+      this.provider = new XenovaEmbeddingProvider();
+      console.log('Using Xenova embedding provider (default)');
+      return;
+    } catch (error) {
+      console.warn('Failed to initialize Xenova provider:', error.message);
+    }
+
+    // Fall back to OpenAI if Xenova fails
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (openaiApiKey) {
       this.provider = new OpenAIEmbeddingProvider(openaiApiKey);
-      console.log('Using OpenAI embedding provider');
+      console.log('Using OpenAI embedding provider (fallback)');
       return;
     }
 
     // Fallback message if no provider can be initialized
     if (!this.provider) {
-      console.error('No embedding provider could be initialized. Please check your API keys.');
+      console.error('No embedding provider could be initialized. Xenova failed and no OpenAI API key is available.');
     }
   }
 
@@ -42,7 +52,7 @@ class EmbeddingService {
       throw new Error('No embedding provider available. Please check your API keys.');
     }
 
-    return this.provider.embed(text);
+    return this.provider.generateEmbedding(text);
   }
 
   /**

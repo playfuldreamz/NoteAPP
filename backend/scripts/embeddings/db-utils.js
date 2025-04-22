@@ -25,11 +25,19 @@ function getBatchOfItems(itemType, batchSize, offset) {
   const tableName = `${itemType}s`;
   const contentField = itemType === 'note' ? 'content' : 'text';
   
-  return db.prepare(`
+  // Get items from database
+  const items = db.prepare(`
     SELECT id, ${contentField}, user_id 
     FROM ${tableName}
     LIMIT ? OFFSET ?
   `).all(batchSize, offset);
+  
+  // Ensure IDs are integers
+  return items.map(item => ({
+    ...item,
+    id: parseInt(item.id, 10),
+    user_id: parseInt(item.user_id, 10)
+  }));
 }
 
 /**
@@ -37,17 +45,24 @@ function getBatchOfItems(itemType, batchSize, offset) {
  * @param {number} itemId - ID of the item
  * @param {string} itemType - 'note' or 'transcript'
  * @param {number} userId - ID of the user
- * @param {Float32Array} embedding - The embedding to store
+ * @param {Float32Array|Array<number>} embedding - The embedding to store
  */
 function storeEmbedding(itemId, itemType, userId, embedding) {
+  // Convert IDs to integers using Number() to avoid floating point
+  const itemIdInt = Number(itemId)|0; // Bitwise OR with 0 forces integer
+  const userIdInt = Number(userId)|0; // Bitwise OR with 0 forces integer
+  
   // Serialize embedding to Buffer
   const embeddingBuffer = Buffer.from(new Float32Array(embedding).buffer);
   
-  // Store embedding in database
-  db.prepare(`
+  // Use a direct SQL string with integer literals to avoid type conversion issues
+  const sql = `
     INSERT OR REPLACE INTO embeddings (item_id, item_type, user_id, content_embedding)
-    VALUES (?, ?, ?, ?)
-  `).run(itemId, itemType, userId, embeddingBuffer);
+    VALUES (${itemIdInt}, '${itemType}', ${userIdInt}, ?)
+  `;
+  
+  // Only pass the buffer as a parameter
+  db.prepare(sql).run(embeddingBuffer);
 }
 
 /**
