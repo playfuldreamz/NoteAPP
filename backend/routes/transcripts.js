@@ -447,53 +447,98 @@ router.put('/:id/content', authenticateToken, async (req, res) => {
 router.get('/', authenticateToken, (req, res) => {
   const limit = req.query.limit ? parseInt(req.query.limit) : null;
   const offset = req.query.offset ? parseInt(req.query.offset) : 0;
-  
-  let query = `
-    SELECT
-      t.id,
-      t.text,
-      t.title,
-      t.summary,
-      t.date,
-      t.duration,
-      json_group_array(json_object('id', tg.id, 'name', tg.name)) AS tags
-    FROM transcripts t
-    LEFT JOIN item_tags it ON t.id = it.item_id AND it.item_type = 'transcript'
-    LEFT JOIN tags tg ON it.tag_id = tg.id
-    WHERE t.user_id = ?
-    GROUP BY t.id
-    ORDER BY t.date DESC
-  `;
-  
-  // Add pagination if limit is specified
-  if (limit !== null) {
-    query += ` LIMIT ${limit} OFFSET ${offset}`;
-  }
+  const fastMode = req.query.fast === 'true';
   
   try {
-    // Use better-sqlite3 API to get transcripts
-    const stmt = db.prepare(query);
-    const rows = stmt.all(req.user.id);
-    
-    // Parse the JSON tags array
-    const transcripts = rows.map(row => ({
-      ...row,
-      tags: JSON.parse(row.tags).filter(tag => tag.id !== null)
-    }));
-    
-    // Get total count for pagination info
+    // Get total count for pagination info - this is fast
+    // Ensure user_id is treated as an integer
+    const userId = parseInt(req.user.id);
     const countStmt = db.prepare('SELECT COUNT(*) as total FROM transcripts WHERE user_id = ?');
-    const countRow = countStmt.get(req.user.id);
+    const countRow = countStmt.get(userId);
     
-    res.json({
-      data: transcripts,
-      pagination: {
-        total: countRow.total,
-        limit: limit,
-        offset: offset,
-        hasMore: limit !== null && offset + limit < countRow.total
+    // If in fast mode, use a simpler query without the expensive tag join
+    if (fastMode) {
+      // Simple query that avoids the expensive tag join
+      let simpleQuery = `
+        SELECT
+          id,
+          text,
+          title,
+          summary,
+          date,
+          duration
+        FROM transcripts
+        WHERE user_id = ?
+        ORDER BY date DESC
+      `;
+      
+      // Add pagination if limit is specified
+      if (limit !== null) {
+        simpleQuery += ` LIMIT ${limit} OFFSET ${offset}`;
       }
-    });
+      
+      const stmt = db.prepare(simpleQuery);
+      const rows = stmt.all(userId);
+      
+      // Add empty tags array to each transcript
+      const transcripts = rows.map(row => ({
+        ...row,
+        tags: []
+      }));
+      
+      return res.json({
+        data: transcripts,
+        pagination: {
+          total: countRow.total,
+          limit: limit,
+          offset: offset,
+          hasMore: limit !== null && offset + limit < countRow.total
+        }
+      });
+    } else {
+      // Only use the complex query with tag joins when absolutely necessary
+      // Note: We're already using the parsed userId from above
+      let query = `
+        SELECT
+          t.id,
+          t.text,
+          t.title,
+          t.summary,
+          t.date,
+          t.duration,
+          json_group_array(json_object('id', tg.id, 'name', tg.name)) AS tags
+        FROM transcripts t
+        LEFT JOIN item_tags it ON t.id = it.item_id AND it.item_type = 'transcript'
+        LEFT JOIN tags tg ON it.tag_id = tg.id
+        WHERE t.user_id = ?
+        GROUP BY t.id
+        ORDER BY t.date DESC
+      `;
+      
+      // Add pagination if limit is specified
+      if (limit !== null) {
+        query += ` LIMIT ${limit} OFFSET ${offset}`;
+      }
+      
+      const stmt = db.prepare(query);
+      const rows = stmt.all(userId);
+      
+      // Parse the JSON tags array
+      const transcripts = rows.map(row => ({
+        ...row,
+        tags: JSON.parse(row.tags).filter(tag => tag.id !== null)
+      }));
+      
+      return res.json({
+        data: transcripts,
+        pagination: {
+          total: countRow.total,
+          limit: limit,
+          offset: offset,
+          hasMore: limit !== null && offset + limit < countRow.total
+        }
+      });
+    }
   } catch (error) {
     console.error('Error fetching transcripts:', error);
     res.status(500).json({ error: error.message });

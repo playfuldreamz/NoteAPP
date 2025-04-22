@@ -34,29 +34,32 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
     isEnhancing,
     isSaving,
     showEnhanced,
+    isMaximized,
     startRecording,
     stopRecording,
     pauseRecording,
-    saveTranscript,
+    saveTranscript: originalSaveTranscript,
     enhanceTranscript,
     resetRecording,
     setIsMaximized,
     enhancedTranscript
   } = useRecording();
 
-  // Handle successful save
-  React.useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    if (!isSaving && updateTranscripts) {
-      // Add a small delay to ensure the backend has processed the save
-      timeoutId = setTimeout(() => {
-        updateTranscripts();
-      }, 500);
+  // Create a wrapper for saveTranscript that calls updateTranscripts after saving
+  const saveTranscript = async () => {
+    try {
+      await originalSaveTranscript();
+      // After successful save, update the transcripts list
+      if (updateTranscripts) {
+        // Add a small delay to ensure the database operation is complete
+        setTimeout(() => {
+          updateTranscripts();
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Error in saveTranscript wrapper:', error);
     }
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [isSaving, updateTranscripts]);
+  };
 
   // Automatically enhance audio when recording starts
   React.useEffect(() => {

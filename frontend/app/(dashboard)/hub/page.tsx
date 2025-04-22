@@ -29,11 +29,12 @@ export default function NotesHubPage() {
   const [transcripts, setTranscripts] = useState<any[]>([]); 
   const [notes, setNotes] = useState<any[]>([]); 
 
-  const fetchTranscripts = useCallback(async () => {
+  const fetchTranscripts = useCallback(async (useFastMode = false) => {
      try {
         const token = localStorage.getItem('token');
         if (!token) return;
-        const response = await fetch('http://localhost:5000/api/transcripts', {
+        const url = `http://localhost:5000/api/transcripts${useFastMode ? '?fast=true' : ''}`;
+        const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!response.ok) throw new Error('Failed to fetch');
@@ -84,10 +85,15 @@ export default function NotesHubPage() {
      }
   };
 
+  // Create a non-debounced version that always uses fast mode
+  const fetchTranscriptsFast = useCallback(() => {
+    fetchTranscripts(true); // Always use fast mode for direct calls
+  }, [fetchTranscripts]);
+
   // Create a debounced version of fetchTranscripts to prevent rapid updates
   const debouncedFetchTranscripts = useCallback(
     debounce(() => {
-      fetchTranscripts();
+      fetchTranscripts(true); // Use fast mode for better performance
     }, 1000),
     [fetchTranscripts]
   );
@@ -111,7 +117,7 @@ export default function NotesHubPage() {
           </div>
           <AudioRecorderContainer
             setTranscript={setTranscript} 
-            updateTranscripts={debouncedFetchTranscripts} 
+            updateTranscripts={fetchTranscripts} 
             transcript={transcript} 
           />
         </motion.div>
