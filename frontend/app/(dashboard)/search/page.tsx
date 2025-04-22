@@ -97,9 +97,9 @@ export default function SearchPage() {
                 {results.length} {results.length === 1 ? 'result' : 'results'} found
               </h2>
               <div className="space-y-4">
-                {results.map((result) => (
+                {results.map((result, index) => (
                   <SearchResultItem 
-                    key={`${result.type}-${result.id}`} 
+                    key={`${result.type}-${result.id}-${index}`} 
                     result={result} 
                     onClick={() => handleItemClick(result)}
                   />

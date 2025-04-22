@@ -82,36 +82,57 @@ class SemanticSearchService {
       }
       
       // Combine results and add distance/relevance score
-      const results = matchingItems.map(match => {
-        if (match.item_type === 'note') {
-          const note = notes.find(n => n.id === match.item_id);
-          if (!note) return null;
-          
-          return {
-            id: note.id,
-            type: 'note',
-            title: note.title,
-            content: note.content,
-            summary: note.summary,
-            timestamp: note.timestamp,
-            relevance: 1 - match.distance // Convert distance to relevance score (0-1)
-          };
-        } else { // transcript
-          const transcript = transcripts.find(t => t.id === match.item_id);
-          if (!transcript) return null;
-          
-          return {
-            id: transcript.id,
-            type: 'transcript',
-            title: transcript.title,
-            content: transcript.text,
-            summary: transcript.summary,
-            timestamp: transcript.date,
-            relevance: 1 - match.distance // Convert distance to relevance score (0-1)
-          };
-        }
-      }).filter(Boolean); // Remove null entries
+      const resultsMap = new Map(); // Use a Map to track unique items by type+id
       
+      matchingItems.forEach(match => {
+        const uniqueKey = `${match.item_type}-${match.item_id}`;
+        // If we've already seen this item, only keep it if the new match has a better relevance score
+        const existingRelevance = resultsMap.has(uniqueKey) ? resultsMap.get(uniqueKey).relevance : -1;
+        const newRelevance = 1 - match.distance;
+        
+        // Only process if this is a new item or has better relevance
+        if (newRelevance > existingRelevance) {
+          let resultItem = null;
+          
+          if (match.item_type === 'note') {
+            const note = notes.find(n => n.id === match.item_id);
+            if (!note) return; // Skip if note not found
+            
+            resultItem = {
+              id: note.id,
+              type: 'note',
+              title: note.title,
+              content: note.content,
+              summary: note.summary,
+              timestamp: note.timestamp,
+              relevance: newRelevance
+            };
+          } else { // transcript
+            const transcript = transcripts.find(t => t.id === match.item_id);
+            if (!transcript) return; // Skip if transcript not found
+            
+            resultItem = {
+              id: transcript.id,
+              type: 'transcript',
+              title: transcript.title,
+              content: transcript.text,
+              summary: transcript.summary,
+              timestamp: transcript.date,
+              relevance: newRelevance
+            };
+          }
+          
+          if (resultItem) {
+            resultsMap.set(uniqueKey, resultItem);
+          }
+        }
+      });
+      
+      // Convert Map values to array and sort by relevance (highest first)
+      const results = Array.from(resultsMap.values())
+        .sort((a, b) => b.relevance - a.relevance);
+      
+      console.log(`Returning ${results.length} unique results after deduplication`);
       return results;
     } catch (error) {
       console.error('Error performing semantic search:', error);
