@@ -6,6 +6,7 @@ import { SearchResult } from '../../../types/search';
 import SearchResultItem from '../../../components/search/SearchResultItem';
 import SearchBar from '../../../components/search/SearchBar';
 import { searchItems } from '../../../services/search';
+import useTitleGeneration from '../../../hooks/useTitleGeneration';
 
 // Import the Modal component (default export)
 import Modal from '../../../components/modal';
@@ -45,6 +46,7 @@ export default function SearchPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { showToast } = useToast();
   const router = useRouter();
+  const { loadingTitles, handleGenerateTitle } = useTitleGeneration();
 
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -70,6 +72,34 @@ export default function SearchPage() {
   const handleItemClick = (item: SearchResult) => {
     setSelectedItem(item);
     setIsModalOpen(true);
+  };
+
+  const handleRegenerateTitle = async () => {
+    if (selectedItem) {
+      try {
+        // Create an update function to update the modal state with the new title
+        const updateModalTitle = (id: number, title: string) => {
+          setSelectedItem(prev => prev ? { ...prev, title } : null);
+          
+          // Also update the title in the search results list
+          setResults(prev => prev.map(result => 
+            result.id === id && result.type === selectedItem.type ? { ...result, title } : result
+          ));
+        };
+        
+        // Call handleGenerateTitle with the correct parameters, including current title
+        await handleGenerateTitle(
+          selectedItem.id, 
+          selectedItem.content, 
+          updateModalTitle,
+          selectedItem.type as 'note' | 'transcript',
+          selectedItem.title // Pass current title to ensure we get a different one
+        );
+      } catch (error) {
+        console.error('Error regenerating title:', error);
+        showToast('Failed to regenerate title', 'error');
+      }
+    }
   };
 
   const handleCloseModal = () => {
@@ -133,7 +163,25 @@ export default function SearchPage() {
           content={selectedItem.content}
           title={selectedItem.title}
           itemId={selectedItem.id}
-          type={selectedItem.type}
+          type={selectedItem.type as 'note' | 'transcript'}
+          initialSummary={selectedItem.summary || null}
+          onRegenerateTitle={handleRegenerateTitle}
+          isRegeneratingTitle={loadingTitles[selectedItem.id] || false}
+          onTitleUpdate={() => {}}
+          onSummaryUpdate={(summary) => {
+            // Update the summary in the search results when it changes
+            setSelectedItem(prev => {
+              if (!prev) return null;
+              // Convert null to undefined to match the SearchResult type
+              const updatedSummary = summary === null ? undefined : summary;
+              return { ...prev, summary: updatedSummary };
+            });
+          }}
+          onTagsUpdate={(tags) => {
+            // We don't update tags in the search results since SearchResult doesn't include tags
+            // This callback is still needed for the Modal component to function properly
+            console.log('Tags updated in modal, but not reflected in search results');
+          }}
         />
       )}
     </div>
