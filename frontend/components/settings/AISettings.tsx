@@ -174,11 +174,15 @@ export const AISettings: React.FC<AISettingsProps> = ({
             `${config.apiKey.substring(0, 4)}...${config.apiKey.substring(config.apiKey.length - 4)}` :
             '****';
           
-          // Only update the API key if it's not already set by the user
-          // This prevents overwriting user input
-          if (!apiKey || apiKey === '') {
-            setApiKey(maskedKey);
-          }
+          // Always show the masked key when loading the component
+          // This ensures users can see and edit their existing key
+          setApiKey(maskedKey);
+          
+          // Save the masked key to the savedApiKeys state for this provider
+          setSavedApiKeys(prev => ({
+            ...prev,
+            [config.provider]: { key: maskedKey }
+          }));
         }
       } catch (error) {
         console.error('Error fetching current AI config:', error);
@@ -321,7 +325,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
         <div className="space-y-4">
           <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-              Current model: <span className="font-semibold">{currentModel}</span> 
+              Current model: <span className="font-semibold">{currentModel}</span>{' '}
               <span className="text-xs ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
                 {modelSource}
               </span>
@@ -350,9 +354,33 @@ export const AISettings: React.FC<AISettingsProps> = ({
                       <div 
                         key={option.value} 
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-gray-800 dark:text-white"
-                        onClick={() => {
+                        onClick={async () => {
                           setTempProvider(option.value as AIProvider);
                           setIsDropdownOpen(false);
+                          
+                          // If switching to OpenAI, check key status
+                          if (option.value === 'openai') {
+                            try {
+                              const status = await getOpenAIKeyStatus();
+                              setOpenAIKeyStatus(status);
+                              
+                              // If there's a valid key, display it (masked)
+                              if (status.available) {
+                                // Get the actual key from the API
+                                const config = await getAIProvider();
+                                if (config.apiKey) {
+                                  const maskedKey = config.apiKey.length > 8 ?
+                                    `${config.apiKey.substring(0, 4)}...${config.apiKey.substring(config.apiKey.length - 4)}` :
+                                    '****';
+                                  setApiKey(maskedKey);
+                                  return;
+                                }
+                              }
+                            } catch (error) {
+                              console.error('Error fetching OpenAI key status:', error);
+                            }
+                          }
+                          
                           // If we have a saved API key for this provider, use it
                           if (savedApiKeys[option.value]) {
                             setApiKey(savedApiKeys[option.value].key);
@@ -370,8 +398,13 @@ export const AISettings: React.FC<AISettingsProps> = ({
             </div>
 
             <div className="mb-2">
-              <label className="block text-gray-700 dark:text-gray-200 text-sm font-bold mb-2">
+              <label className="block text-gray-700 dark:text-gray-200 text-sm font-bold mb-2 flex items-center">
                 API Key
+                {tempProvider === 'openai' && openAIKeyStatus?.available && (
+                  <span className="text-xs ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
+                    {openAIKeyStatus.source}
+                  </span>
+                )}
               </label>
               <input
                 type="password"
