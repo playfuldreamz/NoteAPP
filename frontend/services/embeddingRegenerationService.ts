@@ -4,7 +4,7 @@ import { API_BASE } from './ai';
  * Triggers the regeneration of embeddings for all items (notes and transcripts)
  * @returns Promise with the status of the regeneration request
  */
-export async function regenerateAllEmbeddings(): Promise<{ success: boolean, message: string }> {
+export async function regenerateAllEmbeddings(): Promise<{ success: boolean, message: string, hasAPIKeyError?: boolean }> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 
@@ -37,7 +37,11 @@ export async function getRegenerationStatus(): Promise<{
   inProgress: boolean, 
   total: number, 
   completed: number, 
-  startTime?: string 
+  startTime?: string,
+  errors?: Array<{itemId: number, itemType: string, error: string}>,
+  fatalError?: string,
+  hasAPIKeyError?: boolean,
+  errorCount?: number
 }> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');

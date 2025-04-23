@@ -20,6 +20,10 @@ const EmbeddingRegenerationConfirmation: React.FC<EmbeddingRegenerationConfirmat
     total: number;
     completed: number;
     startTime?: string;
+    errors?: Array<{itemId: number; itemType: string; error: string}>;
+    fatalError?: string;
+    hasAPIKeyError?: boolean;
+    errorCount?: number;
   } | null>(null);
 
   // Check if regeneration is already in progress when component mounts
@@ -46,6 +50,11 @@ const EmbeddingRegenerationConfirmation: React.FC<EmbeddingRegenerationConfirmat
     try {
       const status = await getRegenerationStatus();
       setRegenerationStatus(status);
+      
+      // If there's a fatal error, show it as a toast
+      if (status.fatalError && !status.inProgress) {
+        toast.error(status.fatalError);
+      }
     } catch (error) {
       console.error('Error checking regeneration status:', error);
       // Don't show toast here as this might be called frequently
@@ -61,7 +70,12 @@ const EmbeddingRegenerationConfirmation: React.FC<EmbeddingRegenerationConfirmat
         toast.success('Embedding regeneration started successfully');
         await checkRegenerationStatus();
       } else {
-        toast.error(result.message || 'Failed to start embedding regeneration');
+        // If there's an API key error, show a more specific message
+        if (result.hasAPIKeyError) {
+          toast.error('OpenAI API key is invalid or missing. Switching to Local Model (Xenova).');
+        } else {
+          toast.error(result.message || 'Failed to start embedding regeneration');
+        }
       }
     } catch (error) {
       console.error('Error regenerating embeddings:', error);
@@ -101,21 +115,35 @@ const EmbeddingRegenerationConfirmation: React.FC<EmbeddingRegenerationConfirmat
                 Regeneration in progress
               </span>
             </div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">
-              <p>Processing: {regenerationStatus.completed} of {regenerationStatus.total} items</p>
-              {regenerationStatus.startTime && (
-                <p>Started: {new Date(regenerationStatus.startTime).toLocaleString()}</p>
-              )}
+            <div className="text-xs text-blue-600 dark:text-blue-400">
+              {regenerationStatus.completed} of {regenerationStatus.total} items processed
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mt-2">
               <div 
-                className="bg-blue-500 h-2.5 rounded-full" 
-                style={{ 
-                  width: `${regenerationStatus.total > 0 
-                    ? Math.round((regenerationStatus.completed / regenerationStatus.total) * 100) 
-                    : 0}%` 
-                }}
+                className="bg-blue-600 h-2.5 rounded-full" 
+                style={{ width: `${regenerationStatus.total > 0 ? (regenerationStatus.completed / regenerationStatus.total) * 100 : 0}%` }}
               ></div>
+            </div>
+            {regenerationStatus.errorCount && regenerationStatus.errorCount > 0 && (
+              <div className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+                {regenerationStatus.errorCount} errors encountered. Regeneration will continue with remaining items.
+              </div>
+            )}
+          </div>
+        ) : regenerationStatus?.fatalError ? (
+          <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/30 rounded-md">
+            <div className="flex items-start">
+              <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                  Error during regeneration
+                </span>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  {regenerationStatus.hasAPIKeyError ? 
+                    'Your OpenAI API key is invalid or missing. The system has automatically switched to the Local Model (Xenova).' : 
+                    regenerationStatus.fatalError}
+                </p>
+              </div>
             </div>
           </div>
         ) : (

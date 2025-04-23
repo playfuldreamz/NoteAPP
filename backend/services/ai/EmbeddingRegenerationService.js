@@ -40,8 +40,33 @@ class EmbeddingRegenerationService {
         total: 0,
         completed: 0,
         startTime: new Date().toISOString(),
-        errors: []
+        errors: [],
+        fatalError: null,
+        hasAPIKeyError: false
       };
+
+      // Verify the embedding provider can be initialized before starting
+      try {
+        // This will throw an error if the API key is invalid
+        await embeddingService.initializeProviderForUser(userId);
+      } catch (error) {
+        // If we can't initialize the provider, we can't regenerate embeddings
+        this.regenerationStatus.inProgress = false;
+        this.regenerationStatus.fatalError = error.message;
+        
+        // Check if this is an API key error
+        if (error.message.includes('API key') || 
+            error.message.includes('authentication') || 
+            error.message.includes('401')) {
+          this.regenerationStatus.hasAPIKeyError = true;
+        }
+        
+        return {
+          success: false,
+          message: `Cannot regenerate embeddings: ${error.message}`,
+          hasAPIKeyError: this.regenerationStatus.hasAPIKeyError
+        };
+      }
 
       // Start regeneration in the background
       this.regenerateAllEmbeddings(userId);
@@ -51,8 +76,9 @@ class EmbeddingRegenerationService {
         message: 'Embedding regeneration started successfully'
       };
     } catch (error) {
-      console.error('Error starting embedding regeneration:', error);
       this.regenerationStatus.inProgress = false;
+      this.regenerationStatus.fatalError = error.message;
+      console.error('Error starting embedding regeneration:', error);
       return {
         success: false,
         message: `Failed to start embedding regeneration: ${error.message}`
@@ -62,14 +88,18 @@ class EmbeddingRegenerationService {
 
   /**
    * Get the current status of embedding regeneration
-   * @returns {Object} - The current status
+   * @returns {Object} - Status information
    */
   getStatus() {
     return {
       inProgress: this.regenerationStatus.inProgress,
       total: this.regenerationStatus.total,
       completed: this.regenerationStatus.completed,
-      startTime: this.regenerationStatus.startTime
+      startTime: this.regenerationStatus.startTime,
+      errors: this.regenerationStatus.errors.slice(0, 10), // Limit to first 10 errors
+      fatalError: this.regenerationStatus.fatalError,
+      hasAPIKeyError: this.regenerationStatus.hasAPIKeyError || false,
+      errorCount: this.regenerationStatus.errors.length
     };
   }
 
@@ -80,6 +110,42 @@ class EmbeddingRegenerationService {
    */
   async regenerateAllEmbeddings(userId) {
     try {
+      // Initialize the embedding provider for this user
+      try {
+        await embeddingService.initializeProviderForUser(userId);
+      } catch (error) {
+        // If we can't initialize the provider, we can't regenerate embeddings
+        this.regenerationStatus.inProgress = false;
+        this.regenerationStatus.fatalError = `Failed to initialize embedding provider: ${error.message}`;
+        
+        // Check if this is an API key error
+        if (error.message.includes('API key') || 
+            error.message.includes('authentication') || 
+            error.message.includes('401')) {
+          this.regenerationStatus.hasAPIKeyError = true;
+          console.error('API key error detected during regeneration:', error.message);
+          
+          // Try to fallback to Xenova if this was an OpenAI error
+          try {
+            // Update the user's embedding provider to Xenova
+            const updateStmt = db.prepare(`
+              UPDATE user_settings 
+              SET embedding_provider = 'xenova' 
+              WHERE user_id = ? AND is_active = 1
+            `);
+            updateStmt.run(userId);
+            console.log('Automatically switched embedding provider to Xenova due to OpenAI API key error');
+            
+            // Add this information to the error message
+            this.regenerationStatus.fatalError += '. Automatically switched to Local Model (Xenova).'; 
+          } catch (fallbackError) {
+            console.error('Failed to fallback to Xenova:', fallbackError);
+          }
+        }
+        
+        return;
+      }
+      
       // Get all notes and transcripts
       const notes = db.prepare('SELECT id, content FROM notes WHERE user_id = ?').all(userId);
       const transcripts = db.prepare('SELECT id, text FROM transcripts WHERE user_id = ?').all(userId);
