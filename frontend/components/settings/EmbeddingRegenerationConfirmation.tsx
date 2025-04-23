@@ -41,10 +41,27 @@ const EmbeddingRegenerationConfirmation: React.FC<EmbeddingRegenerationConfirmat
       intervalId = setInterval(checkRegenerationStatus, 3000);
     }
     
+    // Auto-close when regeneration completes successfully
+    if (regenerationStatus && !regenerationStatus.inProgress && 
+        regenerationStatus.completed > 0 && 
+        !regenerationStatus.fatalError && 
+        regenerationStatus.completed === regenerationStatus.total) {
+      // Wait a moment to show the completed status before closing
+      const successTimer = setTimeout(() => {
+        toast.success('Embeddings regenerated successfully!');
+        onClose();
+      }, 1500);
+      
+      return () => {
+        clearTimeout(successTimer);
+        if (intervalId) clearInterval(intervalId);
+      };
+    }
+    
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [isOpen, regenerationStatus?.inProgress]);
+  }, [isOpen, regenerationStatus, onClose]);
 
   const checkRegenerationStatus = async () => {
     try {
@@ -142,6 +159,30 @@ const EmbeddingRegenerationConfirmation: React.FC<EmbeddingRegenerationConfirmat
                   {regenerationStatus.hasAPIKeyError ? 
                     'Your OpenAI API key is invalid or missing. The system has automatically switched to the Local Model (Xenova).' : 
                     regenerationStatus.fatalError}
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                onClick={onClose}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ) : regenerationStatus && regenerationStatus.completed > 0 && regenerationStatus.completed === regenerationStatus.total ? (
+          <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/30 rounded-md">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-green-500 dark:text-green-400 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <div>
+                <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                  Regeneration completed successfully
+                </span>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  All {regenerationStatus.total} items have been processed with the new embedding provider.
                 </p>
               </div>
             </div>
