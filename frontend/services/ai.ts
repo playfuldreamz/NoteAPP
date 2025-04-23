@@ -107,6 +107,28 @@ export async function updateEmbeddingProvider(config: { provider: EmbeddingProvi
   return await response.json();
 }
 
+/**
+ * Get the status of the OpenAI API key availability
+ * @returns Promise with the key status information
+ */
+export async function getOpenAIKeyStatus(): Promise<{ available: boolean, source: 'user' | 'env' | null }> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/openai-key-status`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to get OpenAI key status');
+  }
+
+  return await response.json();
+}
+
 // Custom error class for API key issues
 export class InvalidAPIKeyError extends Error {
   constructor(message: string) {

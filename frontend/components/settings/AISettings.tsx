@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Globe, Search, Cpu, Cloud } from 'lucide-react';
 import { toast } from 'react-toastify';
+import EmbeddingRegenerationConfirmation from './EmbeddingRegenerationConfirmation';
 import { 
   updateAIProvider, 
   getEmbeddingProvider,
   updateEmbeddingProvider, 
+  getOpenAIKeyStatus,
   AIProvider, 
   EmbeddingProvider, 
   API_BASE 
@@ -59,6 +61,9 @@ export const AISettings: React.FC<AISettingsProps> = ({
   });
   const [isEmbeddingDropdownOpen, setIsEmbeddingDropdownOpen] = useState(false);
   const [isEmbeddingLoading, setIsEmbeddingLoading] = useState(false);
+  const [openAIKeyStatus, setOpenAIKeyStatus] = useState<{ available: boolean, source: 'user' | 'env' | null } | null>(null);
+  const [showRegenerationConfirmation, setShowRegenerationConfirmation] = useState(false);
+  const [originalEmbeddingProvider, setOriginalEmbeddingProvider] = useState<EmbeddingProvider>('xenova');
 
   const validateApiKey = (key: string | undefined, provider: AIProvider) => {
     if (!key) return false;
@@ -98,6 +103,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
           provider: config.provider,
           source: config.source
         });
+        setOriginalEmbeddingProvider(config.provider);
       } catch (error) {
         console.error('Error fetching embedding config:', error);
         // Default to Xenova if there's an error
@@ -105,21 +111,51 @@ export const AISettings: React.FC<AISettingsProps> = ({
           provider: 'xenova',
           source: 'default'
         });
+        setOriginalEmbeddingProvider('xenova');
+      }
+    };
+    
+    // Check OpenAI key status
+    const fetchOpenAIKeyStatus = async () => {
+      try {
+        const status = await getOpenAIKeyStatus();
+        setOpenAIKeyStatus(status);
+      } catch (error) {
+        console.error('Error fetching OpenAI key status:', error);
+        setOpenAIKeyStatus({ available: false, source: null });
       }
     };
     
     fetchEmbeddingConfig();
+    fetchOpenAIKeyStatus();
   }, [apiKey, tempProvider]);
 
   const handleSave = async () => {
     try {
       setIsLoading(true);
       
-      // Update the API provider
-      await updateAIProvider({
-        provider: tempProvider,
-        apiKey: apiKey
-      });
+      // Handle the case where we're using an environment API key
+      if (tempProvider === 'openai' && openAIKeyStatus && openAIKeyStatus.available && openAIKeyStatus.source === 'env' && (!apiKey || apiKey === 'your-api-key')) {
+        // We can use the environment key, so we'll send an empty string as the API key
+        // The backend will handle this special case
+        await updateAIProvider({
+          provider: tempProvider,
+          apiKey: ''
+        });
+      } else if (tempProvider === 'gemini' && (!apiKey || apiKey === 'your-api-key')) {
+        // We'll let the backend check if there's a Gemini key in the environment
+        // Similar handling for Gemini if needed
+        await updateAIProvider({
+          provider: tempProvider,
+          apiKey: ''
+        });
+      } else {
+        // Normal case - user is providing their own API key
+        await updateAIProvider({
+          provider: tempProvider,
+          apiKey: apiKey
+        });
+      }
       
       // Update embedding provider if it has changed
       await updateEmbeddingProvider({
@@ -139,6 +175,12 @@ export const AISettings: React.FC<AISettingsProps> = ({
         setSavedApiKeys(updatedKeys);
       }
       
+      // Check if embedding provider has changed and show regeneration confirmation
+      if (embeddingConfig.provider !== originalEmbeddingProvider) {
+        setShowRegenerationConfirmation(true);
+        return; // Don't close the dialog yet
+      }
+      
       toast.success('AI settings updated successfully');
       onClose();
     } catch (error) {
@@ -147,6 +189,12 @@ export const AISettings: React.FC<AISettingsProps> = ({
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const handleRegenerationClose = () => {
+    setShowRegenerationConfirmation(false);
+    toast.success('AI settings updated successfully');
+    onClose();
   };
 
   return (
@@ -321,6 +369,20 @@ export const AISettings: React.FC<AISettingsProps> = ({
                       <li>Provides high-quality embeddings</li>
                       <li>Requires internet connection</li>
                     </ul>
+                    
+                    {openAIKeyStatus === null ? (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Checking API key status...
+                      </p>
+                    ) : openAIKeyStatus.available ? (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                        ✓ Using OpenAI API key from {openAIKeyStatus.source === 'user' ? 'your account settings' : 'server environment'}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-red-500 dark:text-red-400 mt-2">
+                        ⚠ No OpenAI API key found. Please configure one in the Generative AI tab or contact your administrator to set up the server environment.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -349,6 +411,13 @@ export const AISettings: React.FC<AISettingsProps> = ({
           {isLoading || isEmbeddingLoading ? 'Saving...' : 'Save'}
         </button>
       </div>
+      
+      {/* Embedding Regeneration Confirmation Dialog */}
+      <EmbeddingRegenerationConfirmation
+        isOpen={showRegenerationConfirmation}
+        onClose={handleRegenerationClose}
+        provider={embeddingProviderOptions.find(option => option.value === embeddingConfig.provider)?.label || embeddingConfig.provider}
+      />
     </div>
   );
 };

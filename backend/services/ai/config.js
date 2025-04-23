@@ -88,8 +88,53 @@ class AIConfigManager {
    * @returns {Promise<void>}
    */
   static async updateConfig(userId, config) {
+    // Check if we're trying to use an empty API key
     if (!config.apiKey || config.apiKey === 'your-api-key') {
-      throw new Error('Invalid API key provided');
+      // If the provider is OpenAI and we have an environment variable, we can skip saving the key
+      if (config.provider === 'openai' && process.env.OPENAI_API_KEY) {
+        // Just update the provider preference without setting an API key
+        try {
+          // Use a transaction to ensure both operations succeed or fail together
+          const transaction = db.transaction(() => {
+            // First deactivate any existing config for this user
+            db.prepare('UPDATE user_settings SET is_active = 0 WHERE user_id = ?')
+              .run(userId);
+            
+            // Insert new config with empty API key but mark the provider preference
+            db.prepare(
+              `INSERT INTO user_settings (user_id, provider, api_key, is_active)
+               VALUES (?, ?, '', 1)`
+            ).run(userId, config.provider);
+          });
+          
+          // Execute the transaction
+          transaction();
+          return; // Exit early since we've handled this special case
+        } catch (error) {
+          throw new Error(`Error updating user config: ${error.message}`);
+        }
+      } else if (config.provider === 'gemini' && process.env.GEMINI_API_KEY) {
+        // Same handling for Gemini
+        try {
+          const transaction = db.transaction(() => {
+            db.prepare('UPDATE user_settings SET is_active = 0 WHERE user_id = ?')
+              .run(userId);
+            
+            db.prepare(
+              `INSERT INTO user_settings (user_id, provider, api_key, is_active)
+               VALUES (?, ?, '', 1)`
+            ).run(userId, config.provider);
+          });
+          
+          transaction();
+          return;
+        } catch (error) {
+          throw new Error(`Error updating user config: ${error.message}`);
+        }
+      } else {
+        // For other cases where we don't have an environment variable, throw an error
+        throw new Error('Invalid API key provided');
+      }
     }
 
     try {
