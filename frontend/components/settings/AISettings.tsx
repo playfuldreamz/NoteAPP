@@ -80,6 +80,24 @@ export const AISettings: React.FC<AISettingsProps> = ({
     return false;
   };
 
+  // Check if the current embedding configuration is valid
+  const isEmbeddingConfigValid = () => {
+    // Xenova is always valid as it's a local provider
+    if (embeddingConfig.provider === 'xenova') {
+      return true;
+    }
+    
+    // For OpenAI, check if a valid key is available
+    if (embeddingConfig.provider === 'openai') {
+      return openAIKeyStatus?.available === true;
+    }
+    
+    // For future providers, add validation here
+    
+    // Default to true for unknown providers to avoid blocking UI
+    return true;
+  };
+
   useEffect(() => {
     // Load saved API keys from localStorage
     const savedKeys = localStorage.getItem('savedApiKeys');
@@ -404,9 +422,9 @@ export const AISettings: React.FC<AISettingsProps> = ({
           Cancel
         </button>
         <button
-          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors ${(isLoading || isEmbeddingLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors ${(isLoading || isEmbeddingLoading || (activeTab === 'embedding' && !isEmbeddingConfigValid())) ? 'opacity-50 cursor-not-allowed' : ''}`}
           onClick={handleSave}
-          disabled={isLoading || isEmbeddingLoading}
+          disabled={isLoading || isEmbeddingLoading || (activeTab === 'embedding' && !isEmbeddingConfigValid())}
         >
           {isLoading || isEmbeddingLoading ? 'Saving...' : 'Save'}
         </button>
