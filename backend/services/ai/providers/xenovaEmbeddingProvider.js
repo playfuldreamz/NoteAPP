@@ -9,6 +9,7 @@ const EmbeddingProviderBase = require('./embeddingBase');
 
 class XenovaEmbeddingProvider extends EmbeddingProviderBase {
   constructor() {
+    super(); // Call the parent class constructor first
     this.pipe = null;
     this.modelName = 'Xenova/all-MiniLM-L6-v2';
     this.initialized = false;
