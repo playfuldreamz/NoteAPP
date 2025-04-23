@@ -101,7 +101,7 @@ class EmbeddingService {
       console.log(`Generating embedding using ${providerName} for ${userId ? `user ${userId}` : 'default user'}`);
       
       // Generate the embedding using the current provider
-      const embedding = await this.provider.generateEmbedding(text);
+      const embedding = await this.provider.embed(text);
       
       // Log success
       console.log(`Successfully generated embedding with ${providerName}: ${embedding.length} dimensions`);
