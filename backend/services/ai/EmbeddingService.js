@@ -3,8 +3,7 @@
  * Provides a unified interface for generating embeddings using different providers
  * based on user preferences
  */
-const XenovaEmbeddingProvider = require('./providers/xenovaEmbeddingProvider');
-const OpenAIEmbeddingProvider = require('./providers/openAIEmbeddingProvider');
+const EmbeddingProviderFactory = require('./embeddingFactory');
 const EmbeddingConfigService = require('./EmbeddingConfigService');
 const dotenv = require('dotenv');
 
@@ -22,26 +21,25 @@ class EmbeddingService {
    * This initializes with the default provider (Xenova)
    */
   initializeProvider() {
-    // Use Xenova as the default provider (no API key required)
     try {
-      this.provider = new XenovaEmbeddingProvider();
+      // Use Xenova as the default provider (no API key required)
+      this.provider = EmbeddingProviderFactory.createProvider('xenova');
       console.log('Using Xenova embedding provider (default)');
-      return;
     } catch (error) {
       console.warn('Failed to initialize Xenova provider:', error.message);
+      
+      // Try to initialize OpenAI as fallback
+      try {
+        this.provider = EmbeddingProviderFactory.createProvider('openai');
+        console.log('Using OpenAI embedding provider (fallback)');
+      } catch (fallbackError) {
+        console.error('No embedding provider could be initialized:', fallbackError.message);
+      }
     }
-
-    // Fall back to OpenAI if Xenova fails
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    if (openaiApiKey) {
-      this.provider = new OpenAIEmbeddingProvider(openaiApiKey);
-      console.log('Using OpenAI embedding provider (fallback)');
-      return;
-    }
-
+    
     // Fallback message if no provider can be initialized
     if (!this.provider) {
-      console.error('No embedding provider could be initialized. Xenova failed and no OpenAI API key is available.');
+      console.error('No embedding provider could be initialized. Check your configuration and API keys.');
     }
   }
   
@@ -57,20 +55,21 @@ class EmbeddingService {
       
       console.log(`Initializing embedding provider for user ${userId}: ${config.provider}`);
       
-      // Initialize provider based on user preference
-      if (config.provider === 'openai') {
-        const openaiApiKey = process.env.OPENAI_API_KEY;
-        if (openaiApiKey) {
-          this.provider = new OpenAIEmbeddingProvider(openaiApiKey);
-          console.log(`Successfully initialized OpenAI embedding provider for user ${userId}`);
+      try {
+        // Use the factory to create the provider instance
+        this.provider = EmbeddingProviderFactory.createProvider(config.provider);
+        console.log(`Successfully initialized ${config.provider} embedding provider for user ${userId} via factory`);
+      } catch (factoryError) {
+        console.error(`Error creating embedding provider via factory for type '${config.provider}':`, factoryError);
+        
+        // Fall back to Xenova if the requested provider fails
+        if (config.provider !== 'xenova') {
+          console.warn(`Falling back to Xenova provider for user ${userId}`);
+          this.provider = EmbeddingProviderFactory.createProvider('xenova');
         } else {
-          console.warn(`OpenAI provider selected for user ${userId}, but no API key available. Falling back to Xenova.`);
-          this.provider = new XenovaEmbeddingProvider();
+          // Re-throw if even the default provider fails
+          throw factoryError;
         }
-      } else {
-        // Default to Xenova
-        this.provider = new XenovaEmbeddingProvider();
-        console.log(`Successfully initialized Xenova embedding provider for user ${userId}`);
       }
     } catch (error) {
       console.error(`Error initializing provider for user ${userId}:`, error);
