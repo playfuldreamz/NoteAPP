@@ -1,13 +1,41 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
   initialQuery?: string;
+  realTimeSearch?: boolean;
+  debounceTime?: number;
 }
 
-export default function SearchBar({ onSearch, initialQuery = '' }: SearchBarProps) {
+export default function SearchBar({ 
+  onSearch, 
+  initialQuery = '', 
+  realTimeSearch = true,
+  debounceTime = 500 
+}: SearchBarProps) {
   const [query, setQuery] = useState(initialQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
+
+  // Handle real-time search with debouncing
+  useEffect(() => {
+    if (!realTimeSearch) return;
+    
+    // Only set up the timeout if the query has changed from the debounced query
+    // This prevents continuous refreshes after typing has stopped
+    if (query !== debouncedQuery) {
+      const handler = setTimeout(() => {
+        setDebouncedQuery(query);
+        if (query.trim().length >= 2) {
+          onSearch(query);
+        }
+      }, debounceTime);
+
+      return () => {
+        clearTimeout(handler);
+      };
+    }
+  }, [query, debouncedQuery, onSearch, debounceTime, realTimeSearch]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

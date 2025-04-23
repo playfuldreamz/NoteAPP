@@ -37,6 +37,10 @@ const useToast = () => {
   return { showToast };
 };
 
+// Feature flag for real-time search
+const ENABLE_REAL_TIME_SEARCH = true;
+const DEBOUNCE_TIME = 500; // ms
+
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -50,7 +54,20 @@ export default function SearchPage() {
 
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
+      setResults([]);
+      return;
+    }
+
+    // Don't show error toast for real-time search with empty query
+    if (!searchQuery.trim() && !ENABLE_REAL_TIME_SEARCH) {
       showToast('Please enter a search query', 'error');
+      return;
+    }
+
+    // Minimum query length for real-time search
+    if (ENABLE_REAL_TIME_SEARCH && searchQuery.trim().length < 2) {
+      setResults([]);
+      setIsLoading(false);
       return;
     }
 
@@ -112,14 +129,19 @@ export default function SearchPage() {
       <h1 className="text-2xl font-bold mb-6">Semantic Search</h1>
       
       <div className="mb-8">
-        <SearchBar onSearch={handleSearch} initialQuery={query} />
+        <SearchBar 
+          onSearch={handleSearch} 
+          initialQuery={query} 
+          realTimeSearch={ENABLE_REAL_TIME_SEARCH}
+          debounceTime={DEBOUNCE_TIME}
+        />
       </div>
       
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <Spinner size="lg" />
         </div>
-      ) : isSearched ? (
+      ) : isSearched || (ENABLE_REAL_TIME_SEARCH && query.trim().length >= 2) ? (
         <div>
           {results.length > 0 ? (
             <div>

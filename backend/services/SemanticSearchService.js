@@ -6,6 +6,56 @@ const db = require('../database/connection');
 const embeddingService = require('./ai/EmbeddingService');
 
 class SemanticSearchService {
+  constructor() {
+    // Initialize cache
+    this.cache = new Map();
+    this.cacheLifetime = 5 * 60 * 1000; // 5 minutes in milliseconds
+  }
+
+  /**
+   * Get cached search results if available
+   * @param {string} userId - User ID
+   * @param {string} query - Search query
+   * @returns {Array|null} - Cached results or null if not in cache
+   */
+  getCachedResults(userId, query) {
+    const key = `${userId}:${query}`;
+    const cachedItem = this.cache.get(key);
+    
+    if (cachedItem && Date.now() - cachedItem.timestamp < this.cacheLifetime) {
+      console.log(`Returning cached results for query "${query}" for user ${userId}`);
+      return cachedItem.results;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Store search results in cache
+   * @param {string} userId - User ID
+   * @param {string} query - Search query
+   * @param {Array} results - Search results to cache
+   */
+  cacheResults(userId, query, results) {
+    const key = `${userId}:${query}`;
+    this.cache.set(key, {
+      results,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Clear cache for a specific user
+   * @param {string} userId - User ID
+   */
+  clearUserCache(userId) {
+    // Clear all cache entries for this user
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(`${userId}:`)) {
+        this.cache.delete(key);
+      }
+    }
+  }
   /**
    * Search for notes and transcripts that match the query semantically
    * @param {string} query - The search query
@@ -15,6 +65,17 @@ class SemanticSearchService {
    */
   async search(query, userId, limit = 10) {
     try {
+      // Minimum query length check to prevent excessive searches with short queries
+      if (!query || query.trim().length < 2) {
+        console.log(`Query too short, returning empty results: "${query}"`);
+        return [];
+      }
+
+      // Check cache first
+      const cachedResults = this.getCachedResults(userId, query);
+      if (cachedResults) {
+        return cachedResults;
+      }
       // Generate embedding for the query
       const queryEmbedding = await embeddingService.generateEmbedding(query);
       
@@ -133,6 +194,10 @@ class SemanticSearchService {
         .sort((a, b) => b.relevance - a.relevance);
       
       console.log(`Returning ${results.length} unique results after deduplication`);
+      
+      // Cache results before returning
+      this.cacheResults(userId, query, results);
+      
       return results;
     } catch (error) {
       console.error('Error performing semantic search:', error);
