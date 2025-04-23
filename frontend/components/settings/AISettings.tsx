@@ -214,6 +214,18 @@ export const AISettings: React.FC<AISettingsProps> = ({
     toast.success('AI settings updated successfully');
     onClose();
   };
+  
+  // Handle modal close without saving
+  const handleClose = () => {
+    // Reset embedding provider to original value if it was changed but not saved
+    if (embeddingConfig.provider !== originalEmbeddingProvider) {
+      setEmbeddingConfig({
+        ...embeddingConfig,
+        provider: originalEmbeddingProvider
+      });
+    }
+    onClose();
+  };
 
   return (
     <div className="space-y-4 w-full">
@@ -417,7 +429,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
       <div className="flex justify-end space-x-4 mt-6">
         <button
           className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-white rounded hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
-          onClick={onClose}
+          onClick={handleClose}
         >
           Cancel
         </button>
