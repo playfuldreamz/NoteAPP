@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Globe, Search, Cpu, Cloud } from 'lucide-react';
 import { toast } from 'react-toastify';
 import EmbeddingRegenerationConfirmation from './EmbeddingRegenerationConfirmation';
 import { 
   updateAIProvider, 
+  getAIProvider,
   getEmbeddingProvider,
   updateEmbeddingProvider, 
   getOpenAIKeyStatus,
@@ -61,7 +62,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
   });
   const [isEmbeddingDropdownOpen, setIsEmbeddingDropdownOpen] = useState(false);
   const [isEmbeddingLoading, setIsEmbeddingLoading] = useState(false);
-  const [openAIKeyStatus, setOpenAIKeyStatus] = useState<{ available: boolean, source: 'user' | 'env' | null } | null>(null);
+  const [openAIKeyStatus, setOpenAIKeyStatus] = useState<{ available: boolean, source: 'user' | 'env' | null, valid: boolean, error?: string } | null>(null);
   const [showRegenerationConfirmation, setShowRegenerationConfirmation] = useState(false);
   const [originalEmbeddingProvider, setOriginalEmbeddingProvider] = useState<EmbeddingProvider>('xenova');
 
@@ -97,7 +98,24 @@ export const AISettings: React.FC<AISettingsProps> = ({
     // Default to true for unknown providers to avoid blocking UI
     return true;
   };
+  
+  // Check if the current generative AI configuration is valid
+  const isGenerativeConfigValid = () => {
+    // If we're using an environment key, check if it's valid
+    if (tempProvider === 'openai' && openAIKeyStatus?.available && openAIKeyStatus.source === 'env') {
+      return openAIKeyStatus.valid !== false; // If valid is undefined or true, return true
+    }
+    
+    // Otherwise, we need a valid API key
+    return isKeyValid;
+  };
 
+  // Track if this is the initial load
+  const isInitialLoad = useRef(true);
+  
+  // Track the last validated provider to avoid redundant validations
+  const lastValidatedProvider = useRef<AIProvider | null>(null);
+  
   useEffect(() => {
     // Load saved API keys from localStorage
     const savedKeys = localStorage.getItem('savedApiKeys');
@@ -110,7 +128,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
       }
     }
     
-    // Validate the current API key
+    // Validate the current API key based on format
     setIsKeyValid(validateApiKey(apiKey, tempProvider));
     
     // Load embedding configuration
@@ -133,19 +151,62 @@ export const AISettings: React.FC<AISettingsProps> = ({
       }
     };
     
-    // Check OpenAI key status
+    // Check OpenAI key status - only when needed
     const fetchOpenAIKeyStatus = async () => {
       try {
         const status = await getOpenAIKeyStatus();
         setOpenAIKeyStatus(status);
       } catch (error) {
         console.error('Error fetching OpenAI key status:', error);
-        setOpenAIKeyStatus({ available: false, source: null });
+        setOpenAIKeyStatus({ available: false, source: null, valid: false, error: 'Failed to check key status' });
       }
     };
     
-    fetchEmbeddingConfig();
-    fetchOpenAIKeyStatus();
+    // Load current AI provider configuration
+    const fetchCurrentConfig = async () => {
+      try {
+        const config = await getAIProvider();
+        
+        // If we have an API key (from any source), display it (masked)
+        if (config.apiKey) {
+          // Only show first 4 and last 4 characters, mask the rest
+          const maskedKey = config.apiKey.length > 8 ?
+            `${config.apiKey.substring(0, 4)}...${config.apiKey.substring(config.apiKey.length - 4)}` :
+            '****';
+          
+          // Only update the API key if it's not already set by the user
+          // This prevents overwriting user input
+          if (!apiKey || apiKey === '') {
+            setApiKey(maskedKey);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching current AI config:', error);
+      }
+    };
+    
+    // Initial load - fetch all data
+    if (isInitialLoad.current) {
+      fetchEmbeddingConfig();
+      fetchCurrentConfig();
+      
+      // Only validate OpenAI key on initial load if OpenAI is the selected provider
+      if (tempProvider === 'openai') {
+        fetchOpenAIKeyStatus();
+        lastValidatedProvider.current = 'openai';
+      }
+      
+      isInitialLoad.current = false;
+    } else {
+      // On subsequent renders, only validate if the provider changed to OpenAI
+      // or if the API key was manually changed while OpenAI is selected
+      const providerChanged = tempProvider !== lastValidatedProvider.current;
+      
+      if (tempProvider === 'openai' && (providerChanged || apiKey !== '')) {
+        fetchOpenAIKeyStatus();
+        lastValidatedProvider.current = 'openai';
+      }
+    }
   }, [apiKey, tempProvider]);
 
   const handleSave = async () => {
@@ -314,7 +375,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
               </label>
               <input
                 type="password"
-                className={`w-full p-2 border ${apiKeyError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-white`}
+                className={`w-full p-2 border ${apiKeyError || (tempProvider === 'openai' && openAIKeyStatus?.valid === false) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-white`}
                 value={apiKey}
                 onChange={(e) => {
                   setApiKey(e.target.value);
@@ -323,6 +384,11 @@ export const AISettings: React.FC<AISettingsProps> = ({
                 placeholder={`Enter your ${tempProvider} API key`}
               />
               {apiKeyError && <p className="text-red-500 text-xs mt-1">{apiKeyError}</p>}
+              {tempProvider === 'openai' && openAIKeyStatus?.valid === false && (
+                <p className="text-red-500 text-xs mt-1">
+                  ⚠ The OpenAI API key is invalid: {openAIKeyStatus.error || 'Please check your key and try again.'}
+                </p>
+              )}
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Your API key is stored securely in your browser and is only sent to the API provider.
               </p>
@@ -434,9 +500,9 @@ export const AISettings: React.FC<AISettingsProps> = ({
           Cancel
         </button>
         <button
-          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors ${(isLoading || isEmbeddingLoading || (activeTab === 'embedding' && !isEmbeddingConfigValid())) ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors ${(isLoading || isEmbeddingLoading || (activeTab === 'embedding' && !isEmbeddingConfigValid()) || (activeTab === 'generative' && !isGenerativeConfigValid())) ? 'opacity-50 cursor-not-allowed' : ''}`}
           onClick={handleSave}
-          disabled={isLoading || isEmbeddingLoading || (activeTab === 'embedding' && !isEmbeddingConfigValid())}
+          disabled={isLoading || isEmbeddingLoading || (activeTab === 'embedding' && !isEmbeddingConfigValid()) || (activeTab === 'generative' && !isGenerativeConfigValid())}
         >
           {isLoading || isEmbeddingLoading ? 'Saving...' : 'Save'}
         </button>

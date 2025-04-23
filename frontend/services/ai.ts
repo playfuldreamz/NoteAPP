@@ -111,7 +111,7 @@ export async function updateEmbeddingProvider(config: { provider: EmbeddingProvi
  * Get the status of the OpenAI API key availability
  * @returns Promise with the key status information
  */
-export async function getOpenAIKeyStatus(): Promise<{ available: boolean, source: 'user' | 'env' | null }> {
+export async function getOpenAIKeyStatus(): Promise<{ available: boolean, source: 'user' | 'env' | null, valid: boolean, error?: string }> {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('No authentication token found');
 

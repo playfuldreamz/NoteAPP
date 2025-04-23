@@ -16,13 +16,27 @@ const OpenAI = require('openai');
 // Load environment variables
 dotenv.config();
 
+// Cache for API key validation results
+// Format: { key: { valid: boolean, timestamp: number, error?: string } }
+const keyValidationCache = new Map();
+
+// Cache expiration time (5 minutes)
+const CACHE_EXPIRATION_MS = 5 * 60 * 1000;
+
 /**
  * Verify if an OpenAI API key is valid by making a test API call
  * @param {string} apiKey - The OpenAI API key to verify
  * @returns {Promise<boolean>} - Whether the key is valid
  */
 async function verifyOpenAIKey(apiKey) {
-  if (!apiKey) return false;
+  if (!apiKey) return { valid: false, error: 'No API key provided' };
+  
+  // Check cache first
+  const cachedResult = keyValidationCache.get(apiKey);
+  if (cachedResult && (Date.now() - cachedResult.timestamp) < CACHE_EXPIRATION_MS) {
+    console.log('Using cached OpenAI key validation result');
+    return { valid: cachedResult.valid, error: cachedResult.error };
+  }
   
   try {
     const openai = new OpenAI({ apiKey });
@@ -34,10 +48,21 @@ async function verifyOpenAIKey(apiKey) {
       encoding_format: "float",
     });
     
-    return true;
+    // Cache the result
+    keyValidationCache.set(apiKey, { valid: true, timestamp: Date.now() });
+    
+    return { valid: true };
   } catch (error) {
-    console.error('Error verifying OpenAI key:', error.message);
-    return false;
+    console.error('Error verifying OpenAI key:', error);
+    
+    // Cache the error result
+    keyValidationCache.set(apiKey, { 
+      valid: false, 
+      error: error.message, 
+      timestamp: Date.now() 
+    });
+    
+    return { valid: false, error: error.message };
   }
 }
 
@@ -58,22 +83,30 @@ router.get('/', async function(req, res) {
     const envKey = process.env.OPENAI_API_KEY || null;
     
     // Verify the keys
-    let userKeyValid = false;
-    let envKeyValid = false;
+    let userKeyResult = { valid: false };
+    let envKeyResult = { valid: false };
+    let errorMessage = null;
     
     if (userKey) {
-      userKeyValid = await verifyOpenAIKey(userKey);
+      userKeyResult = await verifyOpenAIKey(userKey);
+      if (!userKeyResult.valid) {
+        errorMessage = userKeyResult.error;
+      }
     }
     
-    if (envKey && !userKeyValid) { // Only check env key if user key is not valid
-      envKeyValid = await verifyOpenAIKey(envKey);
+    if (envKey && !userKeyResult.valid) { // Only check env key if user key is not valid
+      envKeyResult = await verifyOpenAIKey(envKey);
+      if (!envKeyResult.valid && !errorMessage) {
+        errorMessage = envKeyResult.error;
+      }
     }
     
     // Return the status
     res.json({ 
-      available: userKeyValid || envKeyValid,
-      source: userKeyValid ? 'user' : (envKeyValid ? 'env' : null),
-      valid: userKeyValid || envKeyValid
+      available: userKey !== null || envKey !== null, // Key exists but might not be valid
+      source: userKey ? 'user' : (envKey ? 'env' : null),
+      valid: userKeyResult.valid || envKeyResult.valid,
+      error: errorMessage
     });
   } catch (error) {
     console.error('Error checking OpenAI key status:', error);
@@ -81,7 +114,8 @@ router.get('/', async function(req, res) {
       message: 'Failed to check OpenAI key status',
       available: false,
       source: null,
-      valid: false
+      valid: false,
+      error: error.message
     });
   }
 });
