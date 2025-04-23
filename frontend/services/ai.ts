@@ -129,6 +129,29 @@ export async function getOpenAIKeyStatus(): Promise<{ available: boolean, source
   return await response.json();
 }
 
+/**
+ * Get a masked version of the API key for a specific provider
+ * @param provider The AI provider to get the masked key for
+ * @returns Promise with the masked key information
+ */
+export async function getMaskedApiKey(provider: AIProvider): Promise<{ provider: string, maskedKey: string, source: 'user' | 'env' | null, available: boolean }> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE}/api/ai/masked-key/${provider}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || `Failed to get masked key for ${provider}`);
+  }
+
+  return await response.json();
+}
+
 // Custom error class for API key issues
 export class InvalidAPIKeyError extends Error {
   constructor(message: string) {

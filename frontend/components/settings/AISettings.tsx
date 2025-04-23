@@ -8,6 +8,7 @@ import {
   getEmbeddingProvider,
   updateEmbeddingProvider, 
   getOpenAIKeyStatus,
+  getMaskedApiKey,
   AIProvider, 
   EmbeddingProvider, 
   API_BASE 
@@ -63,6 +64,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
   const [isEmbeddingDropdownOpen, setIsEmbeddingDropdownOpen] = useState(false);
   const [isEmbeddingLoading, setIsEmbeddingLoading] = useState(false);
   const [openAIKeyStatus, setOpenAIKeyStatus] = useState<{ available: boolean, source: 'user' | 'env' | null, valid: boolean, error?: string } | null>(null);
+  const [isEditingKey, setIsEditingKey] = useState(false);
   const [showRegenerationConfirmation, setShowRegenerationConfirmation] = useState(false);
   const [originalEmbeddingProvider, setOriginalEmbeddingProvider] = useState<EmbeddingProvider>('xenova');
 
@@ -167,22 +169,22 @@ export const AISettings: React.FC<AISettingsProps> = ({
       try {
         const config = await getAIProvider();
         
-        // If we have an API key (from any source), display it (masked)
-        if (config.apiKey) {
-          // Only show first 4 and last 4 characters, mask the rest
-          const maskedKey = config.apiKey.length > 8 ?
-            `${config.apiKey.substring(0, 4)}...${config.apiKey.substring(config.apiKey.length - 4)}` :
-            '****';
+        // Get a securely masked version of the API key from the backend
+        if (config.provider) {
+          const maskedKeyInfo = await getMaskedApiKey(config.provider);
           
-          // Always show the masked key when loading the component
-          // This ensures users can see and edit their existing key
-          setApiKey(maskedKey);
-          
-          // Save the masked key to the savedApiKeys state for this provider
-          setSavedApiKeys(prev => ({
-            ...prev,
-            [config.provider]: { key: maskedKey }
-          }));
+          if (maskedKeyInfo.available && maskedKeyInfo.maskedKey) {
+            setApiKey(maskedKeyInfo.maskedKey);
+            
+            // Save the masked key info to the savedApiKeys state
+            setSavedApiKeys(prev => ({
+              ...prev,
+              [config.provider]: { 
+                key: maskedKeyInfo.maskedKey, 
+                source: maskedKeyInfo.source || 'user' 
+              }
+            }));
+          }
         }
       } catch (error) {
         console.error('Error fetching current AI config:', error);
@@ -355,37 +357,48 @@ export const AISettings: React.FC<AISettingsProps> = ({
                         key={option.value} 
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-gray-800 dark:text-white"
                         onClick={async () => {
-                          setTempProvider(option.value as AIProvider);
+                          const newProvider = option.value as AIProvider;
+                          setTempProvider(newProvider);
                           setIsDropdownOpen(false);
                           
-                          // If switching to OpenAI, check key status
-                          if (option.value === 'openai') {
-                            try {
+                          // Reset editing state when switching providers
+                          setIsEditingKey(false);
+                          
+                          try {
+                            // Get a securely masked version of the API key from the backend
+                            const maskedKeyInfo = await getMaskedApiKey(newProvider);
+                            console.log('Got masked key info:', maskedKeyInfo);
+                            
+                            // Update OpenAI key status if needed
+                            if (newProvider === 'openai') {
                               const status = await getOpenAIKeyStatus();
                               setOpenAIKeyStatus(status);
-                              
-                              // If there's a valid key, display it (masked)
-                              if (status.available) {
-                                // Get the actual key from the API
-                                const config = await getAIProvider();
-                                if (config.apiKey) {
-                                  const maskedKey = config.apiKey.length > 8 ?
-                                    `${config.apiKey.substring(0, 4)}...${config.apiKey.substring(config.apiKey.length - 4)}` :
-                                    '****';
-                                  setApiKey(maskedKey);
-                                  return;
-                                }
-                              }
-                            } catch (error) {
-                              console.error('Error fetching OpenAI key status:', error);
                             }
-                          }
-                          
-                          // If we have a saved API key for this provider, use it
-                          if (savedApiKeys[option.value]) {
-                            setApiKey(savedApiKeys[option.value].key);
-                          } else {
-                            setApiKey('');
+                            
+                            // Set the masked key if available
+                            if (maskedKeyInfo.available && maskedKeyInfo.maskedKey) {
+                              setApiKey(maskedKeyInfo.maskedKey);
+                              
+                              // Save to savedApiKeys
+                              setSavedApiKeys(prev => ({
+                                ...prev,
+                                [newProvider]: { 
+                                  key: maskedKeyInfo.maskedKey, 
+                                  source: maskedKeyInfo.source || 'user' 
+                                }
+                              }));
+                            } else {
+                              // If no key is available, clear the input
+                              setApiKey('');
+                            }
+                          } catch (error) {
+                            console.error(`Error fetching masked key for ${newProvider}:`, error);
+                            // If we have a saved API key for this provider, use it as fallback
+                            if (savedApiKeys[newProvider]) {
+                              setApiKey(savedApiKeys[newProvider].key);
+                            } else {
+                              setApiKey('');
+                            }
                           }
                         }}
                       >
@@ -406,16 +419,76 @@ export const AISettings: React.FC<AISettingsProps> = ({
                   </span>
                 )}
               </label>
-              <input
-                type="password"
-                className={`w-full p-2 border ${apiKeyError || (tempProvider === 'openai' && openAIKeyStatus?.valid === false) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-white`}
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  setApiKeyError(null);
-                }}
-                placeholder={`Enter your ${tempProvider} API key`}
-              />
+              
+              {/* Show masked key display */}
+              {apiKey && !isEditingKey && (
+                <div 
+                  className={`w-full p-2 border ${apiKeyError || (tempProvider === 'openai' && openAIKeyStatus?.valid === false) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-white flex justify-between items-center cursor-pointer`}
+                  onClick={() => setIsEditingKey(true)}
+                >
+                  <div className="font-mono">
+                    {/* For OpenAI keys */}
+                    {tempProvider === 'openai' && apiKey.startsWith('sk-') && (
+                      <>
+                        <span className="text-gray-800 dark:text-white">sk-</span>
+                        <span className="text-gray-500 dark:text-gray-400">{apiKey.substring(3, 7)}</span>
+                        <span className="text-gray-400 dark:text-gray-500">{'•'.repeat(Math.max(10, apiKey.length - 11))}</span>
+                        <span className="text-gray-500 dark:text-gray-400">{apiKey.substring(apiKey.length - 4)}</span>
+                      </>
+                    )}
+                    
+                    {/* For Gemini keys */}
+                    {tempProvider === 'gemini' && (
+                      <>
+                        <span className="text-gray-800 dark:text-white">{apiKey.substring(0, 6)}</span>
+                        <span className="text-gray-400 dark:text-gray-500">{'•'.repeat(Math.max(10, apiKey.length - 10))}</span>
+                        <span className="text-gray-500 dark:text-gray-400">{apiKey.substring(apiKey.length - 4)}</span>
+                      </>
+                    )}
+                    
+                    {/* For other providers */}
+                    {tempProvider !== 'openai' && tempProvider !== 'gemini' && apiKey.length >= 8 && (
+                      <>
+                        <span className="text-gray-800 dark:text-white">{apiKey.substring(0, 4)}</span>
+                        <span className="text-gray-400 dark:text-gray-500">{'•'.repeat(Math.max(10, apiKey.length - 8))}</span>
+                        <span className="text-gray-500 dark:text-gray-400">{apiKey.substring(apiKey.length - 4)}</span>
+                      </>
+                    )}
+                    
+                    {/* Fallback for short keys */}
+                    {((tempProvider !== 'openai' && tempProvider !== 'gemini' && apiKey.length < 8) || 
+                      (tempProvider === 'openai' && !apiKey.startsWith('sk-'))) && (
+                      <span className="text-gray-500 dark:text-gray-400">{apiKey}</span>
+                    )}
+                  </div>
+                  <span className="text-blue-500 text-xs">Edit</span>
+                </div>
+              )}
+              
+              {/* Show input field when editing or no key exists */}
+              {(!apiKey || isEditingKey) && (
+                <input
+                  type="password"
+                  className={`w-full p-2 border ${apiKeyError || (tempProvider === 'openai' && openAIKeyStatus?.valid === false) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-white`}
+                  value={isEditingKey ? '' : apiKey}
+                  onChange={(e) => {
+                    setApiKey(e.target.value);
+                    setApiKeyError(null);
+                  }}
+                  onBlur={() => {
+                    // If the field is empty and we're editing, go back to showing the masked key
+                    if (isEditingKey && !apiKey) {
+                      setIsEditingKey(false);
+                    }
+                    // If we entered a new key, exit edit mode
+                    if (isEditingKey && apiKey) {
+                      setIsEditingKey(false);
+                    }
+                  }}
+                  placeholder={`Enter your ${tempProvider} API key`}
+                  autoFocus={isEditingKey}
+                />
+              )}
               {apiKeyError && <p className="text-red-500 text-xs mt-1">{apiKeyError}</p>}
               {tempProvider === 'openai' && openAIKeyStatus?.valid === false && (
                 <p className="text-red-500 text-xs mt-1">

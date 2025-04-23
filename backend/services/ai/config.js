@@ -87,6 +87,55 @@ class AIConfigManager {
    * @param {{provider: string, apiKey: string}} config - The new configuration
    * @returns {Promise<void>}
    */
+  /**
+   * Get provider-specific configuration for a user
+   * @param {number} userId - The user ID
+   * @param {string} provider - The provider name (e.g., 'openai', 'gemini')
+   * @returns {Promise<{apiKey: string, source: string} | null>}
+   */
+  static async getProviderSpecificConfig(userId, provider) {
+    try {
+      if (!userId || !provider) return null;
+      
+      // Check for user-specific key for this provider
+      const userRow = db.prepare(
+        `SELECT api_key FROM user_settings 
+         WHERE user_id = ? AND provider = ? AND api_key IS NOT NULL AND api_key != ''`
+      ).get(userId, provider);
+      
+      if (userRow?.api_key) {
+        return {
+          apiKey: userRow.api_key,
+          source: 'user'
+        };
+      }
+      
+      // Check for environment variable
+      if (provider === 'openai' && process.env.OPENAI_API_KEY) {
+        return {
+          apiKey: process.env.OPENAI_API_KEY,
+          source: 'env'
+        };
+      } else if (provider === 'gemini' && process.env.GEMINI_API_KEY) {
+        return {
+          apiKey: process.env.GEMINI_API_KEY,
+          source: 'env'
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Error getting ${provider} config:`, error);
+      return null;
+    }
+  }
+  
+  /**
+   * Update AI configuration for a user
+   * @param {number} userId - The user ID
+   * @param {{provider: string, apiKey: string}} config - The new configuration
+   * @returns {Promise<void>}
+   */
   static async updateConfig(userId, config) {
     // Check if we're trying to use an empty API key
     if (!config.apiKey || config.apiKey === 'your-api-key') {
