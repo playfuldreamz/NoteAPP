@@ -478,7 +478,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
                 <input
                   type="password"
                   className={`w-full p-2 border ${apiKeyError || (tempProvider === 'openai' && openAIKeyStatus?.valid === false) ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-white`}
-                  value={isEditingKey ? '' : apiKey}
+                  value={apiKey}
                   onChange={(e) => {
                     setApiKey(e.target.value);
                     setApiKeyError(null);
