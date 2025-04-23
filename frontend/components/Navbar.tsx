@@ -1,10 +1,12 @@
-import { User, Menu, Sparkles, Settings, LogOut } from 'lucide-react';
+import { User, Menu, Sparkles, Settings, LogOut, Search } from 'lucide-react';
 import DarkModeToggle from './DarkModeToggle';
 
 interface NavbarProps {
   username: string;
   currentModel: string;
   modelSource: string;
+  embeddingProvider: string;
+  embeddingSource: string;
   isAuthenticated: boolean;
   onLogout: () => void;
   onOpenSettings: () => void;
@@ -14,6 +16,8 @@ export default function Navbar({
   username,
   currentModel,
   modelSource,
+  embeddingProvider,
+  embeddingSource,
   isAuthenticated,
   onLogout,
   onOpenSettings
@@ -36,26 +40,14 @@ export default function Navbar({
                   <Sparkles className="w-4 h-4" />
                   <span>AI: {currentModel || 'Not Configured'}</span>
                   <span className="hidden sm:inline">({modelSource})</span>
+                  <span className="mx-1 text-blue-300 dark:text-blue-600">|</span>
+                  <Search className="w-4 h-4" />
+                  <span>{embeddingProvider}</span>
+                  <span className="hidden sm:inline">({embeddingSource})</span>
                 </div>
 
                 <div className="flex items-center gap-4">
                   <DarkModeToggle />
-                  
-                  <button
-                    onClick={onOpenSettings}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    title="Settings"
-                  >
-                    <Settings className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-                  </button>
-
-                  <button
-                    onClick={onLogout}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    title="Logout"
-                  >
-                    <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-                  </button>
                 </div>
               </>
             )}

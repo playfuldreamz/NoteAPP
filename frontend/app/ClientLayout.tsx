@@ -12,7 +12,7 @@ import { TranscriptionProviderContext } from '../context/TranscriptionContext';
 import { RecordingProvider } from '../context/RecordingContext';
 import MinimizedRecorder from '../components/audio-recorder/MinimizedRecorder';
 import MaximizedRecorderModal from '../components/audio-recorder/MaximizedRecorderModal';
-import { getAIProvider } from '../services/ai';
+import { getAIProvider, getEmbeddingProvider } from '../services/ai';
 import { ThemeProvider } from '../context/ThemeContext';
 
 interface ClientLayoutProps {
@@ -24,6 +24,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const [username, setUsername] = useState('');
   const [currentModel, setCurrentModel] = useState('');
   const [modelSource, setModelSource] = useState('');
+  const [embeddingProvider, setEmbeddingProvider] = useState('xenova');
+  const [embeddingSource, setEmbeddingSource] = useState('default');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -43,19 +45,29 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     }
   }, [router]);
 
-  // Fetch AI provider when authenticated or settings change
+  // Fetch AI provider and embedding provider when authenticated or settings change
   useEffect(() => {
     if (isAuthenticated) {
-      const fetchAIProvider = async () => {
+      const fetchProviders = async () => {
         try {
-          const config = await getAIProvider();
-          setCurrentModel(config.provider);
-          setModelSource(config.source);
+          // Fetch both providers in parallel
+          const [aiConfig, embeddingConfig] = await Promise.all([
+            getAIProvider(),
+            getEmbeddingProvider()
+          ]);
+          
+          // Update AI provider state
+          setCurrentModel(aiConfig.provider);
+          setModelSource(aiConfig.source);
+          
+          // Update embedding provider state
+          setEmbeddingProvider(embeddingConfig.provider);
+          setEmbeddingSource(embeddingConfig.source);
         } catch (error) {
-          console.error('Failed to fetch AI provider:', error);
+          console.error('Failed to fetch providers:', error);
         }
       };
-      fetchAIProvider();
+      fetchProviders();
     }
   }, [isAuthenticated, isSettingsOpen]);
 
@@ -82,6 +94,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
                 username={username}
                 currentModel={currentModel}
                 modelSource={modelSource}
+                embeddingProvider={embeddingProvider}
+                embeddingSource={embeddingSource}
                 isAuthenticated={isAuthenticated}
                 onLogout={handleLogout}
                 onOpenSettings={() => setIsSettingsOpen(true)}
