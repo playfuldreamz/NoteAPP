@@ -156,6 +156,8 @@ export const AISettings: React.FC<AISettingsProps> = ({
     // Check OpenAI key status - only when needed
     const fetchOpenAIKeyStatus = async () => {
       try {
+        // Set to loading state first
+        setOpenAIKeyStatus({ available: false, source: null, valid: false, error: 'Checking API key status...' });
         const status = await getOpenAIKeyStatus();
         setOpenAIKeyStatus(status);
       } catch (error) {
@@ -371,8 +373,13 @@ export const AISettings: React.FC<AISettingsProps> = ({
                             
                             // Update OpenAI key status if needed
                             if (newProvider === 'openai') {
+                              // Set to loading state first
+                              setOpenAIKeyStatus({ available: false, source: null, valid: false, error: 'Checking API key status...' });
                               const status = await getOpenAIKeyStatus();
                               setOpenAIKeyStatus(status);
+                            } else {
+                              // Clear OpenAI status when switching to other providers
+                              setOpenAIKeyStatus(null);
                             }
                             
                             // Set the masked key if available
@@ -490,9 +497,19 @@ export const AISettings: React.FC<AISettingsProps> = ({
                 />
               )}
               {apiKeyError && <p className="text-red-500 text-xs mt-1">{apiKeyError}</p>}
+              {tempProvider === 'openai' && openAIKeyStatus?.error === 'Checking API key status...' && (
+                <p className="text-gray-500 text-xs mt-1">
+                  Checking API key status...
+                </p>
+              )}
               {tempProvider === 'openai' && openAIKeyStatus?.valid === false && (
                 <p className="text-red-500 text-xs mt-1">
                   ⚠ The OpenAI API key is invalid: {openAIKeyStatus.error || 'Please check your key and try again.'}
+                </p>
+              )}
+              {tempProvider === 'openai' && openAIKeyStatus?.valid === true && (
+                <p className="text-green-500 text-xs mt-1">
+                  ✓ OpenAI API key is valid
                 </p>
               )}
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -530,12 +547,26 @@ export const AISettings: React.FC<AISettingsProps> = ({
                       <div 
                         key={option.value} 
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-gray-800 dark:text-white"
-                        onClick={() => {
+                        onClick={async () => {
+                          const newProvider = option.value as EmbeddingProvider;
                           setEmbeddingConfig({
                             ...embeddingConfig,
-                            provider: option.value as EmbeddingProvider
+                            provider: newProvider
                           });
                           setIsEmbeddingDropdownOpen(false);
+                          
+                          // Check OpenAI key status when OpenAI is selected
+                          if (newProvider === 'openai') {
+                            // Set to loading state first
+                            setOpenAIKeyStatus({ available: false, source: null, valid: false, error: 'Checking API key status...' });
+                            try {
+                              const status = await getOpenAIKeyStatus();
+                              setOpenAIKeyStatus(status);
+                            } catch (error) {
+                              console.error('Error fetching OpenAI key status:', error);
+                              setOpenAIKeyStatus({ available: false, source: null, valid: false, error: 'Failed to check key status' });
+                            }
+                          }
                         }}
                       >
                         {option.label}
@@ -572,7 +603,7 @@ export const AISettings: React.FC<AISettingsProps> = ({
                       <li>Requires internet connection</li>
                     </ul>
                     
-                    {openAIKeyStatus === null ? (
+                    {(openAIKeyStatus === null || openAIKeyStatus.error === 'Checking API key status...') ? (
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                         Checking API key status...
                       </p>
