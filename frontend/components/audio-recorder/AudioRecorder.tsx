@@ -12,13 +12,11 @@ import WaveformVisualizer from './WaveformVisualizer';
 import { useTranscription } from '../../context/TranscriptionContext';
 
 interface AudioRecorderContainerProps {
-  updateTranscripts?: () => void;
   setTranscript?: (transcript: string) => void;
   transcript?: string;
 }
 
 const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
-  updateTranscripts,
   setTranscript,
   transcript: externalTranscript
 }) => {
@@ -34,6 +32,7 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
     isEnhancing,
     isSaving,
     showEnhanced,
+    isMaximized,
     startRecording,
     stopRecording,
     pauseRecording,
@@ -44,19 +43,8 @@ const AudioRecorderContainer: React.FC<AudioRecorderContainerProps> = ({
     enhancedTranscript
   } = useRecording();
 
-  // Handle successful save
-  React.useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    if (!isSaving && updateTranscripts) {
-      // Add a small delay to ensure the backend has processed the save
-      timeoutId = setTimeout(() => {
-        updateTranscripts();
-      }, 500);
-    }
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [isSaving, updateTranscripts]);
+  // The event system now handles updating the transcript list
+  // No need for a wrapper function anymore
 
   // Automatically enhance audio when recording starts
   React.useEffect(() => {

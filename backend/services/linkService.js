@@ -39,7 +39,7 @@ class LinkService {
    * @returns {Promise<{id: number, type: string}|null>} - Resolved target or null if not found
    */
   async resolveItemByTitle(title, userId) {
-    return new Promise((resolve, reject) => {
+    try {
       // First check notes table
       const noteQuery = `
         SELECT id, 'note' as type, timestamp as date
@@ -49,35 +49,34 @@ class LinkService {
         LIMIT 1
       `;
       
-      db.get(noteQuery, [userId, title], (err, noteResult) => {
-        if (err) {
-          return reject(err);
-        }
-        
-        // If found in notes, return it
-        if (noteResult) {
-          return resolve(noteResult);
-        }
-        
-        // If not found in notes, check transcripts table
-        const transcriptQuery = `
-          SELECT id, 'transcript' as type, date
-          FROM transcripts 
-          WHERE user_id = ? AND title = ?
-          ORDER BY date DESC
-          LIMIT 1
-        `;
-        
-        db.get(transcriptQuery, [userId, title], (err, transcriptResult) => {
-          if (err) {
-            return reject(err);
-          }
-          
-          // Return transcript result (might be null if not found)
-          resolve(transcriptResult);
-        });
-      });
-    });
+      // Use better-sqlite3 API
+      const noteStmt = db.prepare(noteQuery);
+      const noteResult = noteStmt.get(userId, title);
+      
+      // If found in notes, return it
+      if (noteResult) {
+        return noteResult;
+      }
+      
+      // If not found in notes, check transcripts table
+      const transcriptQuery = `
+        SELECT id, 'transcript' as type, date
+        FROM transcripts 
+        WHERE user_id = ? AND title = ?
+        ORDER BY date DESC
+        LIMIT 1
+      `;
+      
+      // Use better-sqlite3 API
+      const transcriptStmt = db.prepare(transcriptQuery);
+      const transcriptResult = transcriptStmt.get(userId, title);
+      
+      // Return transcript result (might be null if not found)
+      return transcriptResult;
+    } catch (error) {
+      console.error('Error resolving item by title:', error);
+      throw error;
+    }
   }
 
   /**
@@ -90,83 +89,52 @@ class LinkService {
    * @returns {Promise<void>}
    */
   async processLinks(sourceId, sourceType, content, userId) {
-    if (!content || !sourceId || !userId || !['note', 'transcript'].includes(sourceType)) {
-      return Promise.reject(new Error('Invalid parameters for processing links'));
-    }
-
     try {
-      // Extract all link targets
+      // Extract links from content
       const linkTargets = this.extractLinksFromContent(content);
       
-      // Begin transaction
-      return new Promise((resolve, reject) => {
-        db.serialize(() => {
-          db.run('BEGIN TRANSACTION');
+      // First, resolve all link targets (outside the transaction)
+      const resolvedTargets = await Promise.all(
+        linkTargets.map(async (targetTitle) => {
+          const target = await this.resolveItemByTitle(targetTitle, userId);
+          return { targetTitle, target };
+        })
+      );
+      
+      // Use better-sqlite3 transaction API
+      const processTransaction = db.transaction(() => {
+        // Delete existing links from this source
+        const deleteStmt = db.prepare('DELETE FROM links WHERE source_id = ? AND source_type = ?');
+        deleteStmt.run(sourceId, sourceType);
+        
+        // If no links found, return early
+        if (linkTargets.length === 0) {
+          return;
+        }
+        
+        // Prepare the insert statement once (for better performance)
+        const insertLinkStmt = db.prepare(`
+          INSERT OR IGNORE INTO links 
+          (source_id, source_type, target_id, target_type, link_text) 
+          VALUES (?, ?, ?, ?, ?)
+        `);
+        
+        // Process each resolved target
+        for (const { targetTitle, target } of resolvedTargets) {
+          // Skip if target not found
+          if (!target) continue;
           
-          // Delete existing links from this source
-          db.run(
-            'DELETE FROM links WHERE source_id = ? AND source_type = ?',
-            [sourceId, sourceType],
-            (err) => {
-              if (err) {
-                console.error('Error deleting existing links:', err);
-                db.run('ROLLBACK');
-                return reject(err);
-              }
-              
-              // If no links found, commit and return
-              if (linkTargets.length === 0) {
-                db.run('COMMIT');
-                return resolve();
-              }
-              
-              // Process each link target
-              const processPromises = linkTargets.map(targetTitle => 
-                this.resolveItemByTitle(targetTitle, userId)
-                  .then(target => {
-                    if (!target) return null; // Skip if target not found
-                    
-                    // Insert new link
-                    return new Promise((resolveInsert, rejectInsert) => {
-                      db.run(
-                        `INSERT OR IGNORE INTO links 
-                         (source_id, source_type, target_id, target_type, link_text) 
-                         VALUES (?, ?, ?, ?, ?)`,
-                        [sourceId, sourceType, target.id, target.type, targetTitle],
-                        function(err) {
-                          if (err) {
-                            console.error('Error inserting link:', err);
-                            return rejectInsert(err);
-                          }
-                          resolveInsert();
-                        }
-                      );
-                    });
-                  })
-              );
-              
-              // Wait for all link processing to complete
-              Promise.all(processPromises)
-                .then(() => {
-                  db.run('COMMIT', (err) => {
-                    if (err) {
-                      console.error('Error committing transaction:', err);
-                      return reject(err);
-                    }
-                    resolve();
-                  });
-                })
-                .catch(err => {
-                  console.error('Error processing links:', err);
-                  db.run('ROLLBACK');
-                  reject(err);
-                });
-            }
-          );
-        });
+          // Insert the link
+          insertLinkStmt.run(sourceId, sourceType, target.id, target.type, targetTitle);
+        }
       });
+      
+      // Execute the transaction
+      processTransaction();
+      
+      return Promise.resolve();
     } catch (error) {
-      console.error('Error in processLinks:', error);
+      console.error('Error processing links:', error);
       return Promise.reject(error);
     }
   }
@@ -180,7 +148,7 @@ class LinkService {
    * @returns {Promise<Array>} - Array of backlink objects with source information
    */
   async getBacklinks(targetId, targetType, userId) {
-    return new Promise((resolve, reject) => {
+    try {
       const query = `
         SELECT 
           l.source_id as sourceId,
@@ -210,14 +178,14 @@ class LinkService {
         ORDER BY sourceDate DESC
       `;
       
-      db.all(query, [targetId, targetType, userId, userId], (err, rows) => {
-        if (err) {
-          console.error('Error fetching backlinks:', err);
-          return reject(err);
-        }
-        resolve(rows);
-      });
-    });
+      // Use better-sqlite3 API
+      const stmt = db.prepare(query);
+      const rows = stmt.all(targetId, targetType, userId, userId);
+      return rows;
+    } catch (error) {
+      console.error('Error fetching backlinks:', error);
+      throw error;
+    }
   }
 }
 

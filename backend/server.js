@@ -26,12 +26,17 @@ const aiConfigRoutes = require('./routes/ai/config');
 const aiTasksRoutes = require('./routes/ai/tasks');
 const aiTagsRoutes = require('./routes/ai/tags');
 const aiSummaryRoutes = require('./routes/ai/summary');
+const aiEmbeddingConfigRoutes = require('./routes/ai/embedding-config');
+const openaiKeyStatusRoutes = require('./routes/ai/openai-key-status');
+const maskedKeyRoutes = require('./routes/ai/masked-key');
+const embeddingRegenerationRoutes = require('./routes/ai/embedding-regeneration');
 const actionItemsRoutes = require('./routes/actionItems');
 const transcriptsRoutes = require('./routes/transcripts');
 const notesRoutes = require('./routes/notes');
 const voiceInsightsRoutes = require('./routes/voiceInsights');
 const noteInsightsRoutes = require('./routes/noteInsights');
 const linksRoutes = require('./routes/links');
+const searchRoutes = require('./routes/search');
 const PORT = process.env.PORT || 5000;
 
 // JWT secret key - in production, use an environment variable
@@ -58,12 +63,17 @@ app.use('/api/ai/config', authenticateToken, aiConfigRoutes);
 app.use('/api/ai/tasks', authenticateToken, aiTasksRoutes);
 app.use('/api/ai/tags', authenticateToken, aiTagsRoutes);
 app.use('/api/ai/summary', authenticateToken, aiSummaryRoutes);
+app.use('/api/ai/embedding-config', authenticateToken, aiEmbeddingConfigRoutes);
+app.use('/api/ai/openai-key-status', authenticateToken, openaiKeyStatusRoutes);
+app.use('/api/ai/masked-key', authenticateToken, maskedKeyRoutes);
+app.use('/api/ai/embedding-regeneration', authenticateToken, embeddingRegenerationRoutes);
 app.use('/api/action-items', authenticateToken, actionItemsRoutes);
 app.use('/api/transcripts', transcriptsRoutes);  // No auth required for token validation
 app.use('/api/notes', authenticateToken, notesRoutes);
 app.use('/api/voice-insights', authenticateToken, voiceInsightsRoutes);
 app.use('/api/note-insights', authenticateToken, noteInsightsRoutes);
 app.use('/api/links', linksRoutes);
+app.use('/api/search', searchRoutes);
 
 // Initialize database
 createTables();

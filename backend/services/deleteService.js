@@ -1,28 +1,35 @@
 const db = require('../database/connection');
 const { isTagReferencedAsync } = require('../utils/dbUtils');
 
-// Promisify db.run
-const run = (query, params) => new Promise((resolve, reject) => {
-  db.run(query, params, function(err) {
-    if (err) reject(err);
-    else resolve(this);
-  });
-});
+// Use better-sqlite3 API for run
+const run = (query, params = []) => {
+  try {
+    const stmt = db.prepare(query);
+    return params.length > 0 ? stmt.run(...params) : stmt.run();
+  } catch (error) {
+    throw error;
+  }
+};
 
-// Promisify db.get
-const get = (query, params) => new Promise((resolve, reject) => {
-  db.get(query, params, (err, row) => {
-    if (err) reject(err);
-    else resolve(row);
-  });
-});
+// Use better-sqlite3 API for get
+const get = (query, params = []) => {
+  try {
+    const stmt = db.prepare(query);
+    return params.length > 0 ? stmt.get(...params) : stmt.get();
+  } catch (error) {
+    throw error;
+  }
+};
 
 // Promisify db.all
-const all = (query, params) => new Promise((resolve, reject) => {
-  db.all(query, params, (err, rows) => {
-    if (err) reject(err);
-    else resolve(rows);
-  });
+const all = (query, params = []) => new Promise((resolve, reject) => {
+  try {
+    const stmt = db.prepare(query);
+    const rows = params.length > 0 ? stmt.all(...params) : stmt.all();
+    resolve(rows);
+  } catch (error) {
+    reject(error);
+  }
 });
 
 let transactionDepth = 0;
@@ -160,6 +167,12 @@ const deleteResource = async (resourceType, resourceId, userId, options = {}) =>
       }
     }
 
+    // Delete the embedding for this resource
+    await run(
+      'DELETE FROM embeddings WHERE item_id = ? AND item_type = ? AND user_id = ?',
+      [resourceId, resourceType, userId]
+    );
+
     // Delete the main resource
     await run(
       `DELETE FROM ${resourceType}s WHERE id = ? AND user_id = ?`,
@@ -252,6 +265,12 @@ const bulkDeleteResources = async (resourceType, resourceIds, userId, options = 
         }
       }
     }
+
+    // Delete the embeddings for these resources
+    await run(
+      `DELETE FROM embeddings WHERE item_id IN (${placeholders}) AND item_type = ? AND user_id = ?`,
+      [...resourceIds, resourceType, userId]
+    );
 
     // Delete the main resources
     await run(

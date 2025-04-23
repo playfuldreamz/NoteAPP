@@ -12,59 +12,41 @@ const db = require('../connection');
  * Apply the migration - add summary fields
  */
 function up() {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      // Check if summary column exists in notes table
-      db.all("PRAGMA table_info(notes)", (err, rows) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        
-        // Add summary column to notes table if it doesn't exist
-        const hasNoteSummary = rows.some(row => row.name === 'summary');
-        if (!hasNoteSummary) {
-          console.log('Adding summary column to notes table...');
-          db.run('ALTER TABLE notes ADD COLUMN summary TEXT DEFAULT NULL', (err) => {
-            if (err) {
-              console.error('Error adding summary column to notes table:', err);
-              reject(err);
-              return;
-            }
-            console.log('Successfully added summary column to notes table');
-          });
-        } else {
-          console.log('Summary column already exists in notes table');
-        }
-      });
+  // Check if summary column exists in notes table
+  const notesColumns = db.prepare("PRAGMA table_info(notes)").all();
+  
+  // Add summary column to notes table if it doesn't exist
+  const hasNoteSummary = notesColumns.some(row => row.name === 'summary');
+  if (!hasNoteSummary) {
+    console.log('Adding summary column to notes table...');
+    try {
+      db.prepare('ALTER TABLE notes ADD COLUMN summary TEXT DEFAULT NULL').run();
+      console.log('Successfully added summary column to notes table');
+    } catch (err) {
+      console.error('Error adding summary column to notes table:', err);
+      throw err;
+    }
+  } else {
+    console.log('Summary column already exists in notes table');
+  }
 
-      // Check if summary column exists in transcripts table
-      db.all("PRAGMA table_info(transcripts)", (err, rows) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        
-        // Add summary column to transcripts table if it doesn't exist
-        const hasTranscriptSummary = rows.some(row => row.name === 'summary');
-        if (!hasTranscriptSummary) {
-          console.log('Adding summary column to transcripts table...');
-          db.run('ALTER TABLE transcripts ADD COLUMN summary TEXT DEFAULT NULL', (err) => {
-            if (err) {
-              console.error('Error adding summary column to transcripts table:', err);
-              reject(err);
-              return;
-            }
-            console.log('Successfully added summary column to transcripts table');
-            resolve();
-          });
-        } else {
-          console.log('Summary column already exists in transcripts table');
-          resolve();
-        }
-      });
-    });
-  });
+  // Check if summary column exists in transcripts table
+  const transcriptsColumns = db.prepare("PRAGMA table_info(transcripts)").all();
+  
+  // Add summary column to transcripts table if it doesn't exist
+  const hasTranscriptSummary = transcriptsColumns.some(row => row.name === 'summary');
+  if (!hasTranscriptSummary) {
+    console.log('Adding summary column to transcripts table...');
+    try {
+      db.prepare('ALTER TABLE transcripts ADD COLUMN summary TEXT DEFAULT NULL').run();
+      console.log('Successfully added summary column to transcripts table');
+    } catch (err) {
+      console.error('Error adding summary column to transcripts table:', err);
+      throw err;
+    }
+  } else {
+    console.log('Summary column already exists in transcripts table');
+  }
 }
 
 /**
@@ -74,10 +56,8 @@ function up() {
  * is not implemented here.
  */
 function down() {
-  return new Promise((resolve) => {
-    console.log('Down migration not implemented for SQLite (cannot easily drop columns)');
-    resolve();
-  });
+  console.log('Down migration not implemented for SQLite (cannot easily drop columns)');
+  return true;
 }
 
 module.exports = {

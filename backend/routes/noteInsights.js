@@ -19,14 +19,14 @@ function getStartDate(timeRange) {
   }
 }
 
-// Helper function to run SQLite queries with promises
+// Helper function to run SQLite queries with better-sqlite3
 function runQuery(query, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(query, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+  try {
+    const stmt = db.prepare(query);
+    return stmt.all(...params);
+  } catch (error) {
+    throw error;
+  }
 }
 
 // Get note insights
