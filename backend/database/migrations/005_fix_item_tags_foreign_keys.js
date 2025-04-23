@@ -51,7 +51,7 @@ function up() {
         BEGIN
           SELECT CASE
             WHEN NOT EXISTS(SELECT 1 FROM notes WHERE id = NEW.item_id)
-            THEN RAISE(ABORT, 'Foreign key constraint failed: Note does not exist')
+            THEN RAISE(ABORT, 'Foreign key constraint failed: Note (ID: ' || NEW.item_id || ') does not exist')
           END;
         END;
       `).run();
