@@ -92,7 +92,8 @@ export const AISettings: React.FC<AISettingsProps> = ({
     
     // For OpenAI, check if a valid key is available
     if (embeddingConfig.provider === 'openai') {
-      return openAIKeyStatus?.available === true;
+      // Key must be both available AND valid
+      return openAIKeyStatus?.available === true && openAIKeyStatus?.valid === true;
     }
     
     // For future providers, add validation here
@@ -607,9 +608,13 @@ export const AISettings: React.FC<AISettingsProps> = ({
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                         Checking API key status...
                       </p>
-                    ) : openAIKeyStatus.available ? (
+                    ) : openAIKeyStatus.available && openAIKeyStatus.valid ? (
                       <p className="text-xs text-green-600 dark:text-green-400 mt-2">
                         ✓ Using OpenAI API key from {openAIKeyStatus.source === 'user' ? 'your account settings' : 'server environment'}
+                      </p>
+                    ) : openAIKeyStatus.available && !openAIKeyStatus.valid ? (
+                      <p className="text-xs text-red-500 dark:text-red-400 mt-2">
+                        ⚠ The OpenAI API key is invalid: {openAIKeyStatus.error || 'Please check your key and try again.'}
                       </p>
                     ) : (
                       <p className="text-xs text-red-500 dark:text-red-400 mt-2">
