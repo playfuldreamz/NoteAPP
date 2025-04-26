@@ -71,10 +71,13 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
     if (!isInitialized) {
       toast.error('Transcription provider not initialized');
       return false;
-    }
+    }    // Import isKeyRequiredProvider helper
+    const isKeyRequiredProvider = (provider: ProviderType): boolean => {
+      return provider !== 'webspeech' && provider !== 'realtimestt';
+    };
 
     // Check if provider requires API key
-    if (selectedProvider !== 'webspeech') {
+    if (isKeyRequiredProvider(selectedProvider)) {
       const settings = getProviderSettings(selectedProvider);
       if (!settings?.apiKey) {
         toast.error(`API Key for ${selectedProvider} is required. Please configure it in settings.`);
