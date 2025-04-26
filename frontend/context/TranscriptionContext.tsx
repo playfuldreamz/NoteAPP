@@ -95,8 +95,8 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
       // Get settings for the provider
       const settings = providerSettings[type];
 
-      // For non-WebSpeech providers, verify API key exists
-      if (type !== 'webspeech' && !settings?.apiKey) {
+      // For providers that require API keys, verify key exists
+      if (type !== 'webspeech' && type !== 'realtimestt' && !settings?.apiKey) {
         throw new Error(`${type} API key is required`);
       }
 

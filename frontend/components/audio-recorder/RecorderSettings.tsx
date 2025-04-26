@@ -20,6 +20,9 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   'realtimestt': 'RealtimeSTT (Local Server)'
 };
 
+const isKeyRequiredProvider = (provider: ProviderType): boolean => {
+  return provider !== 'webspeech' && provider !== 'realtimestt';
+};
 
 const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggleSettings }) => {
   const {
@@ -132,18 +135,24 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
         await initializeProvider(selectedProvider);
     }
   };
-
   const handleProviderChange = async (newProvider: ProviderType) => {
      setProvider(newProvider);
      const settings = getProviderSettings(newProvider);
-     const newApiKey = settings?.apiKey || '';
-     setApiKeyInput(newApiKey);
-     // Validate the key for the new provider
-     await validateKey(newApiKey, newProvider, false); // Don't show success toast on provider change
-      // Only show info toast if key is missing for non-webspeech
-      if (newProvider !== 'webspeech' && !newApiKey) {
-          toast.info(`Please enter your ${PROVIDER_DISPLAY_NAMES[newProvider]} API key and click Apply.`);
-      }
+     
+     if (newProvider === 'realtimestt') {
+       // For RealtimeSTT, immediately validate server connection
+       await validateKey('', newProvider, true);
+     } 
+     else {
+       const newApiKey = settings?.apiKey || '';
+       setApiKeyInput(newApiKey);
+       // Validate the key for the new provider
+       await validateKey(newApiKey, newProvider, false);
+       // Only show info toast if key is missing for providers that need keys
+       if (isKeyRequiredProvider(newProvider) && !newApiKey) {
+         toast.info(`Please enter your ${PROVIDER_DISPLAY_NAMES[newProvider]} API key and click Apply.`);
+       }
+     }
   };
 
 
@@ -169,9 +178,25 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
                 {PROVIDER_DISPLAY_NAMES[p]}
               </option>
             ))}
-          </select>
-          <div className="flex items-center text-xs mt-1 h-4">
-            {selectedProvider !== 'webspeech' && ( // Only show status for non-webspeech
+          </select>          <div className="flex items-center text-xs mt-1 h-4">
+            {selectedProvider === 'realtimestt' ? (
+              <>
+                <span className="mr-1">Status:</span>
+                {isValidatingKey ? (
+                  <span className="flex items-center text-blue-500">
+                    <Loader className="w-3 h-3 mr-1 animate-spin" /> Validating...
+                  </span>
+                ) : isKeyValid ? (
+                  <span className="flex items-center text-green-500">
+                    <Check className="w-3 h-3 mr-1" /> Server Available
+                  </span>
+                ) : (
+                  <span className="flex items-center text-red-500">
+                    <AlertCircle className="w-3 h-3 mr-1" /> Server Unavailable
+                  </span>
+                )}
+              </>
+            ) : selectedProvider !== 'webspeech' && (
               <>
                 <span className="mr-1">Status:</span>
                 {isValidatingKey ? (
