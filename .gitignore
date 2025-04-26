@@ -4,6 +4,9 @@
 .env.development
 .env.production
 
+# Allow STT server environment file
+!stt-server/.env
+
 # Dependencies
 node_modules/
 
