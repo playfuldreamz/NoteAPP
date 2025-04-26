@@ -27,7 +27,7 @@ export interface TranscriptionProvider {
   cleanup: () => void;
 }
 
-export type ProviderType = 'webspeech' | 'assemblyai' | 'whisper' | 'azure' | 'deepgram';
+export type ProviderType = 'webspeech' | 'assemblyai' | 'whisper' | 'azure' | 'deepgram' | 'realtimestt';
 
 export interface ProviderConfig {
   type: ProviderType;

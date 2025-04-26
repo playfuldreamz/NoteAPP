@@ -17,10 +17,10 @@ interface UseTranscriptionManagerReturn {
   showEnhanced: boolean;
   providerInstance: any;
   initializeProvider: () => Promise<boolean>;
-  startTranscription: () => Promise<boolean>;
+  startTranscription: (mediaStream?: MediaStream) => Promise<boolean>;
   stopTranscription: () => Promise<void>;
   pauseTranscription: () => Promise<void>;
-  resumeTranscription: (existingTranscript: string) => Promise<boolean>;
+  resumeTranscription: (existingTranscript: string, mediaStream?: MediaStream) => Promise<boolean>;
   enhanceTranscript: () => Promise<void>;
   resetTranscript: () => void;
   setShowEnhanced: (show: boolean) => void;
@@ -101,14 +101,24 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
       return false;
     }
   };
-
   // Start transcription
-  const startTranscription = async (): Promise<boolean> => {
+  const startTranscription = async (mediaStream?: MediaStream): Promise<boolean> => {
     const initialized = await initializeProvider();
     if (!initialized) return false;
     
     try {
-      await providerInstanceRef.current.start();
+      // For RealtimeSTT, we need to pass the mediaStream
+      if (selectedProvider === 'realtimestt') {
+        if (!mediaStream) {
+          console.error('MediaStream is required for RealtimeSTT provider');
+          toast.error('Microphone stream not available');
+          return false;
+        }
+        await providerInstanceRef.current.start(mediaStream);
+      } else {
+        // For other providers, use their standard start method
+        await providerInstanceRef.current.start();
+      }
       return true;
     } catch (error) {
       console.error('Failed to start transcription:', error);
@@ -139,9 +149,8 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
       }
     }
   };
-
   // Resume transcription with existing transcript
-  const resumeTranscription = async (existingTranscript: string): Promise<boolean> => {
+  const resumeTranscription = async (existingTranscript: string, mediaStream?: MediaStream): Promise<boolean> => {
     try {
       if (providerInstanceRef.current) {
         // Set up result handler that preserves the existing transcript
@@ -156,7 +165,17 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
           }
         });
         
-        await providerInstanceRef.current.start();
+        // For RealtimeSTT, we need to pass the mediaStream
+        if (selectedProvider === 'realtimestt') {
+          if (!mediaStream) {
+            console.error('MediaStream is required for RealtimeSTT provider');
+            toast.error('Microphone stream not available');
+            return false;
+          }
+          await providerInstanceRef.current.start(mediaStream);
+        } else {
+          await providerInstanceRef.current.start();
+        }
         return true;
       } else {
         // If provider was cleaned up, recreate it

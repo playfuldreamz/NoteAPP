@@ -31,7 +31,8 @@ const PROVIDER_DISPLAY_NAMES: Record<ProviderType, string> = {
   'assemblyai': 'AssemblyAI',
   'deepgram': 'Deepgram',
   'whisper': 'Whisper',
-  'azure': 'Azure Speech'
+  'azure': 'Azure Speech',
+  'realtimestt': 'RealtimeSTT (Local Server)'
 };
 
 export function TranscriptionProviderContext({ children }: { children: React.ReactNode }) {
@@ -48,7 +49,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
   });
   
   // Available transcription providers
-  const availableProviders: ProviderType[] = ['webspeech', 'assemblyai', 'deepgram'];
+  const availableProviders: ProviderType[] = ['webspeech', 'assemblyai', 'deepgram', 'realtimestt'];
 
   // Reload settings when username changes
   useEffect(() => {
@@ -65,7 +66,8 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
           'assemblyai': {},
           'deepgram': {},
           'whisper': {},
-          'azure': {}
+          'azure': {},
+          'realtimestt': {}
         };
         setProviderSettings(emptySettings);
       }
@@ -198,13 +200,13 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
         const username = localStorage.getItem('username');
         
         // Clear settings if user is logged out
-        if (!token || !username) {
-          setProviderSettings({
+        if (!token || !username) {          setProviderSettings({
             'webspeech': {},
             'assemblyai': {},
             'deepgram': {},
             'whisper': {},
-            'azure': {}
+            'azure': {},
+            'realtimestt': {}
           });
           return;
         }

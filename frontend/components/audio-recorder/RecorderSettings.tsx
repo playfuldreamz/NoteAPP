@@ -16,7 +16,8 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   'assemblyai': 'AssemblyAI',
   'deepgram': 'Deepgram',
   'whisper': 'Whisper',
-  'azure': 'Azure Speech'
+  'azure': 'Azure Speech',
+  'realtimestt': 'RealtimeSTT (Local Server)'
 };
 
 
@@ -54,11 +55,24 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
     }
   }, [selectedProvider, showSettings, getProviderSettings]);
 
-
   const validateKey = async (key: string, providerType: ProviderType, showSuccessToast = true) => {
-    if (providerType === 'webspeech') {
-        setIsKeyValid(true);
-        return true;
+    if (providerType === 'webspeech' || providerType === 'realtimestt') {
+        setIsValidatingKey(true);
+        try {
+            if (providerType === 'realtimestt') {
+                const provider = await TranscriptionProviderFactory.getProvider({ type: providerType });
+                const isAvailable = await provider.isAvailable();
+                setIsKeyValid(isAvailable);
+                if (!isAvailable && showSuccessToast) {
+                    toast.error('RealtimeSTT server is not available');
+                }
+                return isAvailable;
+            }
+            setIsKeyValid(true);
+            return true;
+        } finally {
+            setIsValidatingKey(false);
+        }
     }
     if (!key) {
         setIsKeyValid(null); // No key provided means neither valid nor invalid, just required
@@ -180,10 +194,8 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
               </>
             )}
           </div>
-        </div>
-
-        {/* Provider-specific Settings */}
-        {selectedProvider !== 'webspeech' && (
+        </div>        {/* Provider-specific Settings */}
+        {selectedProvider !== 'webspeech' && selectedProvider !== 'realtimestt' && (
           <div>
             <label htmlFor="api-key" className="block text-sm font-medium mb-1 dark:text-gray-200">
               API Key
@@ -219,6 +231,13 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
                 )}
               </button>
             </div>
+          </div>
+        )}
+        
+        {/* RealtimeSTT Info Message */}
+        {selectedProvider === 'realtimestt' && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-700 rounded">
+            Connects to a local RealtimeSTT server process. Ensure the server is running at {process.env.NEXT_PUBLIC_STT_DATA_URL || 'ws://localhost:8012'}
           </div>
         )}
         {/* Placeholder for other settings like language, etc. */}
