@@ -174,12 +174,10 @@ async def websocket_handler(websocket, path=None):
         except Exception as e:
             logger.error(f"Failed to send transcription: {e}")
 
-    # --- Assign Callbacks ---
-    # WARNING: Assigning to global instance per connection - see CONCURRENCY_NOTES.md
-    # This assignment should ideally happen once or be managed per client if concurrency is added.
-    # For now, we assign it here, accepting the single-user limitation.
-    recorder_instance.on_realtime_transcription_update = on_realtime_update_callback
-    logger.debug(f"Assigned realtime callback for {client_addr}")
+    # --- Assign Callbacks --- 
+    # MOVED: Callback assignment moved to after recorder.start() succeeds
+    # recorder_instance.on_realtime_transcription_update = on_realtime_update_callback
+    # logger.debug(f"Assigned realtime callback for {client_addr}")
 
     # --- Main Message Loop ---
     try:
@@ -192,8 +190,17 @@ async def websocket_handler(websocket, path=None):
                         recorder_instance.start() # Tell the recorder to start processing its buffer
                         is_client_recording_active = True
                         logger.info(f"Recorder started for {client_addr}.")
+                        
+                        # **** ASSIGN CALLBACK AFTER START ****
+                        recorder_instance.on_realtime_transcription_update = on_realtime_update_callback
+                        logger.info(f"Assigned realtime callback for {client_addr} AFTER recorder start.")
+                        # **** END ASSIGN CALLBACK ****
+
                     except Exception as start_err:
                         logger.error(f"Error starting recorder for {client_addr}: {start_err}", exc_info=True)
+                        # Clean up callback if assigned before error
+                        if recorder_instance and recorder_instance.on_realtime_transcription_update == on_realtime_update_callback:
+                             recorder_instance.on_realtime_transcription_update = None
                         await websocket.close(code=1011, reason="Server recorder start error")
                         return # Stop handling this connection
 
@@ -263,10 +270,10 @@ async def websocket_handler(websocket, path=None):
             except Exception as stop_err:
                 logger.error(f"Error stopping recorder for {client_addr}: {stop_err}", exc_info=True)
 
-        # Reset callbacks (imperfect with shared instance, but good practice)
+        # Reset callbacks (important if start failed before assignment or for general cleanup)
         if recorder_instance and recorder_instance.on_realtime_transcription_update == on_realtime_update_callback:
             recorder_instance.on_realtime_transcription_update = None
-            logger.debug(f"Reset recorder callbacks for connection {client_addr}")
+            logger.info(f"Reset recorder callback during cleanup for connection {client_addr}")
 
 
 # --- Main Application Logic ---
