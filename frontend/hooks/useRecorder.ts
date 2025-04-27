@@ -14,7 +14,7 @@ interface UseRecorderReturn {
   startTime: number | null;
   pausedTime: number;
   pauseStartTime: number | null;
-  startRecording: () => void;
+  startRecording: (manageStream?: boolean) => Promise<MediaStream | null>; // Return stream or null
   stopRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
@@ -70,75 +70,88 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
     };
   }, [audioStream]);
 
-  const setupAudioContext = async () => {
-    try {
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setAudioStream(stream);
-      
-      return true;
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      return false;
-    }
-  };
-
-  const startRecording = async () => {
+  const startRecording = async (manageStream: boolean = true): Promise<MediaStream | null> => {
+    console.log(`useRecorder: startRecording called with manageStream=${manageStream}`);
     if (isRecording && isPaused) {
-      // Resume recording
       resumeRecording();
-      return;
+      // Resuming doesn't return a new stream, rely on existing state if needed
+      // Or perhaps the caller should handle resume logic differently?
+      // For now, returning null as we didn't *acquire* a stream here.
+      return audioStream; // Return existing stream on resume
     }
-    
-    // Always create a new audio stream when starting a new recording
-    try {
-      // Stop any existing stream
-      if (audioStream) {
-        audioStream.getTracks().forEach(track => track.stop());
+
+    // Reset state for a new recording attempt
+    setIsRecording(false); // Reset flags first
+    setIsPaused(false);
+    setStartTime(null);
+    setPausedTime(0);
+    setElapsedTime(0);
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    // Stop any existing stream
+    if (audioStream) {
+      console.log("useRecorder: Stopping existing audio stream tracks.");
+      audioStream.getTracks().forEach(track => track.stop());
+      setAudioStream(null);
+    }
+
+    // Set recording state immediately for UI responsiveness
+    setIsRecording(true);
+    setStartTime(Date.now());
+
+    if (manageStream) {
+      console.log("useRecorder: Attempting to manage stream (getUserMedia)...");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("useRecorder: getUserMedia successful.");
+        setAudioStream(stream); // Set state
+        if (options.onRecordingStart) {
+          options.onRecordingStart();
+        }
+        return stream; // Return the acquired stream
+      } catch (error) {
+        console.error('useRecorder: Error accessing microphone:', error);
+        // Reset state fully on failure
+        setIsRecording(false);
+        setStartTime(null);
+        setAudioStream(null);
+        return null; // Indicate failure by returning null
       }
-      
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setAudioStream(stream);
-      
-      setIsRecording(true);
-      setIsPaused(false);
-      setStartTime(Date.now());
-      setPausedTime(0);
-      
-      // Call the onRecordingStart callback if provided
+    } else {
+      console.log("useRecorder: Not managing stream. Starting timer/UI state only.");
+      // If not managing stream, success means UI state is set
       if (options.onRecordingStart) {
         options.onRecordingStart();
       }
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
+      // No stream was acquired or requested in this mode
+      return null; // Indicate success (UI state set) but no stream returned
     }
   };
 
   const stopRecording = () => {
     // If recording is paused, treat this as a full stop
     if (isRecording) {
+      console.log("useRecorder: stopRecording called.");
       // Store the final elapsed time before stopping
       const finalElapsedTime = elapsedTime;
-      
+
       setIsRecording(false);
       setIsPaused(false);
       setStartTime(null);
       setPauseStartTime(null);
-      // Don't reset the elapsed time here, so it can be used for saving
-      // setElapsedTime(0); 
-      // setPausedTime(0);  
-      
+
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      
-      // Stop the audio tracks
+
+      // Stop the audio tracks if they exist
       if (audioStream) {
+        console.log("useRecorder: Stopping audio stream tracks on stopRecording.");
         audioStream.getTracks().forEach(track => track.stop());
+        setAudioStream(null); // Clear the stream state
       }
-      
+
       if (options.onRecordingStop) {
         options.onRecordingStop();
       }
@@ -189,19 +202,27 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
   };
 
   const resetRecording = () => {
+    console.log("useRecorder: resetRecording called.");
     setIsRecording(false);
     setIsPaused(false);
     setElapsedTime(0);
     setPausedTime(0);
     setStartTime(null);
     setPauseStartTime(null);
-    
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
     // Stop and clean up any existing audio stream
     if (audioStream) {
+      console.log("useRecorder: Stopping audio stream tracks on resetRecording.");
       audioStream.getTracks().forEach(track => track.stop());
       setAudioStream(null);
     }
   };
+
 
   return {
     isRecording,
