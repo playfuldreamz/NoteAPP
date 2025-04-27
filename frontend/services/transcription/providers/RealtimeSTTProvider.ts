@@ -119,15 +119,33 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
   }
 
   async start(stream?: MediaStream): Promise<void> {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      throw new Error('RealtimeSTTProvider: WebSocket not connected. Call initialize() first.');
+    console.log("RealtimeSTTProvider: Start called.");
+
+    // --- Ensure WebSocket is connected --- START
+    try {
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        console.log("RealtimeSTTProvider: WebSocket not connected or closed. Re-initializing...");
+        await this.initialize(); // Wait for initialization to complete
+        // Check again after attempting to initialize
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+          throw new Error('RealtimeSTTProvider: Failed to re-establish WebSocket connection.');
+        }
+        console.log("RealtimeSTTProvider: WebSocket re-initialized successfully.");
+      }
+    } catch (initError) {
+      console.error("RealtimeSTTProvider: Error during re-initialization:", initError);
+      this.cleanup(); // Clean up any partial state
+      throw initError; // Re-throw the error to be caught by the caller
     }
+    // --- Ensure WebSocket is connected --- END
+
+    // --- Existing checks and logic --- START
     if (!stream) {
         throw new Error('RealtimeSTTProvider: MediaStream is required to start recording.');
     }
     if (this.audioContext) {
-        console.warn("RealtimeSTTProvider: Audio context already exists. Reusing or restarting might be needed.");
-        await this.stopAudioProcessing();
+        console.warn("RealtimeSTTProvider: Audio context already exists. Stopping previous processing first.");
+        await this.stopAudioProcessing(); // Ensure previous audio processing is fully stopped
     }
 
     console.log("RealtimeSTTProvider: Starting audio processing...");
@@ -138,12 +156,16 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
         const sourceSampleRate = this.audioContext.sampleRate;
         console.log(`RealtimeSTTProvider: Source Sample Rate: ${sourceSampleRate}, Target: ${this.targetSampleRate}`);
 
+        // --- Existing audio processing setup --- 
+        // ... (createMediaStreamSource, createScriptProcessor, onaudioprocess, connect nodes)
         this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
         this.processorNode = this.audioContext.createScriptProcessor(this.bufferSize, 1, 1);
 
         this.processorNode.onaudioprocess = (event: AudioProcessingEvent) => {
             if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-                return;
+                // Added check here too, although initialize should handle it.
+                // console.warn("RealtimeSTTProvider: WebSocket closed during audio processing.");
+                return; 
             }
 
             const inputData = event.inputBuffer.getChannelData(0);
@@ -152,25 +174,31 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
             const pcm16Data = new Int16Array(outputLength);
             let outputIndex = 0;
 
+            // Simple averaging for downsampling (consider a better algorithm if needed)
             while (outputIndex < outputLength) {
                 let sum = 0;
                 const nextInputIndex = Math.round((outputIndex + 1) * downsampleFactor);
-                const count = nextInputIndex - Math.round(outputIndex * downsampleFactor);
+                // Ensure indices are within bounds
+                const startIndex = Math.min(Math.max(0, Math.round(outputIndex * downsampleFactor)), inputData.length);
+                const endIndex = Math.min(Math.max(startIndex, nextInputIndex), inputData.length);
+                const count = endIndex - startIndex;
 
-                for (let i = Math.round(outputIndex * downsampleFactor); i < nextInputIndex && i < inputData.length; i++) {
+                for (let i = startIndex; i < endIndex; i++) {
                     sum += inputData[i];
                 }
+                // Avoid division by zero
                 const average = count > 0 ? sum / count : 0;
-                pcm16Data[outputIndex] = Math.max(-32768, Math.min(32767, Math.round(average * 32767)));
+                // Clamp values to int16 range
+                pcm16Data[outputIndex] = Math.max(-32768, Math.min(32767, Math.round(average * 32767))); 
                 outputIndex++;
             }
 
-            if (pcm16Data.length > 0) {
+            if (pcm16Data.length > 0 && this.socket && this.socket.readyState === WebSocket.OPEN) {
                 const metadata: AudioMetadata = { sampleRate: this.targetSampleRate };
                 const metadataJson = JSON.stringify(metadata);
                 const metadataBytes = new TextEncoder().encode(metadataJson);
                 const metadataLengthBytes = new ArrayBuffer(4);
-                new DataView(metadataLengthBytes).setUint32(0, metadataBytes.byteLength, true);
+                new DataView(metadataLengthBytes).setUint32(0, metadataBytes.byteLength, true); // Use little-endian
 
                 const messageBlob = new Blob([metadataLengthBytes, metadataBytes, pcm16Data.buffer]);
                 this.socket.send(messageBlob);
@@ -178,17 +206,21 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
         };
 
         this.sourceNode.connect(this.processorNode);
-        this.processorNode.connect(this.audioContext.destination);
+        this.processorNode.connect(this.audioContext.destination); // Connect to destination to potentially enable audio monitoring if needed, or keep disconnected if not
 
         console.log("RealtimeSTTProvider: Audio processing started.");
+        // --- Existing audio processing setup --- END
 
     } catch (error) {
          console.error("RealtimeSTTProvider: Error setting up audio processing:", error);
-         this.cleanup();
+         this.cleanup(); // Ensure cleanup on error
          if (this.onErrorCallback) {
              this.onErrorCallback(error instanceof Error ? error : new Error("Audio processing setup failed"));
          }
+         // Re-throw the error so the calling context knows setup failed
+         throw error;
     }
+    // --- Existing checks and logic --- END
   }
 
   private async stopAudioProcessing(): Promise<void> {
