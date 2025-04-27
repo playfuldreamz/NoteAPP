@@ -19,6 +19,7 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
   private wsUrl: string;
   private targetSampleRate = 16000; // Rate expected by the Python server/RealtimeSTT
   private bufferSize = 1024; // Audio processing buffer size
+  private isPaused = false; // Add this flag
 
   constructor(config: ProviderConfig) {
     // Use environment variable for URL, fallback to default localhost
@@ -120,6 +121,7 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
 
   async start(stream?: MediaStream): Promise<void> {
     console.log("RealtimeSTTProvider: Start called.");
+    this.isPaused = false; // Ensure not paused when starting
 
     // --- Ensure WebSocket is connected --- START
     try {
@@ -162,6 +164,12 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
         this.processorNode = this.audioContext.createScriptProcessor(this.bufferSize, 1, 1);
 
         this.processorNode.onaudioprocess = (event: AudioProcessingEvent) => {
+            // **** Check if paused ****
+            if (this.isPaused) {
+                return; // Do not process or send audio if paused
+            }
+            // **** End Check ****
+
             if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
                 // Added check here too, although initialize should handle it.
                 // console.warn("RealtimeSTTProvider: WebSocket closed during audio processing.");
@@ -223,6 +231,41 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
     // --- Existing checks and logic --- END
   }
 
+  // --- Add pause() method ---
+  async pause(): Promise<void> {
+    console.log("RealtimeSTTProvider: Pausing audio sending.");
+    this.isPaused = true;
+    // Do NOT stop audio processing or close WebSocket here
+  }
+  // --- End pause() method ---
+
+  // --- Add resume() method ---
+  async resume(): Promise<void> {
+    console.log("RealtimeSTTProvider: Resuming audio sending.");
+    this.isPaused = false;
+    // Ensure WebSocket is still open, re-initialize if necessary?
+    // For now, assume the connection stays open during pause.
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        console.warn("RealtimeSTTProvider: WebSocket closed during pause. Attempting re-initialization on resume...");
+        try {
+            await this.initialize();
+            if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+                throw new Error("Failed to re-establish WebSocket connection on resume.");
+            }
+            console.log("RealtimeSTTProvider: WebSocket re-initialized successfully on resume.");
+        } catch (error) {
+            console.error("RealtimeSTTProvider: Error re-initializing WebSocket on resume:", error);
+            if (this.onErrorCallback) {
+                this.onErrorCallback(error instanceof Error ? error : new Error("WebSocket resume failed"));
+            }
+            // Optionally, try to cleanup fully
+            await this.cleanup();
+            throw error; // Re-throw
+        }
+    }
+  }
+  // --- End resume() method ---
+
   private async stopAudioProcessing(): Promise<void> {
       if (this.processorNode) {
           this.processorNode.disconnect();
@@ -252,7 +295,8 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
   }
 
   async stop(): Promise<void> {
-    console.log("RealtimeSTTProvider: Stopping...");
+    console.log("RealtimeSTTProvider: Stopping (full stop)..."); // Clarify log
+    this.isPaused = false; // Reset pause state on full stop
     await this.stopAudioProcessing();
 
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {

@@ -160,7 +160,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
 
   const pauseRecording = () => {
     if (!isRecording || isPaused) return;
-    
+    console.log("useRecorder: pauseRecording called."); // Added log
+
     // When pausing, we need to:
     // 1. Calculate how much time has elapsed since we started/resumed recording
     // 2. Add this to our accumulated pausedTime
@@ -173,7 +174,13 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
     
     setIsPaused(true);
     setPauseStartTime(Date.now());
-    
+
+    // Disable audio tracks instead of stopping them
+    if (audioStream) {
+      console.log("useRecorder: Disabling audio stream tracks.");
+      audioStream.getTracks().forEach(track => track.enabled = false);
+    }
+
     // Clear the timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -187,7 +194,14 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
 
   const resumeRecording = () => {
     if (!isRecording || !isPaused) return;
-    
+    console.log("useRecorder: resumeRecording called."); // Added log
+
+    // Enable audio tracks
+    if (audioStream) {
+      console.log("useRecorder: Enabling audio stream tracks.");
+      audioStream.getTracks().forEach(track => track.enabled = true);
+    }
+
     setIsPaused(false);
     const now = Date.now();
     
@@ -196,6 +210,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
     setStartTime(now);
     setPauseStartTime(null);
     
+    // Call the callback *after* enabling tracks
     if (options.onRecordingResume) {
       options.onRecordingResume();
     }
