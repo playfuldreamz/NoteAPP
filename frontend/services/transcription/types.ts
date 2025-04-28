@@ -10,6 +10,7 @@ export interface TranscriptionOptions {
   language?: string;
   maxAlternatives?: number;
   audioStream?: MediaStream;
+  wsUrl?: string;  // WebSocket URL for RealtimeSTT provider
   
   // New option - defaults to true
   automaticEnhancement?: boolean;
