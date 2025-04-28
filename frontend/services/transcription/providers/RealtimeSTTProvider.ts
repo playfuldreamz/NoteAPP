@@ -174,31 +174,28 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
                 // Added check here too, although initialize should handle it.
                 // console.warn("RealtimeSTTProvider: WebSocket closed during audio processing.");
                 return; 
+            }            const inputData = event.inputBuffer.getChannelData(0);
+            const ratio = sourceSampleRate / this.targetSampleRate;
+            const outputLength = Math.floor(inputData.length / ratio);
+            
+            // Create output buffer for linear interpolation results
+            const outputData = new Float32Array(outputLength);
+            
+            // Perform linear interpolation
+            for (let i = 0; i < outputLength; i++) {
+                const inputIndex = i * ratio;
+                const index1 = Math.floor(inputIndex);
+                const index2 = Math.min(index1 + 1, inputData.length - 1);
+                const weight = inputIndex - index1;
+                
+                // Linear interpolation formula
+                outputData[i] = inputData[index1] * (1 - weight) + inputData[index2] * weight;
             }
-
-            const inputData = event.inputBuffer.getChannelData(0);
-            const downsampleFactor = sourceSampleRate / this.targetSampleRate;
-            const outputLength = Math.floor(inputData.length / downsampleFactor);
+            
+            // Convert to Int16Array with clamping
             const pcm16Data = new Int16Array(outputLength);
-            let outputIndex = 0;
-
-            // Simple averaging for downsampling (consider a better algorithm if needed)
-            while (outputIndex < outputLength) {
-                let sum = 0;
-                const nextInputIndex = Math.round((outputIndex + 1) * downsampleFactor);
-                // Ensure indices are within bounds
-                const startIndex = Math.min(Math.max(0, Math.round(outputIndex * downsampleFactor)), inputData.length);
-                const endIndex = Math.min(Math.max(startIndex, nextInputIndex), inputData.length);
-                const count = endIndex - startIndex;
-
-                for (let i = startIndex; i < endIndex; i++) {
-                    sum += inputData[i];
-                }
-                // Avoid division by zero
-                const average = count > 0 ? sum / count : 0;
-                // Clamp values to int16 range
-                pcm16Data[outputIndex] = Math.max(-32768, Math.min(32767, Math.round(average * 32767))); 
-                outputIndex++;
+            for (let i = 0; i < outputLength; i++) {
+                pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.round(outputData[i] * 32767)));
             }
 
             if (pcm16Data.length > 0 && this.socket && this.socket.readyState === WebSocket.OPEN) {
@@ -209,8 +206,7 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
                 new DataView(metadataLengthBytes).setUint32(0, metadataBytes.byteLength, true); // Use little-endian
 
                 const messageBlob = new Blob([metadataLengthBytes, metadataBytes, pcm16Data.buffer]);
-                
-                // Add try...catch around the send operation
+                // Send the message blob to the server
                 try {
                   this.socket.send(messageBlob);
                 } catch (sendError) {
