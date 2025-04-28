@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { toast } from 'react-toastify';
 import { Mic, Loader } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { formatUTCTimestampToLongLocal } from '../../utils/dateUtils';
 
 interface Transcript {
   id: number;
@@ -100,7 +101,7 @@ const RecentRecordingsWidget: React.FC<RecentRecordingsWidgetProps> = ({ onItemC
                     </p>
                   )}
                   <p className="text-xs text-gray-400 dark:text-gray-500">
-                    {new Date(transcript.date).toLocaleString()} • {transcript.duration ? `${Math.floor(transcript.duration / 60)}:${(transcript.duration % 60).toString().padStart(2, '0')}` : '0:00'}
+                    {formatUTCTimestampToLongLocal(transcript.date)} • {transcript.duration ? `${Math.floor(transcript.duration / 60)}:${(transcript.duration % 60).toString().padStart(2, '0')}` : '0:00'}
                   </p>
                 </div>
               </div>

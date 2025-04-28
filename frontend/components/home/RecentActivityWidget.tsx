@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { toast } from 'react-toastify';
 import { Activity, FileText, Loader } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { formatUTCTimestampToLongLocal } from '../../utils/dateUtils';
 
 interface Note {
   id: number;
@@ -100,7 +101,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({ onItemClick
                     </p>
                   )}
                   <p className="text-xs text-gray-400 dark:text-gray-500">
-                    {new Date(note.timestamp).toLocaleDateString()}
+                    {formatUTCTimestampToLongLocal(note.timestamp)}
                   </p>
                 </div>
               </div>

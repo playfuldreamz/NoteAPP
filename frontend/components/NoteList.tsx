@@ -2,9 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from './modal/index';
-import { ChevronUp, Trash2, Eye, Search, Sparkles, Download } from 'lucide-react';
+import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
 import TranscriptActions from './TranscriptActions';
-import { generateTranscriptTitle, updateNoteTitle } from '../services/ai';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 import { deleteResource, bulkDeleteResources } from '../services/deleteService';
@@ -60,7 +59,6 @@ const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate
   }, []);
 
   const handleTagsUpdate = useCallback((updatedTags: Tag[]) => {
-    // Update the tags for the selected note in both filteredNotes and visibleNotes
     const updateNote = (note: Note) => {
       if (note.id === selectedNoteId) {
         return { ...note, tags: updatedTags };
@@ -115,32 +113,6 @@ const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate
       </div>
     );
   }, [expandedTags, toggleTagsExpansion]);
-
-  const renderTags = (note: Note) => {
-    const tags = note.tags || [];
-    const maxVisibleTags = 3;
-    const showAll = expandedTags[note.id] || false;
-    
-    return (
-      <div className="flex flex-col gap-2 mt-2">
-        <div className="flex flex-wrap gap-2">
-          {(showAll ? tags : tags.slice(0, maxVisibleTags)).map(tag => (
-            <span key={tag.id} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-              {tag.name}
-            </span>
-          ))}
-        </div>
-        {tags.length > maxVisibleTags && (
-          <button
-            onClick={() => toggleTagsExpansion(note.id)}
-            className="text-xs text-blue-500 hover:underline self-start"
-          >
-            {showAll ? 'Show less' : `+${tags.length - maxVisibleTags} more`}
-          </button>
-        )}
-      </div>
-    );
-  };
 
   const toggleSelection = (noteId: number) => {
     setSelectedNoteIds(prev => {
@@ -208,9 +180,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate
       if (!token) {
         toast.error('Authentication required');
         return;
-      }
-
-      await deleteResource('note', id, token);
+      }      await deleteResource('note', id, token);
       // Update local state to remove the deleted note
       setFilteredNotes(prev => {
         const newFiltered = prev.filter(n => n.id !== id);
@@ -227,6 +197,9 @@ const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate
         }
         return remainingNotes;
       });
+      
+      // Call the onDelete callback
+      onDelete(id);
       
       toast.success('Note deleted successfully!');
     } catch (error) {
