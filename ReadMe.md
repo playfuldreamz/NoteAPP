@@ -35,6 +35,54 @@ This repository contains a full-stack web application for taking and organizing 
 * Xenova local embedding model (no API key required)
 * Vector embeddings for semantic search
 
+## Transcription Providers
+
+The app supports multiple transcription providers for voice-to-text conversion:
+
+1. **WebSpeech** (Default, Browser-based)
+   - No setup required
+   - Works offline
+   - Language support depends on browser
+
+2. **AssemblyAI**
+   - Requires API key
+   - High accuracy
+   - Real-time transcription
+   - Set up in Recording Settings → Transcription
+
+3. **Deepgram**
+   - Requires API key
+   - Multiple language models
+   - Real-time transcription
+   - Set up in Recording Settings → Transcription
+
+4. **RealtimeSTT** (Local Server)
+   - No API key required
+   - Runs locally
+   - Requires Python environment setup
+   - Great for privacy and offline use
+
+### Setting up RealtimeSTT Server
+
+1. Create and activate Python virtual environment:
+   ```powershell
+   cd stt-server
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1
+   ```
+
+2. Install requirements:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+
+3. Start the server:
+   ```powershell
+   python noteapp_stt_server.py
+   ```
+
+4. In the app, select "RealtimeSTT" as your transcription provider in Settings.
+
 ## Setup and Installation
 
 1. **Clone the repository:**
