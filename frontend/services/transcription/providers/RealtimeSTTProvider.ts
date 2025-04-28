@@ -209,7 +209,19 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
                 new DataView(metadataLengthBytes).setUint32(0, metadataBytes.byteLength, true); // Use little-endian
 
                 const messageBlob = new Blob([metadataLengthBytes, metadataBytes, pcm16Data.buffer]);
-                this.socket.send(messageBlob);
+                
+                // Add try...catch around the send operation
+                try {
+                  this.socket.send(messageBlob);
+                } catch (sendError) {
+                  console.error("RealtimeSTTProvider: Error sending audio data:", sendError);
+                  // Optionally, call onErrorCallback or attempt to reconnect/cleanup
+                  if (this.onErrorCallback) {
+                    this.onErrorCallback(sendError instanceof Error ? sendError : new Error('Failed to send audio data'));
+                  }
+                  // Consider stopping the processing loop or attempting recovery here
+                  // For now, just log the error.
+                }
             }
         };
 
