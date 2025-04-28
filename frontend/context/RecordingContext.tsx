@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { useRecorder } from '../hooks/useRecorder';
 import { useTranscriptionManager } from '../hooks/useTranscriptionManager';
 import { useTranscriptSaver } from '../hooks/useTranscriptSaver';
@@ -63,9 +63,8 @@ export function RecordingProvider({ children }: { children: React.ReactNode }) {
       transcription.resumeTranscription(transcription.originalTranscript);
     }
   });
-
   const transcription = useTranscriptionManager({
-    onTranscriptUpdate: (transcript) => {
+    onTranscriptUpdate: () => {
       // This will be used by components that need the transcript
     }
   });
