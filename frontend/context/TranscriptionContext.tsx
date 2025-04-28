@@ -45,7 +45,8 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
     const username = localStorage.getItem('username');
     const key = username ? `${PROVIDER_SETTINGS_KEY}_${username}` : PROVIDER_SETTINGS_KEY;
     const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : {};
+    // Check for null, undefined, AND the literal string "undefined" before parsing
+    return saved && saved !== 'undefined' ? JSON.parse(saved) : {};
   });
   
   // Available transcription providers
