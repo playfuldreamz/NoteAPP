@@ -24,8 +24,29 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
     this.wsUrl = options?.wsUrl || process.env.NEXT_PUBLIC_STT_DATA_URL || 'ws://localhost:8012';
     console.log(`RealtimeSTTProvider initialized. WebSocket URL: ${this.wsUrl}`);
   }
-
+  // Cache availability check results to reduce WebSocket connections
+  private static lastAvailabilityCheck: number = 0;
+  private static isServerAvailable: boolean | null = null;
+  private static availabilityCacheTimeMs: number = 30000; // Cache for 30 seconds
+  
   async isAvailable(): Promise<boolean> {
+    const now = Date.now();
+    
+    // Use cached result if available and not too old
+    if (RealtimeSTTProvider.isServerAvailable !== null && 
+        (now - RealtimeSTTProvider.lastAvailabilityCheck < RealtimeSTTProvider.availabilityCacheTimeMs)) {
+      console.log(`RealtimeSTT server check: Using cached result (${RealtimeSTTProvider.isServerAvailable ? 'available' : 'unavailable'}).`);
+      return RealtimeSTTProvider.isServerAvailable;
+    }
+    
+    // If we already have an open WebSocket connection, we know the server is available
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      console.log("RealtimeSTT server check: Already connected, server is available.");
+      RealtimeSTTProvider.isServerAvailable = true;
+      RealtimeSTTProvider.lastAvailabilityCheck = now;
+      return true;
+    }
+    
     // Basic check: Can we establish a quick connection?
     return new Promise((resolve) => {
       try {
@@ -33,11 +54,15 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
         testSocket.onopen = () => {
           testSocket.close();
           console.log("RealtimeSTT server check: Connection successful.");
+          RealtimeSTTProvider.isServerAvailable = true;
+          RealtimeSTTProvider.lastAvailabilityCheck = now;
           resolve(true);
         };
         testSocket.onerror = (error) => {
           console.error("RealtimeSTT server check: Connection failed.", error);
           testSocket.close();
+          RealtimeSTTProvider.isServerAvailable = false;
+          RealtimeSTTProvider.lastAvailabilityCheck = now;
           resolve(false);
         };
         // Timeout if connection takes too long
@@ -45,30 +70,68 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
              if (testSocket.readyState !== WebSocket.OPEN && testSocket.readyState !== WebSocket.CLOSED) {
                   console.warn("RealtimeSTT server check: Connection attempt timed out.");
                   testSocket.close();
+                  RealtimeSTTProvider.isServerAvailable = false;
+                  RealtimeSTTProvider.lastAvailabilityCheck = now;
                   resolve(false);
              }
         }, 2000); // 2 second timeout
       } catch (error) {
         console.error("RealtimeSTT server check: Error creating WebSocket.", error);
+        RealtimeSTTProvider.isServerAvailable = false;
+        RealtimeSTTProvider.lastAvailabilityCheck = now;
         resolve(false);
       }
     });
-  }
+  }  // For throttling reconnection attempts
+  private static lastConnectionAttempt = 0;
+  private static connectionThrottleMs = 5000; // Increased throttling to 5 seconds
+  private static isConnecting = false;
+  
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async initialize(options?: TranscriptionOptions): Promise<void> {
     console.log("RealtimeSTTProvider: Initializing...");
     return new Promise((resolve, reject) => {
+      // If socket is already open, resolve immediately
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         console.log("RealtimeSTTProvider: Already initialized.");
         resolve();
         return;
       }
+      
+      // If socket is connecting, wait for it
+      if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
+        console.log("RealtimeSTTProvider: WebSocket connection in progress...");
+        this.socket.onopen = () => {
+          console.log("RealtimeSTTProvider: WebSocket connection now open.");
+          resolve();
+        };
+        this.socket.onerror = (event) => {
+          console.error("RealtimeSTTProvider: WebSocket connection error during wait:", event);
+          reject(new Error("WebSocket connection error"));
+        };
+        return;
+      }
+      
+      // Throttle connection attempts to prevent rapid reconnects
+      const now = Date.now();
+      if (RealtimeSTTProvider.isConnecting || 
+          (now - RealtimeSTTProvider.lastConnectionAttempt < RealtimeSTTProvider.connectionThrottleMs)) {
+        console.log("RealtimeSTTProvider: Connection attempt throttled. Trying again shortly.");
+        setTimeout(() => this.initialize(options).then(resolve).catch(reject), 
+                   RealtimeSTTProvider.connectionThrottleMs);
+        return;
+      }
+      
+      // Update connection attempt tracking
+      RealtimeSTTProvider.lastConnectionAttempt = now;
+      RealtimeSTTProvider.isConnecting = true;
 
       try {
         this.socket = new WebSocket(this.wsUrl);
 
         this.socket.onopen = () => {
           console.log("RealtimeSTTProvider: WebSocket connection opened.");
+          RealtimeSTTProvider.isConnecting = false;
           resolve();
         };
 
@@ -91,10 +154,9 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
               this.onErrorCallback(new Error("Error parsing server message"));
             }
           }
-        };
-
-        this.socket.onerror = (event) => {
+        };        this.socket.onerror = (event) => {
           console.error("RealtimeSTTProvider: WebSocket error:", event);
+          RealtimeSTTProvider.isConnecting = false;
           const error = new Error("WebSocket connection error");
           if (this.onErrorCallback) {
             this.onErrorCallback(error);
@@ -355,24 +417,39 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
   onError(callback: (error: Error) => void): void {
     this.onErrorCallback = callback;
   }
-
+  // Track cleanups to prevent duplicates
+  private static inCleanup = false;
+  
   async cleanup(): Promise<void> {
-    console.log("RealtimeSTTProvider: Cleaning up resources...");
-    await this.stopAudioProcessing();
-
-    if (this.socket) {
-      if (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) {
-        this.socket.close();
-        console.log("RealtimeSTTProvider: WebSocket connection closed during cleanup.");
-      }
-      this.socket.onopen = null;
-      this.socket.onmessage = null;
-      this.socket.onerror = null;
-      this.socket.onclose = null;
-      this.socket = null;
+    // Prevent multiple simultaneous cleanups
+    if (RealtimeSTTProvider.inCleanup) {
+      console.log("RealtimeSTTProvider: Cleanup already in progress, skipping duplicate request");
+      return;
     }
-    this.onResultCallback = null;
-    this.onErrorCallback = null;
-    console.log("RealtimeSTTProvider: Cleanup complete.");
+    
+    RealtimeSTTProvider.inCleanup = true;
+    console.log("RealtimeSTTProvider: Cleaning up resources...");
+    
+    try {
+      await this.stopAudioProcessing();
+
+      if (this.socket) {
+        if (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) {
+          this.socket.close();
+          console.log("RealtimeSTTProvider: WebSocket connection closed during cleanup.");
+        }
+        this.socket.onopen = null;
+        this.socket.onmessage = null;
+        this.socket.onerror = null;
+        this.socket.onclose = null;
+        this.socket = null;
+      }
+      this.onResultCallback = null;
+      this.onErrorCallback = null;
+      console.log("RealtimeSTTProvider: Cleanup complete.");
+    } finally {
+      RealtimeSTTProvider.isConnecting = false;
+      RealtimeSTTProvider.inCleanup = false;
+    }
   }
 }

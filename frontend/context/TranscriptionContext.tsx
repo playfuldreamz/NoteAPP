@@ -41,9 +41,8 @@ const PROVIDER_DISPLAY_NAMES: Record<ProviderType, string> = {
   'realtimestt': 'RealtimeSTT (Local Server)'
 };
 
-export function TranscriptionProviderContext({ children }: { children: React.ReactNode }) {
-  const [currentProvider, setCurrentProvider] = useState<ProviderType>('webspeech');
-  const [activeProvider, setActiveProvider] = useState<ProviderType>('webspeech');
+export function TranscriptionProviderContext({ children }: { children: React.ReactNode }) {  const [currentProvider, setCurrentProvider] = useState<ProviderType>('realtimestt');
+  const [activeProvider, setActiveProvider] = useState<ProviderType>('realtimestt');
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [providerSettings, setProviderSettings] = useState<Record<ProviderType, ProviderSettings>>(() => {
@@ -90,7 +89,6 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
     const key = username ? `${PROVIDER_SETTINGS_KEY}_${username}` : PROVIDER_SETTINGS_KEY;
     localStorage.setItem(key, JSON.stringify(providerSettings));
   }, [providerSettings]);
-
   const initializeProvider = useCallback(async (type: ProviderType) => {
     try {
       setError(null);
@@ -115,8 +113,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
       };
 
       const provider = await TranscriptionProviderFactory.getProvider(config);
-      
-      // Check if provider is available
+        // Check if provider is available
       const isAvailable = await provider.isAvailable();
       if (!isAvailable) {
         throw new Error(`Provider ${type} is not available`);
@@ -124,18 +121,39 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
 
       setIsInitialized(true);
       setActiveProvider(type);
-      // Only show toast when switching from one provider to another (not on initial load)
-      if (currentProvider !== type) {
+      
+      // Only show toast when explicitly switching providers (not on initial load or automatic fallback)
+      if (currentProvider !== type && type !== 'webspeech' && !window.location.pathname.includes('login')) {
         toast.success(`Successfully switched to ${PROVIDER_DISPLAY_NAMES[type]} provider`);
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to initialize provider');
       setError(error);
+      
+      // Special handling for RealtimeSTT failures to avoid excessive error messages
+      if (type === 'realtimestt') {
+        console.warn('RealtimeSTT server not available, falling back to WebSpeech provider');
+        
+        // Update state to reflect the fallback
+        setCurrentProvider('webspeech');
+        
+        // Don't show error toast for initial fallback from RealtimeSTT on page load
+        if (!window.location.pathname.includes('login')) {
+          toast.info('RealtimeSTT server not available, using Web Speech instead');
+        }
+        
+        // Fall back to WebSpeech
+        initializeProvider('webspeech');
+        return;
+      }
+      
+      // Show error only for non-realtimestt providers
       toast.error(error.message);
       
       // Fall back to WebSpeech if available and not already trying it
       if (type !== 'webspeech') {
         console.warn('Falling back to WebSpeech provider');
+        setCurrentProvider('webspeech');
         initializeProvider('webspeech');
       }
     }
@@ -250,13 +268,30 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
     };
 
     loadSettingsFromDB();
-  }, []);
-  // Initialize WebSpeech provider on mount or when currentProvider changes
+  }, []);  // Initialize provider on mount or when currentProvider changes
   useEffect(() => {
-    if (currentProvider === 'webspeech') {
-      initializeProvider('webspeech');
+    // Initialize the selected provider
+    let mounted = true;
+    
+    // Only initialize providers if we're not on login page to prevent unnecessary connections
+    if (!window.location.pathname.includes('login')) {
+      // Use timeout to delay initialization slightly, which helps prevent
+      // multiple initializations during page transitions
+      const timer = setTimeout(() => {
+        if (mounted) {
+          initializeProvider(currentProvider);
+        }
+      }, 500);
+      
+      return () => {
+        mounted = false;
+        clearTimeout(timer);
+        TranscriptionProviderFactory.cleanup();
+      };
     }
+    
     return () => {
+      mounted = false;
       TranscriptionProviderFactory.cleanup();
     };
   }, [initializeProvider, currentProvider]);

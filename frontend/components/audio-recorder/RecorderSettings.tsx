@@ -8,7 +8,7 @@ import type { ProviderType } from '../../services/transcription/types';
 
 interface RecorderSettingsProps {
     showSettings: boolean;
-    toggleSettings: () => void;
+    // Removed unused toggleSettings prop
 }
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -24,7 +24,7 @@ const isKeyRequiredProvider = (provider: ProviderType): boolean => {
   return provider !== 'webspeech' && provider !== 'realtimestt';
 };
 
-const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggleSettings }) => {
+const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings }) => {
   const {
     provider: selectedProvider,
     setProvider,
@@ -32,7 +32,7 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
     availableProviders,
     getProviderSettings,
     updateProviderSettings,
-    activeProvider,
+    // Removed unused activeProvider
   } = useTranscription();
 
   const { isRecording } = useRecording(); // Add this to get recording state
@@ -44,35 +44,53 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
   // Load saved API key when provider changes or settings are shown
   useEffect(() => {
     const settings = getProviderSettings(selectedProvider);
+    
+    // Handle API key providers
     if (settings?.apiKey) {
       setApiKeyInput(settings.apiKey);
-      // Re-validate if settings are shown or provider changes
-      if (showSettings) {
-          validateKey(settings.apiKey, selectedProvider, false); // Don't show toast on initial load
-      } else {
-         setIsKeyValid(null); // Reset validation status when settings closed
-      }
     } else {
       setApiKeyInput('');
+    }
+    
+    // Validate the provider when settings are shown or provider changes
+    if (showSettings) {
+      if (selectedProvider === 'realtimestt') {
+        // For RealtimeSTT, validate server connection
+        validateKey('', selectedProvider, false); // Don't show toast on initial load
+      } else if (settings?.apiKey) {
+        validateKey(settings.apiKey, selectedProvider, false);
+      } else {
+        setIsKeyValid(selectedProvider === 'webspeech' ? true : null);
+      }
+    } else {
+      // Reset validation status when settings closed
       setIsKeyValid(null);
     }
   }, [selectedProvider, showSettings, getProviderSettings]);
-
   const validateKey = async (key: string, providerType: ProviderType, showSuccessToast = true) => {
-    if (providerType === 'webspeech' || providerType === 'realtimestt') {
+    if (providerType === 'webspeech') {
+        // WebSpeech is always available in supported browsers
+        setIsKeyValid(true);
+        return true;
+    }
+    
+    if (providerType === 'realtimestt') {
         setIsValidatingKey(true);
         try {
-            if (providerType === 'realtimestt') {
-                const provider = await TranscriptionProviderFactory.getProvider({ type: providerType });
-                const isAvailable = await provider.isAvailable();
-                setIsKeyValid(isAvailable);
-                if (!isAvailable && showSuccessToast) {
-                    toast.error('RealtimeSTT server is not available');
-                }
-                return isAvailable;
+            // Use the existing cached provider if possible
+            const provider = await TranscriptionProviderFactory.getProvider({ type: providerType });
+            const isAvailable = await provider.isAvailable();
+            
+            console.log(`RealtimeSTT validation result: ${isAvailable ? 'available' : 'unavailable'}`);
+            setIsKeyValid(isAvailable);
+            
+            if (isAvailable && showSuccessToast) {
+                toast.success('RealtimeSTT server is available');
+            } else if (!isAvailable && showSuccessToast) {
+                toast.error('RealtimeSTT server is not available');
             }
-            setIsKeyValid(true);
-            return true;
+            
+            return isAvailable;
         } finally {
             setIsValidatingKey(false);
         }
@@ -95,17 +113,22 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
         toast.success('API key validated successfully!');
       } else if (!isAvailable) {
         toast.error('Invalid API key');
-      }
-      return isAvailable;
-    } catch (error: any) {
+      }      return isAvailable;    } catch (error: unknown) {
       console.error('API key validation error:', error);
       setIsKeyValid(false);
-      if (error.type === 'PAYMENT_REQUIRED') {
+      
+      // Type guard to safely access error properties
+      if (typeof error === 'object' && error !== null && 'type' in error && 
+          (error as Record<string, unknown>).type === 'PAYMENT_REQUIRED') {
+          const errorObj = error as Record<string, unknown>;
+          const errorMessage = 'message' in errorObj ? String(errorObj.message) : 'Payment required';
+          const paymentLink = 'link' in errorObj ? String(errorObj.link) : '#';
+          
           toast.error(
             <div>
-              <p>{error.message}</p>
+              <p>{errorMessage}</p>
               <a
-                href={error.link}
+                href={paymentLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:text-blue-600 underline mt-2 block"
