@@ -8,6 +8,8 @@ export class DeepgramProvider implements TranscriptionProvider {
   private onErrorCallback: ((error: Error) => void) | null = null;
   private apiKey: string;
   private finalTranscript: string = '';
+  private isPaused: boolean = false;
+  pausedTranscript: string = ''; // Changed to public to match interface
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -45,6 +47,7 @@ export class DeepgramProvider implements TranscriptionProvider {
     }
   }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async initialize(options?: TranscriptionOptions): Promise<void> {
   // No need to request microphone access here
   this.finalTranscript = '';
@@ -52,9 +55,11 @@ async initialize(options?: TranscriptionOptions): Promise<void> {
 
 async start(): Promise<void> {
   try {
-    // Reset the final transcript when starting a new session
+    // Reset states
     this.finalTranscript = '';
-    
+    this.isPaused = false;
+    this.pausedTranscript = '';
+
     // Request microphone access
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     
@@ -117,9 +122,8 @@ async start(): Promise<void> {
             });
           }
         }
-      };
-
-      this.socket.onerror = (event: Event) => {
+      };      
+      this.socket.onerror = () => {
         if (this.onErrorCallback) {
           const error = new Error('WebSocket connection error');
           this.onErrorCallback(error);
@@ -132,7 +136,7 @@ async start(): Promise<void> {
 
       // Send audio data to Deepgram
       this.mediaRecorder.ondataavailable = async (event: BlobEvent) => {
-        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN) {
+        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN && !this.isPaused) {
           const arrayBuffer = await event.data.arrayBuffer();
           this.socket.send(arrayBuffer);
         }
@@ -161,6 +165,42 @@ async start(): Promise<void> {
         isFinal: true,
         confidence: 1.0,
       });
+    }
+  }
+
+  async pause(): Promise<void> {
+    console.log('Deepgram: Pausing transcription');
+    this.isPaused = true;
+    this.pausedTranscript = this.finalTranscript;
+    
+    // Pause the media recorder but keep connection open
+    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      this.mediaRecorder.pause();
+    }
+  }
+
+  async resume(): Promise<void> {
+    console.log('Deepgram: Resuming transcription');
+    this.isPaused = false;
+
+    // Restore transcript state
+    if (this.pausedTranscript) {
+      this.finalTranscript = this.pausedTranscript;
+    }
+
+    // Resume media recorder
+    if (this.mediaRecorder) {
+      if (this.mediaRecorder.state === 'paused') {
+        this.mediaRecorder.resume();
+      } else if (this.mediaRecorder.state === 'inactive') {
+        this.mediaRecorder.start(250);
+      }
+    }
+
+    // Make sure connection is still alive
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      console.log('Deepgram: Reconnecting WebSocket...');
+      await this.initialize();
     }
   }
 
@@ -195,5 +235,7 @@ async start(): Promise<void> {
     this.onResultCallback = null;
     this.onErrorCallback = null;
     this.finalTranscript = '';
+    this.isPaused = false;
+    this.pausedTranscript = '';
   }
 }

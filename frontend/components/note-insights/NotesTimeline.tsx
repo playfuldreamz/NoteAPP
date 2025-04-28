@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import { formatUTCDateToShortLocal } from '../../utils/dateUtils'; // Update import to use the renamed function
 
 ChartJS.register(
   CategoryScale,
@@ -50,13 +51,13 @@ const NotesTimeline: React.FC<NotesTimelineProps> = ({ data, tagsData, isLoading
     );
   }
 
-  // Create a combined set of dates from both datasets
+  // Create a combined set of dates from both datasets (already YYYY-MM-DD)
   const allDates = new Set([
     ...(data?.map(item => item.date) || []),
     ...(tagsData?.map(item => item.date) || [])
   ]);
-  
-  // Sort dates chronologically
+
+  // Sort dates chronologically (YYYY-MM-DD strings)
   const sortedDates = Array.from(allDates).sort();
 
   // Create datasets with 0 counts for missing dates
@@ -70,8 +71,11 @@ const NotesTimeline: React.FC<NotesTimelineProps> = ({ data, tagsData, isLoading
     return found ? found.count : 0;
   });
 
+  // Format dates for display using the short format utility function
+  const formattedDates = sortedDates.map(formatUTCDateToShortLocal);
+
   const chartData = {
-    labels: sortedDates,
+    labels: formattedDates, // Use formatted short local dates
     datasets: [
       {
         label: 'Notes Created',

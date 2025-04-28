@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { useTranscription } from '../context/TranscriptionContext';
 import { TranscriptionProviderFactory } from '../services/transcription/providerFactory';
-import type { TranscriptionResult, ProviderType } from '../services/transcription/types';
+import type { TranscriptionResult, ProviderType, TranscriptionProvider } from '../services/transcription/types';
 import { enhanceTranscript as enhanceTranscriptAPI, InvalidAPIKeyError } from '../services/ai';
 
 interface UseTranscriptionManagerOptions {
@@ -15,12 +15,12 @@ interface UseTranscriptionManagerReturn {
   enhancedTranscript: string;
   isEnhancing: boolean;
   showEnhanced: boolean;
-  providerInstance: any;
+  providerInstance: TranscriptionProvider | null;
   initializeProvider: () => Promise<boolean>;
-  startTranscription: () => Promise<boolean>;
+  startTranscription: (mediaStream?: MediaStream) => Promise<boolean>;
   stopTranscription: () => Promise<void>;
   pauseTranscription: () => Promise<void>;
-  resumeTranscription: (existingTranscript: string) => Promise<boolean>;
+  resumeTranscription: (existingTranscript: string, mediaStream?: MediaStream) => Promise<boolean>;
   enhanceTranscript: () => Promise<void>;
   resetTranscript: () => void;
   setShowEnhanced: (show: boolean) => void;
@@ -34,9 +34,8 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
   const [enhancedTranscript, setEnhancedTranscript] = useState('');
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [showEnhanced, setShowEnhanced] = useState(false);
-  
-  // Refs
-  const providerInstanceRef = useRef<any>(null);
+    // Refs
+  const providerInstanceRef = useRef<TranscriptionProvider | null>(null);
   
   // Get transcription context
   const { 
@@ -71,10 +70,13 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
     if (!isInitialized) {
       toast.error('Transcription provider not initialized');
       return false;
-    }
+    }    // Import isKeyRequiredProvider helper
+    const isKeyRequiredProvider = (provider: ProviderType): boolean => {
+      return provider !== 'webspeech' && provider !== 'realtimestt';
+    };
 
     // Check if provider requires API key
-    if (selectedProvider !== 'webspeech') {
+    if (isKeyRequiredProvider(selectedProvider)) {
       const settings = getProviderSettings(selectedProvider);
       if (!settings?.apiKey) {
         toast.error(`API Key for ${selectedProvider} is required. Please configure it in settings.`);
@@ -101,14 +103,28 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
       return false;
     }
   };
-
   // Start transcription
-  const startTranscription = async (): Promise<boolean> => {
+  const startTranscription = async (mediaStream?: MediaStream): Promise<boolean> => {
     const initialized = await initializeProvider();
     if (!initialized) return false;
-    
-    try {
-      await providerInstanceRef.current.start();
+      try {
+      if (!providerInstanceRef.current) {
+        console.error('No provider instance available');
+        return false;
+      }
+
+      // For RealtimeSTT, we need to pass the mediaStream
+      if (selectedProvider === 'realtimestt') {
+        if (!mediaStream) {
+          console.error('MediaStream is required for RealtimeSTT provider');
+          toast.error('Microphone stream not available');
+          return false;
+        }
+        await providerInstanceRef.current.start(mediaStream);
+      } else {
+        // For other providers, use their standard start method
+        await providerInstanceRef.current.start();
+      }
       return true;
     } catch (error) {
       console.error('Failed to start transcription:', error);
@@ -128,60 +144,60 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
       }
     }
   };
-
   // Pause transcription
   const pauseTranscription = async (): Promise<void> => {
-    if (providerInstanceRef.current) {
+    // Store current transcript before pausing
+    const currentTranscript = originalTranscript;
+    
+    if (providerInstanceRef.current && typeof providerInstanceRef.current.pause === 'function') {
       try {
-        await providerInstanceRef.current.stop();
+        console.log(`useTranscriptionManager: Calling provider.pause() for ${providerInstanceRef.current.name}`);
+        await providerInstanceRef.current.pause();
+        // Store transcript in provider instance for resuming later
+        providerInstanceRef.current.pausedTranscript = currentTranscript;
       } catch (error) {
-        console.error('Error pausing transcription:', error);
+        console.error('Error pausing transcription provider:', error);
+        toast.error(`Failed to pause transcription: ${(error as Error).message}`);
       }
+    } else {
+      console.warn("useTranscriptionManager: Pause called but no provider or pause method available.");
+      // For providers without native pause, we'll need to stop
+      await stopTranscription();
     }
   };
 
   // Resume transcription with existing transcript
-  const resumeTranscription = async (existingTranscript: string): Promise<boolean> => {
-    try {
-      if (providerInstanceRef.current) {
-        // Set up result handler that preserves the existing transcript
-        providerInstanceRef.current.onResult((result: TranscriptionResult) => {
-          if (result.transcript) {
-            // Combine the existing transcript with the new one
-            const combinedTranscript = existingTranscript + " " + result.transcript;
-            setOriginalTranscript(combinedTranscript);
-            if (onTranscriptUpdate) {
-              onTranscriptUpdate(combinedTranscript);
-            }
+  const resumeTranscription = async (existingTranscript: string, mediaStream?: MediaStream): Promise<boolean> => {
+    if (providerInstanceRef.current) {
+      try {
+        if (typeof providerInstanceRef.current.resume === 'function') {
+          console.log(`useTranscriptionManager: Calling provider.resume() for ${providerInstanceRef.current.name}`);
+          // Ensure we have the transcript stored before resuming
+          if (!providerInstanceRef.current.pausedTranscript) {
+            providerInstanceRef.current.pausedTranscript = existingTranscript;
           }
-        });
-        
-        await providerInstanceRef.current.start();
-        return true;
-      } else {
-        // If provider was cleaned up, recreate it
-        const initialized = await initializeProvider();
-        if (!initialized) return false;
-        
-        // Set up result handler that preserves the existing transcript
-        providerInstanceRef.current.onResult((result: TranscriptionResult) => {
-          if (result.transcript) {
-            // Combine the existing transcript with the new one
-            const combinedTranscript = existingTranscript + " " + result.transcript;
-            setOriginalTranscript(combinedTranscript);
-            if (onTranscriptUpdate) {
-              onTranscriptUpdate(combinedTranscript);
-            }
-          }
-        });
-        
-        await providerInstanceRef.current.start();
-        return true;
+          await providerInstanceRef.current.resume();
+          return true;
+        } else {
+          console.warn(`useTranscriptionManager: Provider ${providerInstanceRef.current.name} lacks .resume(), attempting restart with existing content.`);
+          setOriginalTranscript(existingTranscript); // Store the existing transcript
+          return await startTranscription(mediaStream);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('already started')) {
+          // If already started, consider it a success
+          return true;
+        }
+        console.error('Failed to resume transcription provider:', error);
+        toast.error(`Failed to resume transcription: ${(error as Error).message}`);
+        // If resume fails, try a restart as fallback
+        setOriginalTranscript(existingTranscript);
+        return await startTranscription(mediaStream);
       }
-    } catch (error) {
-      console.error('Failed to resume transcription:', error);
-      toast.error(`Failed to resume transcription: ${(error as Error).message}`);
-      return false;
+    } else {
+      console.warn("useTranscriptionManager: Resume called but no provider available. Attempting full restart...");
+      setOriginalTranscript(existingTranscript);
+      return await startTranscription(mediaStream);
     }
   };
 

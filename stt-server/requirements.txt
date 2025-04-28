@@ -1,0 +1,22 @@
+# Core STT library
+RealtimeSTT
+
+# WebSocket server
+websockets
+
+# Numerical processing
+numpy
+scipy
+
+# Machine Learning framework (CPU version)
+# Ensure this matches RealtimeSTT/faster-whisper requirements if specific versions are needed
+torch --index-url https://download.pytorch.org/whl/cpu
+torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Transcription engine (likely pulled by RealtimeSTT, but explicit is safer)
+faster-whisper
+
+# For loading .env files
+python-dotenv
+# For microphone input in test client
+pyaudio

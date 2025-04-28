@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { format, isValid, parseISO } from 'date-fns';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { 
   Calendar, 
@@ -7,12 +6,12 @@ import {
   CheckCircle2, 
   Circle, 
   XCircle, 
-  AlertTriangle, 
   RotateCw, 
   ListTodo, 
   Info, 
   ClipboardList 
 } from 'lucide-react';
+import { formatUTCTimestampToLongLocal } from '../utils/dateUtils';
 
 interface ActionItem {
   id: number;
@@ -59,15 +58,13 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No deadline';
     try {
-      const date = parseISO(dateString);
-      return isValid(date) ? format(date, 'MMM d, yyyy') : 'Invalid date';
+      return formatUTCTimestampToLongLocal(dateString);
     } catch {
       return 'Invalid date';
     }
   };
-
   // Fetch action items
-  const fetchActionItems = async () => {
+  const fetchActionItems = useCallback(async () => {
     try {
       const token = getAuthToken();
       if (!token) {
@@ -92,7 +89,7 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
       console.error('Fetch error:', err);
       setError('Failed to fetch action items');
     }
-  };
+  }, [itemId, type, API_BASE_URL]); // Add dependencies for fetchActionItems
 
   // Extract action items
   const extractActionItems = async () => {
@@ -185,7 +182,7 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
 
   useEffect(() => {
     fetchActionItems();
-  }, [itemId]);
+  }, [itemId, fetchActionItems]); // Add fetchActionItems to dependencies
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -339,7 +336,7 @@ const ActionItemsModule: React.FC<ActionItemsModuleProps> = ({
               <ClipboardList className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              No action items found. Click "Extract Action Items" to analyze the content.
+              No action items found. Click &ldquo;Extract Action Items&rdquo; to analyze the content.
             </p>
           </div>
         )}
