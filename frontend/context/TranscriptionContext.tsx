@@ -1,13 +1,19 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { TranscriptionProvider, ProviderType, ProviderConfig } from '../services/transcription/types';
+import type { ProviderType, ProviderConfig } from '../services/transcription/types';
 import { TranscriptionProviderFactory } from '../services/transcription/providerFactory';
 import { toast } from 'react-toastify';
 
+interface ProviderOptionValue {
+  value: string | number | boolean;
+  label?: string;
+  description?: string;
+}
+
 interface ProviderSettings {
   apiKey?: string;
-  options?: Record<string, any>;
+  options?: Record<string, ProviderOptionValue>;
 }
 
 interface TranscriptionContextType {
@@ -245,8 +251,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
 
     loadSettingsFromDB();
   }, []);
-
-  // Initialize WebSpeech provider on mount
+  // Initialize WebSpeech provider on mount or when currentProvider changes
   useEffect(() => {
     if (currentProvider === 'webspeech') {
       initializeProvider('webspeech');
@@ -254,7 +259,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
     return () => {
       TranscriptionProviderFactory.cleanup();
     };
-  }, [initializeProvider]);
+  }, [initializeProvider, currentProvider]);
 
   const value = {
     provider: currentProvider,
