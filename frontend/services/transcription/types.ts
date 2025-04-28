@@ -22,6 +22,8 @@ export interface TranscriptionProvider {
   initialize: (options?: TranscriptionOptions) => Promise<void>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
+  pause: () => Promise<void>;  // Pause transcription without cleanup
+  resume: () => Promise<void>; // Resume transcription from paused state
   onResult: (callback: (result: TranscriptionResult) => void) => void;
   onError: (callback: (error: Error) => void) => void;
   cleanup: () => void;
