@@ -61,6 +61,8 @@ The app supports multiple transcription providers for voice-to-text conversion:
    - Runs locally
    - Requires Python environment setup
    - Great for privacy and offline use
+   - Efficient audio processing with AudioWorklet API
+   - High-quality audio resampling with linear interpolation
 
 ### Setting up RealtimeSTT Server
 
@@ -250,6 +252,22 @@ module.exports = {
   description: 'Brief description'
 };
 ```
+
+## Audio Processing
+
+The application uses modern web audio processing techniques for high-quality audio capture and transcription:
+
+- **AudioWorklet API**: Audio processing runs off the main thread for better performance
+- **Linear Interpolation**: High-quality audio resampling preserves audio fidelity
+- **Efficient Buffer Management**: Smart buffering of audio data for minimal latency
+- **Pause/Resume Support**: Clean handling of recording pause and resume
+- **Adaptive Processing**: Automatic adjustment to different input sample rates
+
+This implementation replaces the older ScriptProcessorNode (deprecated) with the modern AudioWorkletNode, resulting in:
+- Improved UI responsiveness during recording
+- Better audio quality for transcription
+- More efficient CPU usage
+- Reduced risk of audio glitches
 
 ## Usage
 

@@ -10,6 +10,9 @@ This is the local Speech-to-Text server component of NoteApp that provides real-
 - Local processing for privacy
 - Supports multiple audio formats
 - Low latency response times
+- Advanced audio processing with AudioWorklet API
+- High-quality audio resampling with linear interpolation
+- Off-main-thread audio processing for better performance
 
 ## Prerequisites
 

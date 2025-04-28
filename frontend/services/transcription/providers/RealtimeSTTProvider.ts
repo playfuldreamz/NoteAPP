@@ -8,17 +8,16 @@ interface AudioMetadata {
 export class RealtimeSTTProvider implements TranscriptionProvider {
   public name = 'realtimestt';
   public isOnline = true; // Requires connection to the local server
-
   private socket: WebSocket | null = null;
   private audioContext: AudioContext | null = null;
-  private processorNode: ScriptProcessorNode | null = null;
+  private workletNode: AudioWorkletNode | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private mediaStream: MediaStream | null = null;
   private onResultCallback: ((result: TranscriptionResult) => void) | null = null;
   private onErrorCallback: ((error: Error) => void) | null = null;
   private wsUrl: string;
   private targetSampleRate = 16000; // Rate expected by the Python server/RealtimeSTT
-  private bufferSize = 1024; // Audio processing buffer size
+  private bufferSize = 4096; // Audio buffer size for worklet
   private isPaused = false; // Add this flag
   constructor({ options }: ProviderConfig) {
     // Use environment variable for URL or options URL, fallback to default localhost
@@ -156,73 +155,81 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
         const AudioContextCtor = (window.AudioContext || (window as unknown as { webkitAudioContext: AudioContextType }).webkitAudioContext);
         this.audioContext = new AudioContextCtor();
         const sourceSampleRate = this.audioContext.sampleRate;
-        console.log(`RealtimeSTTProvider: Source Sample Rate: ${sourceSampleRate}, Target: ${this.targetSampleRate}`);
-
-        // --- Existing audio processing setup --- 
-        // ... (createMediaStreamSource, createScriptProcessor, onaudioprocess, connect nodes)
+        console.log(`RealtimeSTTProvider: Source Sample Rate: ${sourceSampleRate}, Target: ${this.targetSampleRate}`);        // Create media stream source
         this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
-        this.processorNode = this.audioContext.createScriptProcessor(this.bufferSize, 1, 1);
-
-        this.processorNode.onaudioprocess = (event: AudioProcessingEvent) => {
-            // **** Check if paused ****
-            if (this.isPaused) {
-                return; // Do not process or send audio if paused
-            }
-            // **** End Check ****
-
-            if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-                // Added check here too, although initialize should handle it.
-                // console.warn("RealtimeSTTProvider: WebSocket closed during audio processing.");
-                return; 
-            }            const inputData = event.inputBuffer.getChannelData(0);
-            const ratio = sourceSampleRate / this.targetSampleRate;
-            const outputLength = Math.floor(inputData.length / ratio);
+        
+        // Load the audio worklet module
+        try {
+            await this.audioContext.audioWorklet.addModule('/audio-processor.worklet.js');
+            console.log("RealtimeSTTProvider: AudioWorklet module loaded successfully.");
             
-            // Create output buffer for linear interpolation results
-            const outputData = new Float32Array(outputLength);
+            // Create the AudioWorkletNode with processor options
+            this.workletNode = new AudioWorkletNode(this.audioContext, 'audio-processor', {
+                processorOptions: {
+                    targetSampleRate: this.targetSampleRate
+                },
+                outputChannelCount: [1]
+            });
             
-            // Perform linear interpolation
-            for (let i = 0; i < outputLength; i++) {
-                const inputIndex = i * ratio;
-                const index1 = Math.floor(inputIndex);
-                const index2 = Math.min(index1 + 1, inputData.length - 1);
-                const weight = inputIndex - index1;
-                
-                // Linear interpolation formula
-                outputData[i] = inputData[index1] * (1 - weight) + inputData[index2] * weight;
-            }
-            
-            // Convert to Int16Array with clamping
-            const pcm16Data = new Int16Array(outputLength);
-            for (let i = 0; i < outputLength; i++) {
-                pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.round(outputData[i] * 32767)));
-            }
-
-            if (pcm16Data.length > 0 && this.socket && this.socket.readyState === WebSocket.OPEN) {
-                const metadata: AudioMetadata = { sampleRate: this.targetSampleRate };
-                const metadataJson = JSON.stringify(metadata);
-                const metadataBytes = new TextEncoder().encode(metadataJson);
-                const metadataLengthBytes = new ArrayBuffer(4);
-                new DataView(metadataLengthBytes).setUint32(0, metadataBytes.byteLength, true); // Use little-endian
-
-                const messageBlob = new Blob([metadataLengthBytes, metadataBytes, pcm16Data.buffer]);
-                // Send the message blob to the server
-                try {
-                  this.socket.send(messageBlob);
-                } catch (sendError) {
-                  console.error("RealtimeSTTProvider: Error sending audio data:", sendError);
-                  // Optionally, call onErrorCallback or attempt to reconnect/cleanup
-                  if (this.onErrorCallback) {
-                    this.onErrorCallback(sendError instanceof Error ? sendError : new Error('Failed to send audio data'));
-                  }
-                  // Consider stopping the processing loop or attempting recovery here
-                  // For now, just log the error.
+            // Set up message handler to receive processed audio chunks from the worklet
+            this.workletNode.port.onmessage = (event) => {
+                // Skip processing if paused
+                if (this.isPaused) {
+                    return;
                 }
+                
+                // Skip if socket is not open
+                if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+                    return;
+                }
+                
+                const pcm16Data = event.data as Int16Array;
+                
+                if (pcm16Data && pcm16Data.length > 0) {
+                    const metadata: AudioMetadata = { sampleRate: this.targetSampleRate };
+                    const metadataJson = JSON.stringify(metadata);
+                    const metadataBytes = new TextEncoder().encode(metadataJson);
+                    const metadataLengthBytes = new ArrayBuffer(4);
+                    new DataView(metadataLengthBytes).setUint32(0, metadataBytes.byteLength, true); // Use little-endian
+                      // Clone the Int16Array to ensure we get a standard ArrayBuffer, not a SharedArrayBuffer
+                    const pcm16Buffer = pcm16Data.slice().buffer;
+                    
+                    const messageBlob = new Blob([metadataLengthBytes, metadataBytes, pcm16Buffer]);
+                    
+                    // Send the message blob to the server
+                    try {
+                        this.socket.send(messageBlob);
+                        // console.log(`RealtimeSTTProvider: Sent audio chunk: ${pcm16Data.length} samples`);
+                    } catch (sendError) {
+                        console.error("RealtimeSTTProvider: Error sending audio data:", sendError);
+                        if (this.onErrorCallback) {
+                            this.onErrorCallback(sendError instanceof Error ? sendError : new Error('Failed to send audio data'));
+                        }
+                    }
+                }
+            };
+            
+            this.workletNode.port.onmessageerror = (error) => {
+                console.error("RealtimeSTTProvider: Error receiving message from worklet:", error);
+                if (this.onErrorCallback) {
+                    this.onErrorCallback(new Error("Error receiving message from audio worklet"));
+                }
+            };
+            
+            // Connect the source to the worklet
+            this.sourceNode.connect(this.workletNode);
+            
+            // Optionally connect to destination for monitoring (usually not needed)
+            // this.workletNode.connect(this.audioContext.destination);
+            
+            console.log("RealtimeSTTProvider: Audio processing started with AudioWorkletNode.");
+        } catch (workletError) {
+            console.error("RealtimeSTTProvider: Failed to load or initialize AudioWorklet:", workletError);
+            if (this.onErrorCallback) {
+                this.onErrorCallback(workletError instanceof Error ? workletError : new Error("Failed to initialize AudioWorklet"));
             }
-        };
-
-        this.sourceNode.connect(this.processorNode);
-        this.processorNode.connect(this.audioContext.destination); // Connect to destination to potentially enable audio monitoring if needed, or keep disconnected if not
+            throw workletError;
+        }
 
         console.log("RealtimeSTTProvider: Audio processing started.");
         // --- Existing audio processing setup --- END
@@ -238,65 +245,92 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
     }
     // --- Existing checks and logic --- END
   }
-
-  // --- Add pause() method ---
+  // Pause audio processing and sending
   async pause(): Promise<void> {
-    console.log("RealtimeSTTProvider: Pausing audio sending.");
+    console.log("RealtimeSTTProvider: Pausing audio processing and sending.");
     this.isPaused = true;
-    // Do NOT stop audio processing or close WebSocket here
-  }
-  // --- End pause() method ---
-
-  // --- Add resume() method ---
-  async resume(): Promise<void> {
-    console.log("RealtimeSTTProvider: Resuming audio sending.");
-    this.isPaused = false;
-    // Ensure WebSocket is still open, re-initialize if necessary?
-    // For now, assume the connection stays open during pause.
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-        console.warn("RealtimeSTTProvider: WebSocket closed during pause. Attempting re-initialization on resume...");
-        try {
-            await this.initialize();
-            if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-                throw new Error("Failed to re-establish WebSocket connection on resume.");
-            }
-            console.log("RealtimeSTTProvider: WebSocket re-initialized successfully on resume.");
-        } catch (error) {
-            console.error("RealtimeSTTProvider: Error re-initializing WebSocket on resume:", error);
-            if (this.onErrorCallback) {
-                this.onErrorCallback(error instanceof Error ? error : new Error("WebSocket resume failed"));
-            }
-            // Optionally, try to cleanup fully
-            await this.cleanup();
-            throw error; // Re-throw
-        }
+    
+    // Notify the worklet to pause processing
+    if (this.workletNode) {
+      try {
+        this.workletNode.port.postMessage({ type: 'pause' });
+      } catch (error) {
+        console.warn("RealtimeSTTProvider: Error sending pause message to worklet:", error);
+      }
     }
   }
-  // --- End resume() method ---
 
-  private async stopAudioProcessing(): Promise<void> {
-      if (this.processorNode) {
-          this.processorNode.disconnect();
-          this.processorNode.onaudioprocess = null;
-          this.processorNode = null;
-          console.log("RealtimeSTTProvider: Processor node disconnected.");
+  // Resume audio processing and sending
+  async resume(): Promise<void> {
+    console.log("RealtimeSTTProvider: Resuming audio processing and sending.");
+    this.isPaused = false;
+    
+    // Ensure WebSocket is still open, re-initialize if necessary
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      console.warn("RealtimeSTTProvider: WebSocket closed during pause. Attempting re-initialization on resume...");
+      try {
+        await this.initialize();
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+          throw new Error("Failed to re-establish WebSocket connection on resume.");
+        }
+        console.log("RealtimeSTTProvider: WebSocket re-initialized successfully on resume.");
+      } catch (error) {
+        console.error("RealtimeSTTProvider: Error re-initializing WebSocket on resume:", error);
+        if (this.onErrorCallback) {
+          this.onErrorCallback(error instanceof Error ? error : new Error("WebSocket resume failed"));
+        }
+        // Optionally, try to cleanup fully
+        await this.cleanup();
+        throw error; // Re-throw
       }
+    }
+    
+    // Notify the worklet to resume processing
+    if (this.workletNode) {
+      try {
+        this.workletNode.port.postMessage({ type: 'resume' });
+        
+        // Request statistics from the worklet
+        this.workletNode.port.postMessage({ type: 'getStats' });
+      } catch (error) {
+        console.warn("RealtimeSTTProvider: Error sending resume message to worklet:", error);
+      }
+    }
+  }
+  private async stopAudioProcessing(): Promise<void> {
+      if (this.workletNode) {
+          // Send flush message to worklet to process remaining samples
+          try {
+              this.workletNode.port.postMessage({ type: 'flush' });
+          } catch (error) {
+              console.warn("RealtimeSTTProvider: Error sending flush message to worklet:", error);
+          }
+          
+          this.workletNode.disconnect();
+          this.workletNode.port.onmessage = null;
+          this.workletNode.port.onmessageerror = null;
+          this.workletNode = null;
+          console.log("RealtimeSTTProvider: AudioWorklet node disconnected.");
+      }
+      
       if (this.sourceNode) {
           this.sourceNode.disconnect();
           this.sourceNode = null;
           console.log("RealtimeSTTProvider: Source node disconnected.");
       }
+      
       if (this.mediaStream) {
           this.mediaStream.getTracks().forEach(track => track.stop());
           console.log("RealtimeSTTProvider: MediaStream tracks stopped.");
           this.mediaStream = null;
       }
+      
       if (this.audioContext && this.audioContext.state !== 'closed') {
           try {
               await this.audioContext.close();
               console.log("RealtimeSTTProvider: AudioContext closed.");
           } catch (error) {
-               console.error("RealtimeSTTProvider: Error closing AudioContext:", error);
+              console.error("RealtimeSTTProvider: Error closing AudioContext:", error);
           }
           this.audioContext = null;
       }
