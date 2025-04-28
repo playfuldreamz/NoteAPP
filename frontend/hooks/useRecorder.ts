@@ -56,16 +56,18 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
       }
     };
   }, [isRecording, isPaused, startTime, pausedTime]);
-
   // Cleanup audio resources on unmount
   useEffect(() => {
+    // Capture the ref value inside the effect
+    const audioContext = audioContextRef.current;
+    
     return () => {
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
       }
       
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close();
+      if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close();
       }
     };
   }, [audioStream]);
@@ -132,9 +134,6 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
     // If recording is paused, treat this as a full stop
     if (isRecording) {
       console.log("useRecorder: stopRecording called.");
-      // Store the final elapsed time before stopping
-      const finalElapsedTime = elapsedTime;
-
       setIsRecording(false);
       setIsPaused(false);
       setStartTime(null);
