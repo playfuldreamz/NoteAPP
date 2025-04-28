@@ -1,13 +1,13 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { TranscriptionProvider, ProviderType, ProviderConfig } from '../services/transcription/types';
+import type { ProviderType, ProviderConfig } from '../services/transcription/types';
 import { TranscriptionProviderFactory } from '../services/transcription/providerFactory';
 import { toast } from 'react-toastify';
 
 interface ProviderSettings {
   apiKey?: string;
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }
 
 interface TranscriptionContextType {
@@ -251,7 +251,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
     return () => {
       TranscriptionProviderFactory.cleanup();
     };
-  }, [initializeProvider]);
+  }, [initializeProvider, currentProvider]);
 
   const value = {
     provider: currentProvider,
