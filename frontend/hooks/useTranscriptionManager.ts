@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { useTranscription } from '../context/TranscriptionContext';
 import { TranscriptionProviderFactory } from '../services/transcription/providerFactory';
-import type { TranscriptionResult, ProviderType } from '../services/transcription/types';
+import type { TranscriptionResult, ProviderType, TranscriptionProvider } from '../services/transcription/types';
 import { enhanceTranscript as enhanceTranscriptAPI, InvalidAPIKeyError } from '../services/ai';
 
 interface UseTranscriptionManagerOptions {
@@ -15,7 +15,7 @@ interface UseTranscriptionManagerReturn {
   enhancedTranscript: string;
   isEnhancing: boolean;
   showEnhanced: boolean;
-  providerInstance: any;
+  providerInstance: TranscriptionProvider | null;
   initializeProvider: () => Promise<boolean>;
   startTranscription: (mediaStream?: MediaStream) => Promise<boolean>;
   stopTranscription: () => Promise<void>;
@@ -34,9 +34,8 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
   const [enhancedTranscript, setEnhancedTranscript] = useState('');
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [showEnhanced, setShowEnhanced] = useState(false);
-  
-  // Refs
-  const providerInstanceRef = useRef<any>(null);
+    // Refs
+  const providerInstanceRef = useRef<TranscriptionProvider | null>(null);
   
   // Get transcription context
   const { 
@@ -108,8 +107,12 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
   const startTranscription = async (mediaStream?: MediaStream): Promise<boolean> => {
     const initialized = await initializeProvider();
     if (!initialized) return false;
-    
-    try {
+      try {
+      if (!providerInstanceRef.current) {
+        console.error('No provider instance available');
+        return false;
+      }
+
       // For RealtimeSTT, we need to pass the mediaStream
       if (selectedProvider === 'realtimestt') {
         if (!mediaStream) {
