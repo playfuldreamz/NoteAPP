@@ -9,6 +9,9 @@ export class AssemblyAIProvider implements TranscriptionProvider {
   private apiKey: string;
   private finalTranscript: string = '';
 
+  private isPaused: boolean = false;
+  private pausedTranscript: string = '';
+
   constructor(apiKey: string) {
     this.apiKey = apiKey;
     this.finalTranscript = '';
@@ -49,8 +52,10 @@ export class AssemblyAIProvider implements TranscriptionProvider {
 
   async initialize(options?: TranscriptionOptions): Promise<void> {
     try {
-      // Reset the final transcript when initializing
+      // Reset states
       this.finalTranscript = '';
+      this.isPaused = false;
+      this.pausedTranscript = '';
       
       const token = await this.getToken();
       
@@ -111,8 +116,8 @@ export class AssemblyAIProvider implements TranscriptionProvider {
       });
 
       this.mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN) {
-          // Convert audio data to the correct format
+        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN && !this.isPaused) {
+          // Only send data if not paused
           const arrayBuffer = await event.data.arrayBuffer();
           const audioData = new Int16Array(arrayBuffer);
           
@@ -155,6 +160,34 @@ export class AssemblyAIProvider implements TranscriptionProvider {
     this.cleanup();
   }
 
+  async pause(): Promise<void> {
+    console.log('AssemblyAI: Pausing transcription');
+    this.isPaused = true;
+    this.pausedTranscript = this.finalTranscript;
+
+    // Stop sending new data but keep connection alive
+    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      this.mediaRecorder.pause();
+    }
+  }
+
+  async resume(): Promise<void> {
+    console.log('AssemblyAI: Resuming transcription');
+    this.isPaused = false;
+    
+    // Restore final transcript
+    if (this.pausedTranscript) {
+      this.finalTranscript = this.pausedTranscript;
+    }
+
+    // Resume sending data
+    if (this.mediaRecorder && this.mediaRecorder.state === 'paused') {
+      this.mediaRecorder.resume();
+    } else if (this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
+      this.mediaRecorder.start(100);
+    }
+  }
+
   onResult(callback: (result: TranscriptionResult) => void): void {
     this.onResultCallback = callback;
   }
@@ -179,5 +212,7 @@ export class AssemblyAIProvider implements TranscriptionProvider {
     }
     
     this.finalTranscript = '';
+    this.isPaused = false;
+    this.pausedTranscript = '';
   }
 }

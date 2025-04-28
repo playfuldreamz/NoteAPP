@@ -9,6 +9,9 @@ export class DeepgramProvider implements TranscriptionProvider {
   private apiKey: string;
   private finalTranscript: string = '';
 
+  private isPaused: boolean = false;
+  private pausedTranscript: string = '';
+
   constructor(apiKey: string) {
     this.apiKey = apiKey;
     this.finalTranscript = '';
@@ -52,9 +55,11 @@ async initialize(options?: TranscriptionOptions): Promise<void> {
 
 async start(): Promise<void> {
   try {
-    // Reset the final transcript when starting a new session
+    // Reset states
     this.finalTranscript = '';
-    
+    this.isPaused = false;
+    this.pausedTranscript = '';
+
     // Request microphone access
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     
@@ -132,7 +137,7 @@ async start(): Promise<void> {
 
       // Send audio data to Deepgram
       this.mediaRecorder.ondataavailable = async (event: BlobEvent) => {
-        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN) {
+        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN && !this.isPaused) {
           const arrayBuffer = await event.data.arrayBuffer();
           this.socket.send(arrayBuffer);
         }
@@ -161,6 +166,42 @@ async start(): Promise<void> {
         isFinal: true,
         confidence: 1.0,
       });
+    }
+  }
+
+  async pause(): Promise<void> {
+    console.log('Deepgram: Pausing transcription');
+    this.isPaused = true;
+    this.pausedTranscript = this.finalTranscript;
+    
+    // Pause the media recorder but keep connection open
+    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      this.mediaRecorder.pause();
+    }
+  }
+
+  async resume(): Promise<void> {
+    console.log('Deepgram: Resuming transcription');
+    this.isPaused = false;
+
+    // Restore transcript state
+    if (this.pausedTranscript) {
+      this.finalTranscript = this.pausedTranscript;
+    }
+
+    // Resume media recorder
+    if (this.mediaRecorder) {
+      if (this.mediaRecorder.state === 'paused') {
+        this.mediaRecorder.resume();
+      } else if (this.mediaRecorder.state === 'inactive') {
+        this.mediaRecorder.start(250);
+      }
+    }
+
+    // Make sure connection is still alive
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      console.log('Deepgram: Reconnecting WebSocket...');
+      await this.initialize();
     }
   }
 
@@ -195,5 +236,7 @@ async start(): Promise<void> {
     this.onResultCallback = null;
     this.onErrorCallback = null;
     this.finalTranscript = '';
+    this.isPaused = false;
+    this.pausedTranscript = '';
   }
 }
