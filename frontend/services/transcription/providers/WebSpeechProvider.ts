@@ -52,9 +52,8 @@ export class WebSpeechProvider implements TranscriptionProvider {
   private resultCallback: ((result: TranscriptionResult) => void) | null = null;
   private errorCallback: ((error: Error) => void) | null = null;
   private isStopping: boolean = false;
-  private isPaused: boolean = false;
-  private finalTranscript: string = '';
-  private pausedTranscript: string = ''; // Store transcript during pause
+  private isPaused: boolean = false;  private finalTranscript: string = '';
+  pausedTranscript: string = ''; // Made public to match TranscriptionProvider interface
   
   // Audio enhancement components
   private audioContext: AudioContext | null = null;
