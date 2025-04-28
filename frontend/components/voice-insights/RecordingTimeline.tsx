@@ -59,15 +59,25 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], tagsDa
 
   const normalizeRecordingDate = (dateStr: string) => {
     try {
+      // Directly extract YYYY-MM-DD from the ISO string (assuming format like YYYY-MM-DDTHH:mm:ss.sssZ)
+      if (dateStr && dateStr.includes('T')) {
+        return dateStr.split('T')[0];
+      }
+      // If it's already YYYY-MM-DD or another format, return as is or handle appropriately
+      // Basic check for YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+      }
+      // Fallback: attempt to parse and format, but without timezone shift
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) {
+        console.warn('Invalid date string encountered in normalizeRecordingDate:', dateStr);
         return dateStr; // Return original if invalid
       }
-
-      // Convert to local timezone
-      const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-      return `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
+      // Format directly from the parsed date object (which interprets based on UTC or local depending on input string)
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; 
     } catch (error) {
+      console.error('Error normalizing recording date:', dateStr, error);
       return dateStr;
     }
   };
@@ -98,10 +108,9 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], tagsDa
   const today = new Date();
   const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   
-  // Sort dates chronologically and filter out future dates
+  // Sort dates chronologically
   const sortedDates = Array.from(allDates)
-    .sort()
-    .filter(date => date <= todayFormatted);
+    .sort();
 
   // Format dates for display with timezone handling
   const formattedDates = sortedDates.map(date => {
