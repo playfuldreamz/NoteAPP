@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { formatUTCDateStringToLocal } from '../../utils/dateUtils'; // Import the utility function
+import { formatUTCDateToShortLocal } from '../../utils/dateUtils'; // Update import to use the renamed function
 
 ChartJS.register(
   CategoryScale,
@@ -60,16 +60,15 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], tagsDa
 
   // Create a combined set of dates directly from the props
   const allDates = new Set([
-    ...data.map(item => item.date.split('T')[0]), // Extract YYYY-MM-DD from recording dates
+    ...data.map(item => item.date.split('T')[0]), // Extract YYYY-MM-DD
     ...tagsData.map(item => item.date) // Tags dates are already YYYY-MM-DD
   ]);
 
-  // Sort dates chronologically (these are still YYYY-MM-DD strings)
-  const sortedDates = Array.from(allDates)
-    .sort();
+  // Sort dates chronologically (YYYY-MM-DD strings)
+  const sortedDates = Array.from(allDates).sort();
 
-  // Format dates for display using the utility function
-  const formattedDates = sortedDates.map(formatUTCDateStringToLocal);
+  // Format dates for display using the short format utility function
+  const formattedDates = sortedDates.map(formatUTCDateToShortLocal);
 
   // Create datasets with 0 counts for missing dates
   const recordingData = sortedDates.map(date => {
@@ -85,7 +84,7 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], tagsDa
   });
 
   const durationChartData = {
-    labels: formattedDates, // Use formatted local dates
+    labels: formattedDates, // Use formatted short local dates
     datasets: [
       {
         label: 'Recording Duration (minutes)',
@@ -98,7 +97,7 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], tagsDa
   };
 
   const tagsChartData = {
-    labels: formattedDates, // Use formatted local dates
+    labels: formattedDates, // Use formatted short local dates
     datasets: [
       {
         label: 'Tags Created',

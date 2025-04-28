@@ -4,11 +4,10 @@ import Modal from './modal/index';
 import { ChevronUp, Trash2, Eye, Search, Download } from 'lucide-react';
 import TranscriptActions from './TranscriptActions';
 import type { TranscriptFilters } from './TranscriptActions';
-import { generateTranscriptTitle, updateTranscriptTitle } from '../services/ai';
 import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocument';
 import useTitleGeneration from '../hooks/useTitleGeneration';
 import { deleteResource, bulkDeleteResources } from '../services/deleteService';
-import { useTagsContext } from '../context/TagsContext';
+import { formatUTCTimestampToLongLocal } from '../utils/dateUtils';
 
 interface Tag {
   id: number;
@@ -46,7 +45,6 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
   const [downloadOptions, setDownloadOptions] = useState<Record<number, DownloadOptions>>({});
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedTranscriptIds, setSelectedTranscriptIds] = useState<Set<number>>(new Set());
-  const { updateItemTags } = useTagsContext();
 
   const getDownloadOptions = (transcriptId: number): DownloadOptions => ({
     format: downloadOptions[transcriptId]?.format || 'txt',
@@ -122,7 +120,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     setShowLoadMore(filteredTranscripts.length > itemsToShow);
   }, [filteredTranscripts, itemsToShow]);
 
-  const applyFilters = (transcripts: Transcript[], filters: TranscriptFilters) => {
+  const applyFilters = useCallback((transcripts: Transcript[], filters: TranscriptFilters) => {
     // Ensure transcripts is an array before spreading
     let filtered = transcripts ? [...transcripts] : [];
 
@@ -177,42 +175,42 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
     }
 
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  };
+  }, []); // Keep applyFilters stable unless its own logic needs external deps
 
-  const handleFilter = (filters: TranscriptFilters) => {
+  const handleFilter = useCallback((filters: TranscriptFilters) => {
     const filtered = applyFilters(initialTranscripts, filters);
     setFilteredTranscripts(filtered);
-  };
+  }, [initialTranscripts, applyFilters]); // Add initialTranscripts and applyFilters dependency
 
   useEffect(() => {
-    handleFilter({ tags: [] }); // Initial load with no filters
-  }, [initialTranscripts]);
+    // Initial load with no filters, depends on handleFilter
+    handleFilter({ tags: [] });
+  }, [handleFilter]); // Add handleFilter dependency
 
   useEffect(() => {
     if (!initialTranscripts || !Array.isArray(initialTranscripts)) {
       setFilteredTranscripts([]);
       return;
     }
-    
-    const sortedTranscripts = [...initialTranscripts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setFilteredTranscripts(sortedTranscripts);
-  }, [initialTranscripts]);
+    // Apply initial sort/filter when initialTranscripts change
+    handleFilter({ tags: [] }); // Or apply current filters if they should persist
+  }, [initialTranscripts, handleFilter]); // Depend on initialTranscripts and handleFilter
 
   useEffect(() => {
+    // This effect handles search query changes
     if (searchQuery) {
-      const filtered = initialTranscripts.filter(transcript =>
+      const baseTranscripts = initialTranscripts || [];
+      const filtered = baseTranscripts.filter(transcript =>
         transcript.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
         transcript.title?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       const sortedFiltered = filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setFilteredTranscripts(sortedFiltered);
-      setVisibleTranscripts(sortedFiltered.slice(0, itemsToShow));
-      setShowLoadMore(sortedFiltered.length > itemsToShow);
     } else {
-      setVisibleTranscripts(filteredTranscripts.slice(0, itemsToShow));
-      setShowLoadMore(filteredTranscripts.length > itemsToShow);
+      // When search is cleared, re-apply the base filters
+      handleFilter({ tags: [] }); // Assuming reset clears search and applies base filters
     }
-  }, [searchQuery, filteredTranscripts, itemsToShow]);
+  }, [searchQuery, initialTranscripts, handleFilter]); // Dependencies: searchQuery, initialTranscripts, handleFilter
 
   // This effect updates the visible transcripts whenever filteredTranscripts or itemsToShow changes
   useEffect(() => {
@@ -591,7 +589,7 @@ const TranscriptsList: React.FC<TranscriptsListProps> = ({ transcripts: initialT
                 </div>
                 {renderTranscriptTags(transcript)}
                 <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
-                  <span>{new Date(transcript.date).toLocaleString()}</span>
+                  <span>{formatUTCTimestampToLongLocal(transcript.date)}</span>
                 </div>
               </div>
             </div>

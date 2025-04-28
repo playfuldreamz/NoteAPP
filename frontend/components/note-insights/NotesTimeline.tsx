@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { formatUTCDateStringToLocal } from '../../utils/dateUtils'; // Import the utility function
+import { formatUTCDateToShortLocal } from '../../utils/dateUtils'; // Update import to use the renamed function
 
 ChartJS.register(
   CategoryScale,
@@ -71,11 +71,11 @@ const NotesTimeline: React.FC<NotesTimelineProps> = ({ data, tagsData, isLoading
     return found ? found.count : 0;
   });
 
-  // Format dates for display using the utility function
-  const formattedDates = sortedDates.map(formatUTCDateStringToLocal);
+  // Format dates for display using the short format utility function
+  const formattedDates = sortedDates.map(formatUTCDateToShortLocal);
 
   const chartData = {
-    labels: formattedDates, // Use formatted local dates
+    labels: formattedDates, // Use formatted short local dates
     datasets: [
       {
         label: 'Notes Created',

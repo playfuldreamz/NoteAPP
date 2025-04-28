@@ -9,6 +9,7 @@ import useDownloadDocument, { DownloadOptions } from '../hooks/useDownloadDocume
 import useTitleGeneration from '../hooks/useTitleGeneration';
 import { deleteResource, bulkDeleteResources } from '../services/deleteService';
 import { useTagsContext } from '../context/TagsContext';
+import { formatUTCTimestampToLongLocal } from '../utils/dateUtils';
 
 interface Tag {
   id: number;
@@ -615,7 +616,7 @@ const NoteList: React.FC<NoteListProps> = ({ notes = [], onDelete, onTitleUpdate
               </div>
               {renderNoteTags(note)}
               <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
-                <span>{new Date(note.timestamp).toLocaleString()}</span>
+                <span>{formatUTCTimestampToLongLocal(note.timestamp)}</span>
               </div>
             </div>
           </div>
