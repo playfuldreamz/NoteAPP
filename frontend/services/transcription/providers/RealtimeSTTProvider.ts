@@ -20,10 +20,9 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
   private targetSampleRate = 16000; // Rate expected by the Python server/RealtimeSTT
   private bufferSize = 1024; // Audio processing buffer size
   private isPaused = false; // Add this flag
-
-  constructor(config: ProviderConfig) {
-    // Use environment variable for URL, fallback to default localhost
-    this.wsUrl = process.env.NEXT_PUBLIC_STT_DATA_URL || 'ws://localhost:8012';
+  constructor({ options }: ProviderConfig) {
+    // Use environment variable for URL or options URL, fallback to default localhost
+    this.wsUrl = options?.wsUrl || process.env.NEXT_PUBLIC_STT_DATA_URL || 'ws://localhost:8012';
     console.log(`RealtimeSTTProvider initialized. WebSocket URL: ${this.wsUrl}`);
   }
 
@@ -56,7 +55,7 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
       }
     });
   }
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async initialize(options?: TranscriptionOptions): Promise<void> {
     console.log("RealtimeSTTProvider: Initializing...");
     return new Promise((resolve, reject) => {
@@ -151,10 +150,11 @@ export class RealtimeSTTProvider implements TranscriptionProvider {
     }
 
     console.log("RealtimeSTTProvider: Starting audio processing...");
-    this.mediaStream = stream;
-
-    try {
-        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    this.mediaStream = stream;    try {
+        // Define explicit type for cross-browser AudioContext
+        type AudioContextType = typeof AudioContext
+        const AudioContextCtor = (window.AudioContext || (window as unknown as { webkitAudioContext: AudioContextType }).webkitAudioContext);
+        this.audioContext = new AudioContextCtor();
         const sourceSampleRate = this.audioContext.sampleRate;
         console.log(`RealtimeSTTProvider: Source Sample Rate: ${sourceSampleRate}, Target: ${this.targetSampleRate}`);
 
