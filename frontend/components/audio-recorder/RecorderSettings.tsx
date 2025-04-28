@@ -8,7 +8,7 @@ import type { ProviderType } from '../../services/transcription/types';
 
 interface RecorderSettingsProps {
     showSettings: boolean;
-    toggleSettings: () => void;
+    // Removed unused toggleSettings prop
 }
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -16,11 +16,15 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   'assemblyai': 'AssemblyAI',
   'deepgram': 'Deepgram',
   'whisper': 'Whisper',
-  'azure': 'Azure Speech'
+  'azure': 'Azure Speech',
+  'realtimestt': 'RealtimeSTT (Local Server)'
 };
 
+const isKeyRequiredProvider = (provider: ProviderType): boolean => {
+  return provider !== 'webspeech' && provider !== 'realtimestt';
+};
 
-const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggleSettings }) => {
+const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings }) => {
   const {
     provider: selectedProvider,
     setProvider,
@@ -28,7 +32,7 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
     availableProviders,
     getProviderSettings,
     updateProviderSettings,
-    activeProvider,
+    // Removed unused activeProvider
   } = useTranscription();
 
   const { isRecording } = useRecording(); // Add this to get recording state
@@ -40,25 +44,56 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
   // Load saved API key when provider changes or settings are shown
   useEffect(() => {
     const settings = getProviderSettings(selectedProvider);
+    
+    // Handle API key providers
     if (settings?.apiKey) {
       setApiKeyInput(settings.apiKey);
-      // Re-validate if settings are shown or provider changes
-      if (showSettings) {
-          validateKey(settings.apiKey, selectedProvider, false); // Don't show toast on initial load
-      } else {
-         setIsKeyValid(null); // Reset validation status when settings closed
-      }
     } else {
       setApiKeyInput('');
+    }
+    
+    // Validate the provider when settings are shown or provider changes
+    if (showSettings) {
+      if (selectedProvider === 'realtimestt') {
+        // For RealtimeSTT, validate server connection
+        validateKey('', selectedProvider, false); // Don't show toast on initial load
+      } else if (settings?.apiKey) {
+        validateKey(settings.apiKey, selectedProvider, false);
+      } else {
+        setIsKeyValid(selectedProvider === 'webspeech' ? true : null);
+      }
+    } else {
+      // Reset validation status when settings closed
       setIsKeyValid(null);
     }
   }, [selectedProvider, showSettings, getProviderSettings]);
-
-
   const validateKey = async (key: string, providerType: ProviderType, showSuccessToast = true) => {
     if (providerType === 'webspeech') {
+        // WebSpeech is always available in supported browsers
         setIsKeyValid(true);
         return true;
+    }
+    
+    if (providerType === 'realtimestt') {
+        setIsValidatingKey(true);
+        try {
+            // Use the existing cached provider if possible
+            const provider = await TranscriptionProviderFactory.getProvider({ type: providerType });
+            const isAvailable = await provider.isAvailable();
+            
+            console.log(`RealtimeSTT validation result: ${isAvailable ? 'available' : 'unavailable'}`);
+            setIsKeyValid(isAvailable);
+            
+            if (isAvailable && showSuccessToast) {
+                toast.success('RealtimeSTT server is available');
+            } else if (!isAvailable && showSuccessToast) {
+                toast.error('RealtimeSTT server is not available');
+            }
+            
+            return isAvailable;
+        } finally {
+            setIsValidatingKey(false);
+        }
     }
     if (!key) {
         setIsKeyValid(null); // No key provided means neither valid nor invalid, just required
@@ -78,17 +113,22 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
         toast.success('API key validated successfully!');
       } else if (!isAvailable) {
         toast.error('Invalid API key');
-      }
-      return isAvailable;
-    } catch (error: any) {
+      }      return isAvailable;    } catch (error: unknown) {
       console.error('API key validation error:', error);
       setIsKeyValid(false);
-      if (error.type === 'PAYMENT_REQUIRED') {
+      
+      // Type guard to safely access error properties
+      if (typeof error === 'object' && error !== null && 'type' in error && 
+          (error as Record<string, unknown>).type === 'PAYMENT_REQUIRED') {
+          const errorObj = error as Record<string, unknown>;
+          const errorMessage = 'message' in errorObj ? String(errorObj.message) : 'Payment required';
+          const paymentLink = 'link' in errorObj ? String(errorObj.link) : '#';
+          
           toast.error(
             <div>
-              <p>{error.message}</p>
+              <p>{errorMessage}</p>
               <a
-                href={error.link}
+                href={paymentLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:text-blue-600 underline mt-2 block"
@@ -118,18 +158,24 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
         await initializeProvider(selectedProvider);
     }
   };
-
   const handleProviderChange = async (newProvider: ProviderType) => {
      setProvider(newProvider);
      const settings = getProviderSettings(newProvider);
-     const newApiKey = settings?.apiKey || '';
-     setApiKeyInput(newApiKey);
-     // Validate the key for the new provider
-     await validateKey(newApiKey, newProvider, false); // Don't show success toast on provider change
-      // Only show info toast if key is missing for non-webspeech
-      if (newProvider !== 'webspeech' && !newApiKey) {
-          toast.info(`Please enter your ${PROVIDER_DISPLAY_NAMES[newProvider]} API key and click Apply.`);
-      }
+     
+     if (newProvider === 'realtimestt') {
+       // For RealtimeSTT, immediately validate server connection
+       await validateKey('', newProvider, true);
+     } 
+     else {
+       const newApiKey = settings?.apiKey || '';
+       setApiKeyInput(newApiKey);
+       // Validate the key for the new provider
+       await validateKey(newApiKey, newProvider, false);
+       // Only show info toast if key is missing for providers that need keys
+       if (isKeyRequiredProvider(newProvider) && !newApiKey) {
+         toast.info(`Please enter your ${PROVIDER_DISPLAY_NAMES[newProvider]} API key and click Apply.`);
+       }
+     }
   };
 
 
@@ -155,9 +201,25 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
                 {PROVIDER_DISPLAY_NAMES[p]}
               </option>
             ))}
-          </select>
-          <div className="flex items-center text-xs mt-1 h-4">
-            {selectedProvider !== 'webspeech' && ( // Only show status for non-webspeech
+          </select>          <div className="flex items-center text-xs mt-1 h-4">
+            {selectedProvider === 'realtimestt' ? (
+              <>
+                <span className="mr-1">Status:</span>
+                {isValidatingKey ? (
+                  <span className="flex items-center text-blue-500">
+                    <Loader className="w-3 h-3 mr-1 animate-spin" /> Validating...
+                  </span>
+                ) : isKeyValid ? (
+                  <span className="flex items-center text-green-500">
+                    <Check className="w-3 h-3 mr-1" /> Server Available
+                  </span>
+                ) : (
+                  <span className="flex items-center text-red-500">
+                    <AlertCircle className="w-3 h-3 mr-1" /> Server Unavailable
+                  </span>
+                )}
+              </>
+            ) : selectedProvider !== 'webspeech' && (
               <>
                 <span className="mr-1">Status:</span>
                 {isValidatingKey ? (
@@ -180,10 +242,8 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
               </>
             )}
           </div>
-        </div>
-
-        {/* Provider-specific Settings */}
-        {selectedProvider !== 'webspeech' && (
+        </div>        {/* Provider-specific Settings */}
+        {selectedProvider !== 'webspeech' && selectedProvider !== 'realtimestt' && (
           <div>
             <label htmlFor="api-key" className="block text-sm font-medium mb-1 dark:text-gray-200">
               API Key
@@ -219,6 +279,13 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings, toggl
                 )}
               </button>
             </div>
+          </div>
+        )}
+        
+        {/* RealtimeSTT Info Message */}
+        {selectedProvider === 'realtimestt' && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-700 rounded">
+            Connects to a local RealtimeSTT server process. Ensure the server is running at {process.env.NEXT_PUBLIC_STT_DATA_URL || 'ws://localhost:8012'}
           </div>
         )}
         {/* Placeholder for other settings like language, etc. */}

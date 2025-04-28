@@ -44,14 +44,16 @@ router.get('/', async (req, res) => {
       GROUP BY DATE(timestamp)
       ORDER BY date ASC
     `;
-    const timeline = await runQuery(timelineQuery, [userId, startDate.toISOString()]);
-
-    // Get tags creation timeline data
+    const timeline = await runQuery(timelineQuery, [userId, startDate.toISOString()]);    // Get tags creation timeline data for notes only
     const tagsTimelineQuery = `
-      SELECT DATE(ut.created_at) as date, COUNT(*) as count
-      FROM user_tags ut
-      WHERE ut.user_id = ? AND ut.created_at >= datetime(?)
-      GROUP BY DATE(ut.created_at)
+      SELECT DATE(it.created_at) as date, COUNT(*) as count
+      FROM item_tags it
+      WHERE it.item_type = 'note'
+      AND it.item_id IN (
+        SELECT id FROM notes WHERE user_id = ?
+      )
+      AND it.created_at >= datetime(?)
+      GROUP BY DATE(it.created_at)
       ORDER BY date ASC
     `;
     const tagsTimeline = await runQuery(tagsTimelineQuery, [userId, startDate.toISOString()]);

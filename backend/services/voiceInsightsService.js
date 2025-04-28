@@ -12,11 +12,15 @@ const getVoiceInsights = async (userId, timeRange) => {
     hours = days * 24;
   }
   
-  const startDate = new Date();
-  startDate.setHours(startDate.getHours() - hours);
+  const now = new Date(); // Get current time
+  const startDate = new Date(now); // Create startDate based on now
+  startDate.setHours(startDate.getHours() - hours); // Set start date back by 'hours'
+
+  const endDate = new Date(now); // Create endDate based on now
+  endDate.setHours(endDate.getHours() + 24); // Set end date forward by 24 hours
 
   try {
-    // Get all transcripts within the time range
+    // Get all transcripts within the adjusted time range
     const query = `
       SELECT 
         t.id, 
@@ -28,30 +32,30 @@ const getVoiceInsights = async (userId, timeRange) => {
       FROM transcripts t
       LEFT JOIN item_tags it ON t.id = it.item_id AND it.item_type = 'transcript'
       LEFT JOIN tags tg ON it.tag_id = tg.id
-      WHERE t.user_id = ? AND t.date >= datetime(?)
+      WHERE t.user_id = ? AND t.date >= datetime(?) AND t.date < datetime(?) -- Use startDate and endDate
       GROUP BY t.id
       ORDER BY t.date ASC
     `;
 
-    // Get tag creation data for transcripts
+    // Get tag creation data for transcripts within the adjusted time range
     const tagCreationQuery = `
       SELECT strftime('%Y-%m-%d', it.created_at) as date, COUNT(*) as count
       FROM item_tags it
       JOIN tags t ON it.tag_id = t.id
       WHERE it.item_type = 'transcript'
       AND EXISTS (SELECT 1 FROM transcripts tr WHERE tr.id = it.item_id AND tr.user_id = ?)
-      AND it.created_at >= datetime(?)
+      AND it.created_at >= datetime(?) AND it.created_at < datetime(?) -- Use startDate and endDate
       GROUP BY strftime('%Y-%m-%d', it.created_at)
       ORDER BY date ASC
     `;
 
-    // Use better-sqlite3 API to get transcripts
+    // Use better-sqlite3 API to get transcripts with updated parameters
     const stmt = db.prepare(query);
-    const transcripts = stmt.all(userId, startDate.toISOString());
+    const transcripts = stmt.all(userId, startDate.toISOString(), endDate.toISOString()); // Pass endDate
 
-    // Get tag creation timeline data using better-sqlite3 API
+    // Get tag creation timeline data using better-sqlite3 API with updated parameters
     const tagStmt = db.prepare(tagCreationQuery);
-    const tagTimeline = tagStmt.all(userId, startDate.toISOString());
+    const tagTimeline = tagStmt.all(userId, startDate.toISOString(), endDate.toISOString()); // Pass endDate
 
     // Process transcripts
     const timelineMap = new Map();
@@ -113,7 +117,7 @@ const getVoiceInsights = async (userId, timeRange) => {
     // Calculate quick stats
     const totalDurationSeconds = transcripts.reduce((sum, t) => sum + (t.duration || 0), 0);
     const totalDurationHours = totalDurationSeconds / (60 * 60);  // Convert seconds to hours
-    const weeklyRecordingTime = (totalDurationHours * 7) / activeDays;
+    const weeklyRecordingTime = activeDays > 0 ? (totalDurationHours * 7) / activeDays : 0; // Avoid division by zero
     
     const avgRecordingLength = transcripts.length > 0 
       ? (totalDurationSeconds / transcripts.length) / 60  // Convert seconds to minutes

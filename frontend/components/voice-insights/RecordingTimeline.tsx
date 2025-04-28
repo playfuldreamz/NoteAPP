@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import { formatUTCDateToShortLocal } from '../../utils/dateUtils'; // Update import to use the renamed function
 
 ChartJS.register(
   CategoryScale,
@@ -57,83 +58,37 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], tagsDa
     );
   }
 
-  const normalizeRecordingDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) {
-        return dateStr; // Return original if invalid
-      }
-
-      // Convert to local timezone
-      const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-      return `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
-    } catch (error) {
-      return dateStr;
-    }
-  };
-
-  const normalizeTagsDate = (dateStr: string) => {
-    // Skip timezone adjustment for dates already in YYYY-MM-DD format
-    return dateStr;
-  };
-
-  // Normalize all dates in both datasets
-  const normalizedData = data.map(item => ({
-    ...item,
-    date: normalizeRecordingDate(item.date)
-  }));
-
-  const normalizedTagsData = tagsData.map(item => ({
-    ...item,
-    date: normalizeTagsDate(item.date)
-  }));
-
-  // Create a combined set of dates from both datasets
+  // Create a combined set of dates directly from the props
   const allDates = new Set([
-    ...normalizedData.map(item => item.date),
-    ...normalizedTagsData.map(item => item.date)
+    ...data.map(item => item.date.split('T')[0]), // Extract YYYY-MM-DD
+    ...tagsData.map(item => item.date) // Tags dates are already YYYY-MM-DD
   ]);
-  
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date();
-  const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  
-  // Sort dates chronologically and filter out future dates
-  const sortedDates = Array.from(allDates)
-    .sort()
-    .filter(date => date <= todayFormatted);
 
-  // Format dates for display with timezone handling
-  const formattedDates = sortedDates.map(date => {
-    // Create date with timezone handling to prevent off-by-one errors
-    const [year, month, day] = date.split('-').map(Number);
-    // Months are 0-indexed in JavaScript Date
-    const dateObj = new Date(year, month - 1, day);
-    return dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  });
+  // Sort dates chronologically (YYYY-MM-DD strings)
+  const sortedDates = Array.from(allDates).sort();
+
+  // Format dates for display using the short format utility function
+  const formattedDates = sortedDates.map(formatUTCDateToShortLocal);
 
   // Create datasets with 0 counts for missing dates
   const recordingData = sortedDates.map(date => {
-    const found = normalizedData.find(item => item.date === date);
+    // Find based on the original YYYY-MM-DD date
+    const found = data.find(item => item.date.startsWith(date));
     return found ? Math.round(found.duration / 60) : 0; // Convert seconds to minutes
   });
 
   const tagsCreatedData = sortedDates.map(date => {
-    const found = normalizedTagsData.find(item => item.date === date);
+    // Find based on the original YYYY-MM-DD date
+    const found = tagsData.find(item => item.date === date);
     return found ? found.count : 0;
   });
 
-  const labels = sortedDates;
-
-  const recordingDurations = recordingData;
-  const tagsCounts = tagsCreatedData;
-
   const durationChartData = {
-    labels: formattedDates,
+    labels: formattedDates, // Use formatted short local dates
     datasets: [
       {
         label: 'Recording Duration (minutes)',
-        data: recordingDurations,
+        data: recordingData,
         borderColor: 'rgb(75, 192, 192)',
         backgroundColor: 'rgba(75, 192, 192, 0.2)',
         tension: 0.4,
@@ -142,11 +97,11 @@ const RecordingTimeline: React.FC<RecordingTimelineProps> = ({ data = [], tagsDa
   };
 
   const tagsChartData = {
-    labels: formattedDates,
+    labels: formattedDates, // Use formatted short local dates
     datasets: [
       {
         label: 'Tags Created',
-        data: tagsCounts,
+        data: tagsCreatedData,
         backgroundColor: 'rgba(255, 99, 132, 0.5)',
         borderColor: 'rgb(255, 99, 132)',
         borderWidth: 1,

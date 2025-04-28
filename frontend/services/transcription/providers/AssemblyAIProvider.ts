@@ -1,5 +1,10 @@
 import { TranscriptionProvider, TranscriptionResult, TranscriptionOptions } from '../types';
 
+interface ExtendedError extends Error {
+  type?: string;
+  link?: string;
+}
+
 export class AssemblyAIProvider implements TranscriptionProvider {
   private socket: WebSocket | null = null;
   private mediaRecorder: MediaRecorder | null = null;
@@ -8,6 +13,8 @@ export class AssemblyAIProvider implements TranscriptionProvider {
   private onErrorCallback: ((error: Error) => void) | null = null;
   private apiKey: string;
   private finalTranscript: string = '';
+  private isPaused: boolean = false;
+  pausedTranscript: string = ''; // Changed to public to match interface
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -21,7 +28,7 @@ export class AssemblyAIProvider implements TranscriptionProvider {
     try {
       await this.getToken();
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -38,19 +45,20 @@ export class AssemblyAIProvider implements TranscriptionProvider {
     const data = await response.json();
     
     if (!response.ok) {
-      const error = new Error(data.error);
-      (error as any).type = data.type;
-      (error as any).link = data.link;
+      const error = new Error(data.error);      
+      (error as ExtendedError).type = data.type;
+      (error as ExtendedError).link = data.link;
       throw error;
     }
 
     return data.token;
-  }
-
+  }  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async initialize(options?: TranscriptionOptions): Promise<void> {
     try {
-      // Reset the final transcript when initializing
+      // Reset states
       this.finalTranscript = '';
+      this.isPaused = false;
+      this.pausedTranscript = '';
       
       const token = await this.getToken();
       
@@ -84,9 +92,7 @@ export class AssemblyAIProvider implements TranscriptionProvider {
             }
           }
         }
-      };
-
-      this.socket.onerror = (error) => {
+      };      this.socket.onerror = () => {
         if (this.onErrorCallback) {
           this.onErrorCallback(new Error('WebSocket error'));
         }
@@ -111,8 +117,8 @@ export class AssemblyAIProvider implements TranscriptionProvider {
       });
 
       this.mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN) {
-          // Convert audio data to the correct format
+        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN && !this.isPaused) {
+          // Only send data if not paused
           const arrayBuffer = await event.data.arrayBuffer();
           const audioData = new Int16Array(arrayBuffer);
           
@@ -155,6 +161,34 @@ export class AssemblyAIProvider implements TranscriptionProvider {
     this.cleanup();
   }
 
+  async pause(): Promise<void> {
+    console.log('AssemblyAI: Pausing transcription');
+    this.isPaused = true;
+    this.pausedTranscript = this.finalTranscript;
+
+    // Stop sending new data but keep connection alive
+    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      this.mediaRecorder.pause();
+    }
+  }
+
+  async resume(): Promise<void> {
+    console.log('AssemblyAI: Resuming transcription');
+    this.isPaused = false;
+    
+    // Restore final transcript
+    if (this.pausedTranscript) {
+      this.finalTranscript = this.pausedTranscript;
+    }
+
+    // Resume sending data
+    if (this.mediaRecorder && this.mediaRecorder.state === 'paused') {
+      this.mediaRecorder.resume();
+    } else if (this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
+      this.mediaRecorder.start(100);
+    }
+  }
+
   onResult(callback: (result: TranscriptionResult) => void): void {
     this.onResultCallback = callback;
   }
@@ -179,5 +213,7 @@ export class AssemblyAIProvider implements TranscriptionProvider {
     }
     
     this.finalTranscript = '';
+    this.isPaused = false;
+    this.pausedTranscript = '';
   }
 }

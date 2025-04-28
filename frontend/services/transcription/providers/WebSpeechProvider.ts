@@ -52,7 +52,8 @@ export class WebSpeechProvider implements TranscriptionProvider {
   private resultCallback: ((result: TranscriptionResult) => void) | null = null;
   private errorCallback: ((error: Error) => void) | null = null;
   private isStopping: boolean = false;
-  private finalTranscript: string = '';
+  private isPaused: boolean = false;  private finalTranscript: string = '';
+  pausedTranscript: string = ''; // Made public to match TranscriptionProvider interface
   
   // Audio enhancement components
   private audioContext: AudioContext | null = null;
@@ -212,7 +213,6 @@ export class WebSpeechProvider implements TranscriptionProvider {
           this.finalTranscript += ' ' + transcript;
           this.finalTranscript = this.finalTranscript.trim();
           
-          // Send the complete transcript (including all previous final results)
           this.resultCallback({ 
             transcript: this.finalTranscript, 
             isFinal: true, 
@@ -221,7 +221,6 @@ export class WebSpeechProvider implements TranscriptionProvider {
         } else {
           interimTranscript += transcript;
           
-          // Send the current interim transcript along with all previous final results
           this.resultCallback({ 
             transcript: this.finalTranscript + ' ' + interimTranscript, 
             isFinal: false, 
@@ -233,18 +232,26 @@ export class WebSpeechProvider implements TranscriptionProvider {
 
     this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (this.errorCallback) {
-        this.errorCallback(new Error(event.error));
+        // Don't report errors if we're intentionally pausing/stopping
+        if (!this.isStopping && !this.isPaused) {
+          this.errorCallback(new Error(event.error));
+        }
       }
-    };
-
-    this.recognition.onend = () => {
-      // Only auto restart if continuous mode AND we're not explicitly stopping
-      if (this.recognition?.continuous && !this.isStopping) {
+    };    this.recognition.onend = () => {
+      console.log(`WebSpeech recognition ended. isPaused=${this.isPaused}, isStopping=${this.isStopping}`);
+      // Only auto restart if continuous mode AND we're not explicitly stopping/pausing
+      if (this.recognition?.continuous && !this.isStopping && !this.isPaused) {
         console.log('WebSpeech recognition ended, restarting because continuous mode is enabled');
-        this.recognition.start();
+        try {
+          this.recognition.start();
+        } catch (error) {
+          // If already started, just ignore
+          if (!(error instanceof Error && error.message.includes('already started'))) {
+            console.error('Error restarting recognition:', error);
+          }
+        }
       } else {
         console.log('WebSpeech recognition ended, not restarting');
-        // If we're explicitly stopping, make sure to send the final transcript one last time
         if (this.isStopping && this.resultCallback && this.finalTranscript) {
           this.resultCallback({
             transcript: this.finalTranscript,
@@ -256,34 +263,74 @@ export class WebSpeechProvider implements TranscriptionProvider {
       }
     };
   }
-
   async start(): Promise<void> {
     if (!this.recognition) {
       throw new Error('Recognition not initialized. Call initialize() first.');
     }
-    
-    // If we have enhanced the audio stream, we'll use it
-    if (this.enhancedStream && this.speechDetector) {
-      this.speechDetector.start();
-      
-      // Use the enhanced stream for recognition
-      // Note: Web Speech API doesn't directly support setting a custom stream
-      // So we'll use MediaRecorder as an intermediary if needed
+
+    // Only reset transcript if not resuming from pause
+    if (!this.pausedTranscript) {
+      this.finalTranscript = '';
     }
     
-    this.finalTranscript = '';
+    this.isPaused = false;
     this.isStopping = false;
-    this.recognition.start();
+
+    // If recognition is in progress, don't try to start again
+    if (this.recognition && !this.isPaused && !this.isStopping) {
+      try {
+        this.recognition.start();
+      } catch (error) {
+        // If already started, just ignore the error
+        if (error instanceof Error && error.message.includes('already started')) {
+          return;
+        }
+        throw error;
+      }
+    }
   }
 
   async stop(): Promise<void> {
-    if (this.recognition) {
-      this.isStopping = true;
-      this.recognition.stop();
-    }
+    if (!this.recognition) return;
+    
+    this.isStopping = true;
+    this.isPaused = false;
+    this.pausedTranscript = '';
+    this.recognition.stop();
     
     if (this.speechDetector) {
       this.speechDetector.stop();
+    }
+  }
+  async pause(): Promise<void> {
+    if (!this.recognition) return;
+
+    console.log('WebSpeech: Pausing recognition');
+    // Don't set isPaused until after we've stopped to prevent onend from restarting
+    this.pausedTranscript = this.finalTranscript; // Store current transcript
+    this.recognition.stop(); // Temporarily stop recognition
+    this.isPaused = true;
+  }
+
+  async resume(): Promise<void> {
+    if (!this.recognition) {
+      throw new Error('Recognition not initialized. Call initialize() first.');
+    }
+
+    console.log('WebSpeech: Resuming recognition');
+    if (this.pausedTranscript) {
+      this.finalTranscript = this.pausedTranscript;
+    }
+    this.isPaused = false;
+    
+    try {
+      this.recognition.start();
+    } catch (error) {
+      // If already started, just ignore the error
+      if (error instanceof Error && error.message.includes('already started')) {
+        return;
+      }
+      throw error;
     }
   }
 
