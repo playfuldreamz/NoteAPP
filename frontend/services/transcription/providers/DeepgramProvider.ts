@@ -8,9 +8,8 @@ export class DeepgramProvider implements TranscriptionProvider {
   private onErrorCallback: ((error: Error) => void) | null = null;
   private apiKey: string;
   private finalTranscript: string = '';
-
   private isPaused: boolean = false;
-  private pausedTranscript: string = '';
+  pausedTranscript: string = ''; // Changed to public to match interface
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -48,6 +47,7 @@ export class DeepgramProvider implements TranscriptionProvider {
     }
   }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async initialize(options?: TranscriptionOptions): Promise<void> {
   // No need to request microphone access here
   this.finalTranscript = '';
@@ -122,9 +122,8 @@ async start(): Promise<void> {
             });
           }
         }
-      };
-
-      this.socket.onerror = (event: Event) => {
+      };      
+      this.socket.onerror = () => {
         if (this.onErrorCallback) {
           const error = new Error('WebSocket connection error');
           this.onErrorCallback(error);

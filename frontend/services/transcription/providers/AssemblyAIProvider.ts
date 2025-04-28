@@ -1,5 +1,10 @@
 import { TranscriptionProvider, TranscriptionResult, TranscriptionOptions } from '../types';
 
+interface ExtendedError extends Error {
+  type?: string;
+  link?: string;
+}
+
 export class AssemblyAIProvider implements TranscriptionProvider {
   private socket: WebSocket | null = null;
   private mediaRecorder: MediaRecorder | null = null;
@@ -8,9 +13,8 @@ export class AssemblyAIProvider implements TranscriptionProvider {
   private onErrorCallback: ((error: Error) => void) | null = null;
   private apiKey: string;
   private finalTranscript: string = '';
-
   private isPaused: boolean = false;
-  private pausedTranscript: string = '';
+  pausedTranscript: string = ''; // Changed to public to match interface
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -24,7 +28,7 @@ export class AssemblyAIProvider implements TranscriptionProvider {
     try {
       await this.getToken();
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -41,15 +45,14 @@ export class AssemblyAIProvider implements TranscriptionProvider {
     const data = await response.json();
     
     if (!response.ok) {
-      const error = new Error(data.error);
-      (error as any).type = data.type;
-      (error as any).link = data.link;
+      const error = new Error(data.error);      
+      (error as ExtendedError).type = data.type;
+      (error as ExtendedError).link = data.link;
       throw error;
     }
 
     return data.token;
-  }
-
+  }  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async initialize(options?: TranscriptionOptions): Promise<void> {
     try {
       // Reset states
@@ -89,9 +92,7 @@ export class AssemblyAIProvider implements TranscriptionProvider {
             }
           }
         }
-      };
-
-      this.socket.onerror = (error) => {
+      };      this.socket.onerror = () => {
         if (this.onErrorCallback) {
           this.onErrorCallback(new Error('WebSocket error'));
         }
