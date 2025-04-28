@@ -141,45 +141,60 @@ export function useTranscriptionManager(options: UseTranscriptionManagerOptions 
       }
     }
   };
-
   // Pause transcription
   const pauseTranscription = async (): Promise<void> => {
+    // Store current transcript before pausing
+    const currentTranscript = originalTranscript;
+    
     if (providerInstanceRef.current && typeof providerInstanceRef.current.pause === 'function') {
       try {
-        console.log("useTranscriptionManager: Calling provider.pause()"); // Added log
-        await providerInstanceRef.current.pause(); // Call the new pause method
+        console.log(`useTranscriptionManager: Calling provider.pause() for ${providerInstanceRef.current.name}`);
+        await providerInstanceRef.current.pause();
+        // Store transcript in provider instance for resuming later
+        providerInstanceRef.current.pausedTranscript = currentTranscript;
       } catch (error) {
         console.error('Error pausing transcription provider:', error);
+        toast.error(`Failed to pause transcription: ${(error as Error).message}`);
       }
     } else {
-        console.warn("useTranscriptionManager: Pause called but no provider or pause method available.");
+      console.warn("useTranscriptionManager: Pause called but no provider or pause method available.");
+      // For providers without native pause, we'll need to stop
+      await stopTranscription();
     }
   };
 
   // Resume transcription with existing transcript
   const resumeTranscription = async (existingTranscript: string, mediaStream?: MediaStream): Promise<boolean> => {
-    // NOTE: existingTranscript and mediaStream might not be needed if provider handles state internally
-    if (providerInstanceRef.current && typeof providerInstanceRef.current.resume === 'function') {
+    if (providerInstanceRef.current) {
       try {
-        console.log("useTranscriptionManager: Calling provider.resume()"); // Added log
-        await providerInstanceRef.current.resume(); // Call the new resume method
-        
-        // Re-attach result handler just in case? (May not be necessary if provider state persists)
-        // providerInstanceRef.current.onResult(handleResult); 
-        // providerInstanceRef.current.onError(handleError);
-
-        return true;
+        if (typeof providerInstanceRef.current.resume === 'function') {
+          console.log(`useTranscriptionManager: Calling provider.resume() for ${providerInstanceRef.current.name}`);
+          // Ensure we have the transcript stored before resuming
+          if (!providerInstanceRef.current.pausedTranscript) {
+            providerInstanceRef.current.pausedTranscript = existingTranscript;
+          }
+          await providerInstanceRef.current.resume();
+          return true;
+        } else {
+          console.warn(`useTranscriptionManager: Provider ${providerInstanceRef.current.name} lacks .resume(), attempting restart with existing content.`);
+          setOriginalTranscript(existingTranscript); // Store the existing transcript
+          return await startTranscription(mediaStream);
+        }
       } catch (error) {
+        if (error instanceof Error && error.message.includes('already started')) {
+          // If already started, consider it a success
+          return true;
+        }
         console.error('Failed to resume transcription provider:', error);
         toast.error(`Failed to resume transcription: ${(error as Error).message}`);
-        return false;
+        // If resume fails, try a restart as fallback
+        setOriginalTranscript(existingTranscript);
+        return await startTranscription(mediaStream);
       }
     } else {
-      console.warn("useTranscriptionManager: Resume called but no provider or resume method available. Attempting full restart...");
-      // Fallback: If pause/resume isn't supported or provider was lost, try a full restart
-      // This might lose the existing transcript context depending on provider implementation
-      setOriginalTranscript(existingTranscript); // Ensure existing transcript is preserved in state
-      return await startTranscription(mediaStream); 
+      console.warn("useTranscriptionManager: Resume called but no provider available. Attempting full restart...");
+      setOriginalTranscript(existingTranscript);
+      return await startTranscription(mediaStream);
     }
   };
 
