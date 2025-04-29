@@ -40,12 +40,9 @@ def load_config():
         level=getattr(logging, config['log_level'], logging.INFO),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
-    # --- DSPy Configuration ---
+      # --- DSPy Configuration ---
     llm_provider, llm_model, api_key = get_llm_config()
-    
-    logger.info(f"Configuring DSPy LLM Provider: {llm_provider}, Model: {llm_model}")    # Use the modern dspy.LM factory method with simplified config
-    import dspy
+    logger.info(f"Configuring DSPy LLM Provider: {llm_provider}, Model: {llm_model}")
     from config import MAX_TOKENS
     
     if not api_key and llm_provider not in ['ollama', 'lmstudio']:
@@ -53,30 +50,27 @@ def load_config():
         raise ValueError(f"Missing API key for {llm_provider}")
     
     try:
-        # Create model name with provider prefix
+        # Create full model name with provider prefix - which should be "gemini/" for Gemini models
+        # llm_provider should already be "gemini" from config.py's get_llm_config()
         model_name = f"{llm_provider}/{llm_model}"
+        logger.info(f"Using unified model name: {model_name}")
         
-        # Configure LM based on provider
-        if llm_provider == 'ollama':
-            # Ollama doesn't need API key
-            lm = dspy.LM(model_name)
-        elif llm_provider == 'lmstudio':
-            # LMStudio uses OpenAI-compatible API
+        # Use the simplified dspy.LM factory API for all providers
+        lm_kwargs = {'api_key': api_key}
+        
+        # Add provider-specific configurations if needed
+        if llm_provider == 'openai':
+            lm_kwargs['max_tokens'] = MAX_TOKENS
+        elif llm_provider in ['ollama', 'lmstudio']:
+            # Local models may need base_url and don't require real API keys
+            lm_kwargs['api_key'] = 'not-needed'
             base_url = os.environ.get('LOCAL_LLM_BASE_URL')
-            lm_kwargs = {'api_key': 'not-needed'}
             if base_url:
                 lm_kwargs['api_base'] = base_url
-            lm = dspy.LM(model_name, **lm_kwargs)
-        else:
-            # Standard providers (OpenAI, Google, Anthropic)
-            lm_kwargs = {
-                'api_key': api_key
-            }
-            if llm_provider == 'openai':
-                lm_kwargs['max_tokens'] = MAX_TOKENS
-            
-            lm = dspy.LM(model_name, **lm_kwargs)
-          logger.info(f"Configured DSPy for {llm_provider.capitalize()} with model {llm_model}")
+        
+        # One unified call to dspy.LM for all providers
+        lm = dspy.LM(model_name, **lm_kwargs)
+        logger.info(f"Configured DSPy with {model_name}")
         
         # Set the LM as the default for DSPy
         dspy.configure(lm=lm)
@@ -84,10 +78,6 @@ def load_config():
     except Exception as e:
         logger.error(f"Failed to configure DSPy LM: {e}")
         raise
-
-    # Configure DSPy globally
-    dspy.configure(lm=lm)
-    logger.info("DSPy configured successfully.")
 
 
 # --- Flask App Setup ---
@@ -115,12 +105,15 @@ def chat_endpoint():
     if not user_id:
          return jsonify({"error": "Missing 'user_id' in request"}), 400 # User context is crucial
 
-    logger.info(f"Received  request for user {user_id}. Input: '{user_input[:50]}...'")
-
+    logger.info(f"Received  request for user {user_id}. Input: '{user_input[:50]}...'")    
     try:
         # Instantiate agent per request for now (stateless)
+        logger.info(f"Creating ChatAgent instance...")
         agent = ChatAgent()
+        logger.info(f"ChatAgent created successfully")
+        
         # Run the agent's forward pass
+        logger.info(f"Running ChatAgent forward pass for user {user_id}")
         prediction = agent.forward(
             user_input=user_input,
             chat_history=chat_history,
@@ -137,7 +130,8 @@ def chat_endpoint():
 
     except Exception as e:
         logger.error(f"Error processing chat request for user {user_id}: {e}", exc_info=True)
-        return jsonify({"error": "Failed to process chat request"}), 500
+        logger.error(f"Exception traceback:", exc_info=True)
+        return jsonify({"error": f"Failed to process chat request: {str(e)}"}), 500
 
 # --- Main Execution Block ---
 if __name__ == "__main__":

@@ -8,10 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # LLM Provider Configuration
-DEFAULT_LLM_PROVIDER = 'google'  # Options: openai, google, anthropic, ollama, lmstudio
+DEFAULT_LLM_PROVIDER = 'gemini'  # Options: openai, gemini, anthropic, ollama, lmstudio
 DEFAULT_LLM_MODELS = {
     'openai': 'gpt-4o-mini',
-    'google': 'gemini-pro',    # Default Gemini model
+    'gemini': 'gemini-1.5-pro-latest',  # Versioned Gemini model ID
     'anthropic': 'claude-3-sonnet',
     'ollama': 'llama3',
     'lmstudio': 'Meta-Llama-3-8B-Instruct'
@@ -40,14 +40,15 @@ def get_llm_config():
     if provider in DEFAULT_LLM_MODELS:
         model = os.environ.get('DSPY_LLM_MODEL', DEFAULT_LLM_MODELS[provider])
     else:
-        model = os.environ.get('DSPY_LLM_MODEL', 'gemini-pro')  # Fallback to gemini-pro
-    
-    # Get the appropriate API key based on provider
+        model = os.environ.get('DSPY_LLM_MODEL', 'gemini-1.5-pro-latest')  # Fallback to gemini-pro
+      # Get the appropriate API key based on provider
     api_key = None
     if provider == 'openai':
         api_key = os.environ.get('OPENAI_API_KEY')
-    elif provider == 'google':
+    elif provider in ['gemini', 'google']:
         api_key = os.environ.get('GEMINI_API_KEY')
+        # Ensure we use the correct provider prefix for LiteLLM
+        provider = 'gemini'  # LiteLLM expects "gemini" not "google"
     elif provider == 'anthropic':
         api_key = os.environ.get('ANTHROPIC_API_KEY')
     # For ollama/lmstudio, no API key needed
