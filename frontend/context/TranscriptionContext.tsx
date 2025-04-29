@@ -1,13 +1,20 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { TranscriptionProvider, ProviderType, ProviderConfig } from '../services/transcription/types';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ProviderType } from '../services/transcription/types';
 import { TranscriptionProviderFactory } from '../services/transcription/providerFactory';
-import { toast } from 'react-toastify';
+import { useProviderSettings } from '../hooks/useProviderSettings';
+import { useProviderInitialization } from '../hooks/useProviderInitialization';
+
+interface ProviderOptionValue {
+  value: string | number | boolean;
+  label?: string;
+  description?: string;
+}
 
 interface ProviderSettings {
   apiKey?: string;
-  options?: Record<string, any>;
+  options?: Record<string, ProviderOptionValue>;
 }
 
 interface TranscriptionContextType {
