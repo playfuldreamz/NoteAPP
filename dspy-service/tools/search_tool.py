@@ -31,10 +31,13 @@ def search_items_func(query: str, user_id: str | int, **kwargs) -> str:
     logger.info(f"SearchItemsTool called with query: '{query}' for user_id: {user_id}")
     if not user_id:
         logger.error("SearchItemsTool requires user_id.")
-        return json.dumps({"error": "User context missing for search."})
-
+        return json.dumps({"error": "User context missing for search."})    
     api_endpoint = f"{NODE_BACKEND_URL}/api/search"
-    headers = {'Content-Type': 'application/json'}
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'DSPy-Service/1.0',
+        'X-DSPy-Service': 'true'
+    }
     # IMPORTANT: This assumes the Node.js endpoint uses user_id from the
     # authenticated request context. If not, user_id might need to be
     # passed differently or this tool needs the auth token.

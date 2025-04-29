@@ -6,6 +6,7 @@ const db = require('../database/connection');
 const { isTagReferenced } = require('../utils/dbUtils');
 const linkService = require('../services/linkService');
 const embeddingGenerationTask = require('../services/ai/tasks/embeddingGeneration');
+const { isDspyServiceRequest } = require('../utils/dspyUtils');
 
 /**
  * @route GET /api/notes/count
@@ -181,10 +182,15 @@ router.get('/', authenticateToken, (req, res) => {
   }
 });
 
-// Get a single note by ID
+// Get a single note by ID - works for both authenticated users and DSPy service
 router.get('/:id', authenticateToken, (req, res) => {
   const noteId = req.params.id;
   const userId = req.user.id;
+  
+  // Handle DSPy service requests with special logging
+  if (req.user.isDspyService) {
+    console.log(`DSPy service requesting note ${noteId} for user ${userId}`);
+  }
 
   const query = `
     SELECT

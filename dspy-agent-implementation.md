@@ -90,7 +90,20 @@
      }
      ```
 
-2. Test with curl (Windows PowerShell):
+2. Test with dedicated test scripts:
+   ```powershell
+   # Test the DSPy service directly
+   cd dspy-service
+   .\test_dspy_api.ps1
+   
+   # Test specific functionality (content retrieval)
+   .\test_note_content.ps1
+   
+   # Debug tool functionality in detail
+   python debug_content_retrieval.py
+   ```
+
+3. Test with curl (Windows PowerShell):
    ```powershell
    $token = "your_jwt_token"
    $body = @{
@@ -106,7 +119,21 @@
 #### Monitoring and Verification:
 - Check the Python terminal for logs showing the agent's reasoning process, tool calls, and response generation
 - Check the Node.js terminal for logs showing request handling and proxying
+- Review detailed authentication logs for diagnosing service-to-service communication issues
 - Verify that the API response contains the expected `final_answer` field
+
+#### Testing Tool Integration:
+Before deploying to production, create some test data:
+```powershell
+# Create a test note with ID 15 for testing content retrieval
+cd backend
+node create-test-note.js
+```
+
+Test the full conversation flow:
+1. Search for notes about a topic
+2. Reference a specific note from search results
+3. Ask for specific content by ID from previous results
 
 ### Common Issues and Solutions
 
@@ -125,19 +152,105 @@ If you encounter an error like `AttributeError: module 'dspy' has no attribute '
   dspy.configure(lm=lm)
   ```
 
+#### Google Gemini API Versioned Models
+
+If you encounter a 404 error like `models/gemini-pro is not found for API version v1beta`:
+- This happens because Google's API requires specific versioned model IDs
+- Solution: Use a versioned model ID like `gemini-1.5-pro-latest` instead of just `gemini-pro`
+- Example:
+  ```
+  # In .env file:
+  DSPY_LLM_PROVIDER=gemini
+  DSPY_LLM_MODEL=gemini-1.5-pro-latest  # Versioned model ID required
+  ```
+
+#### Authentication Between DSPy Service and Node.js Backend
+
+If you encounter authentication errors when DSPy service tools try to access the Node.js backend:
+- Problem: The DSPy Python service can't use JWT tokens that the Node.js backend requires
+- Solution: Implement a service-to-service authentication bypass in the Node.js middleware:
+
+1. Create a dedicated utility file:
+   ```javascript
+   // backend/utils/dspyUtils.js
+   const isDspyServiceRequest = (req) => {
+     // Check if request is from localhost and has userId
+     const isLocalRequest = 
+       req.ip === '::1' || 
+       req.ip === '127.0.0.1' ||
+       req.ip.includes('::ffff:127.0.0.1');
+     
+     const hasUserId = 
+       (req.query && req.query.userId) || 
+       (req.body && req.body.userId);
+     
+     return isLocalRequest && hasUserId;
+   };
+   
+   module.exports = { isDspyServiceRequest };
+   ```
+
+2. Modify authentication middleware:
+   ```javascript
+   // backend/middleware/auth.js
+   const { isDspyServiceRequest } = require('../utils/dspyUtils');
+
+   const authenticateToken = (req, res, next) => {
+     // Bypass authentication for DSPy service
+     if (isDspyServiceRequest(req)) {
+       const userId = req.query.userId || (req.body ? req.body.userId : null);
+       req.user = { id: userId, isDspyService: true };
+       return next();
+     }
+     
+     // Normal JWT token authentication
+     const token = req.headers['authorization']?.split(' ')[1];
+     if (!token) return res.status(401).json({ error: 'Access denied' });
+     
+     try {
+       const verified = jwt.verify(token, JWT_SECRET);
+       req.user = verified;
+       next();
+     } catch (err) {
+       res.status(400).json({ error: 'Invalid token' });
+     }
+   };
+   ```
+
+3. Add authentication headers in DSPy tools:
+   ```python
+   # In content_tool.py and search_tool.py
+   headers = {
+       'Content-Type': 'application/json',
+       'User-Agent': 'DSPy-Service/1.0',
+       'X-DSPy-Service': 'true'
+   }
+   ```
+
+## Current Status (April 2025)
+
+- ✅ Basic DSPy agent integrated with Node.js backend
+- ✅ Search and content retrieval tools working
+- ✅ Authentication between services configured
+- ✅ Gemini LLM integration with proper versioned models
+- ✅ Testing utilities for diagnosing and verifying functionality
+
 ## Next Phases
 
 ### Phase 2: Advanced Tools & RAG Integration
 - Implement advanced search capabilities
 - Add knowledge extraction tools
 - Develop question-answering over note contents
+- Implement multi-document reasoning
 
 ### Phase 3: Agent Memory & Stateful Conversations
 - Session management
 - Conversation memory
 - Context-aware responses
+- User preference retention
 
 ### Phase 4: UI Integration & Testing
 - Frontend chat interface
 - Real-time responses
 - User feedback mechanisms
+- Error state handling and recovery
