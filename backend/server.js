@@ -30,6 +30,7 @@ const aiEmbeddingConfigRoutes = require('./routes/ai/embedding-config');
 const openaiKeyStatusRoutes = require('./routes/ai/openai-key-status');
 const maskedKeyRoutes = require('./routes/ai/masked-key');
 const embeddingRegenerationRoutes = require('./routes/ai/embedding-regeneration');
+const dspyProxyRoutes = require('./routes/ai/dspy_proxy');
 const actionItemsRoutes = require('./routes/actionItems');
 const transcriptsRoutes = require('./routes/transcripts');
 const notesRoutes = require('./routes/notes');
@@ -67,6 +68,7 @@ app.use('/api/ai/embedding-config', authenticateToken, aiEmbeddingConfigRoutes);
 app.use('/api/ai/openai-key-status', authenticateToken, openaiKeyStatusRoutes);
 app.use('/api/ai/masked-key', authenticateToken, maskedKeyRoutes);
 app.use('/api/ai/embedding-regeneration', authenticateToken, embeddingRegenerationRoutes);
+app.use('/api', dspyProxyRoutes); // Mount the DSPy proxy routes (prefix with /api)
 app.use('/api/action-items', authenticateToken, actionItemsRoutes);
 app.use('/api/transcripts', transcriptsRoutes);  // No auth required for token validation
 app.use('/api/notes', authenticateToken, notesRoutes);

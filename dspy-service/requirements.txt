@@ -1,0 +1,10 @@
+# DSPy Service Requirements
+dspy-ai>=2.5.6  # Using latest version with dspy.LM() factory method
+flask>=2.0.0
+python-dotenv>=0.20.0
+requests>=2.28.0
+# Optional: For WebSocket support if needed later
+# websockets>=10.0
+# For FastAPI alternative (uncomment if switching from Flask)
+# fastapi>=0.95.0
+# uvicorn>=0.20.0
