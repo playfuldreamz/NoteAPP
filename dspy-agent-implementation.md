@@ -237,20 +237,160 @@ If you encounter authentication errors when DSPy service tools try to access the
 
 ## Next Phases
 
-### Phase 2: Advanced Tools & RAG Integration
-- Implement advanced search capabilities
-- Add knowledge extraction tools
-- Develop question-answering over note contents
-- Implement multi-document reasoning
+### Phase 2: Advanced Tools & RAG Integration (May 2025)
 
-### Phase 3: Agent Memory & Stateful Conversations
-- Session management
-- Conversation memory
-- Context-aware responses
-- User preference retention
+**Objective**: Enhance the DSPy agent with advanced retrieval and reasoning capabilities to provide more valuable insights from user content.
 
-### Phase 4: UI Integration & Testing
-- Frontend chat interface
-- Real-time responses
-- User feedback mechanisms
-- Error state handling and recovery
+#### Implementation Tasks:
+1. **Enhanced Search Capabilities**:
+   - Implement hybrid search combining semantic and keyword-based approaches
+   - Add metadata filtering (by date, tags, type)
+   - Develop search ranking improvements with user context awareness
+   - Support more complex search queries with multiple constraints
+
+2. **Knowledge Extraction Tools**:
+   - Create a `SummarizeContentTool` for generating concise summaries
+   - Develop a `ExtractKeyPointsTool` to identify main concepts from notes
+   - Implement a `IdentifyEntitiesTool` to recognize people, places, and organizations
+   - Create a `ExtractTimelineEventsTool` to build chronological timelines from notes
+
+3. **Question-Answering over Note Contents**:
+   - Implement a structured RAG pipeline with query rewriting and transformation
+   - Create query-specific content retrieval with dynamic chunking
+   - Develop an answer generation module with source attribution
+   - Support follow-up questions with context maintenance
+   - Add fact verification against source content
+
+4. **Multi-Document Reasoning**:
+   - Implement cross-document entity resolution and linking
+   - Create a tool for comparing information across multiple notes
+   - Develop contextual understanding across document boundaries
+   - Support reasoning over contradictory information from multiple sources
+   - Add temporal reasoning for documents created at different times
+
+#### Success Criteria:
+- Agent can answer complex questions requiring synthesis of multiple documents
+- Knowledge extraction tools produce accurate, structured data from unstructured notes
+- Search functionality outperforms basic semantic search in accuracy and relevance
+- Agent can explain reasoning and cite sources for information provided
+
+### Phase 3: Agent Memory & Stateful Conversations (June 2025)
+
+**Objective**: Create a more personalized and context-aware conversation experience with persistent memory across sessions.
+
+#### Implementation Tasks:
+1. **Session Management**:
+   - Design and implement a session storage system
+   - Create session initialization and continuation mechanisms
+   - Develop session context persistence across multiple interactions
+   - Implement session timeout and garbage collection logic
+   - Add session encryption for security
+
+2. **Conversation Memory**:
+   - Create a short-term memory structure for immediate conversation context
+   - Implement long-term memory for persistent user insights
+   - Develop memory consolidation from short-term to long-term
+   - Add memory retrieval based on contextual relevance
+   - Create a memory forgetting mechanism to prevent context overflow
+
+3. **Context-Aware Responses**:
+   - Implement user intent tracking across conversation turns
+   - Develop contextual entity resolution for pronouns and references
+   - Create relevance scoring for potential response content
+   - Add conversation state tracking (e.g., "user is searching for X")
+   - Implement adaptive response formats based on conversation history
+
+4. **User Preference Retention**:
+   - Create a user preference model structure
+   - Implement preference learning from explicit statements
+   - Develop preference inference from implicit signals
+   - Add preference application in search ranking and response generation
+   - Create tools for users to view and modify stored preferences
+
+#### Success Criteria:
+- Agent maintains context across multiple conversation turns without repetition
+- User preferences are correctly captured and applied to future interactions
+- Long-running conversations remain coherent without context loss
+- Agent can recall information from previous sessions when relevant
+
+### Phase 4: UI Integration & Testing (July 2025)
+
+**Objective**: Deliver a seamless, responsive user interface for the DSPy agent and implement comprehensive testing for reliability.
+
+#### Implementation Tasks:
+1. **Frontend Chat Interface**:
+   - Design and implement a responsive chat UI component
+   - Create message typing indicators and loading states
+   - Develop markdown and code highlighting support
+   - Implement file attachment and preview capabilities
+   - Add support for rich responses (tables, charts, formatted text)
+   - Create accessibility features (keyboard navigation, screen reader support)
+
+2. **Real-Time Responses**:
+   - Implement streaming responses with token-by-token display
+   - Create websocket connection for bidirectional communication
+   - Develop partial response rendering and progressive enhancement
+   - Add response throttling for performance optimization
+   - Create typing indicator during agent "thinking" phases
+
+3. **User Feedback Mechanisms**:
+   - Implement thumbs up/down feedback collection
+   - Create detailed feedback forms for response quality
+   - Develop correction submission interface
+   - Add feedback aggregation and reporting
+   - Implement A/B testing framework for response variations
+
+4. **Error State Handling and Recovery**:
+   - Design graceful degradation for API failures
+   - Implement automatic retry logic with exponential backoff
+   - Create user-friendly error messages for different failure modes
+   - Develop session recovery after connection loss
+   - Add client-side input validation to prevent common errors
+   - Implement crash reporting and diagnostics
+
+#### Success Criteria:
+- Chat interface provides a smooth, intuitive user experience
+- Streaming responses appear immediately with minimal latency
+- Feedback collection gathers actionable data on agent performance
+- System gracefully handles errors with appropriate recovery mechanisms
+- UI adapts appropriately to different devices and screen sizes
+
+### Phase 5: Production Optimization & Scaling (August 2025)
+
+**Objective**: Prepare the DSPy agent for production deployment with optimizations for performance, cost efficiency, and scalability.
+
+#### Implementation Tasks:
+1. **Performance Optimization**:
+   - Implement response caching for common queries
+   - Develop lazy loading of large context windows
+   - Create batching for similar user requests
+   - Add intelligent request throttling and prioritization
+   - Optimize database queries and indexing
+
+2. **Cost Management**:
+   - Implement token usage tracking and reporting
+   - Create tiered service levels based on usage patterns
+   - Develop model switching for different query complexities
+   - Add compression techniques for context windows
+   - Implement usage quotas and alerts
+
+3. **Scalability Infrastructure**:
+   - Design horizontal scaling for the DSPy service
+   - Implement load balancing across service instances
+   - Create distributed session state management
+   - Develop autoscaling based on request volume
+   - Add performance monitoring and alerting
+
+4. **Security Enhancements**:
+   - Conduct comprehensive security audit
+   - Implement data sanitization and validation
+   - Add rate limiting and abuse prevention
+   - Create privacy-preserving features for sensitive data
+   - Develop compliance documentation and controls
+
+#### Success Criteria:
+- System handles high load with stable performance
+- Cost per user interaction stays within target thresholds
+- Infrastructure scales automatically with changing demand
+- Security measures protect against common attack vectors
+- Privacy controls meet or exceed regulatory requirements
