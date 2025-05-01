@@ -2,20 +2,23 @@ import os
 import logging
 import sys
 from dotenv import load_dotenv
-import dspy 
-from flask import Flask, request, jsonify 
-# from fastapi import FastAPI, HTTPException # <-- Or FastAPI
 
 # --- Add current directory to Python path for imports ---
-import sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
+# Import patch before any DSPy imports
+from modules import dspy_config_patch
+
+# Now import DSPy and other modules
+import dspy
+from flask import Flask, request, jsonify
 
 # --- Import Agent and Tools ---
 from modules.chat_agent import ChatAgent
 # Tools are used by the agent, direct import not needed here unless testing
 
 # --- Basic Logging Setup ---
-# (Keep existing logger setup)
 logger = logging.getLogger(__name__)
 
 # --- Global Variables ---
@@ -44,36 +47,54 @@ def load_config():
     llm_provider, llm_model, api_key = get_llm_config()
     logger.info(f"Configuring DSPy LLM Provider: {llm_provider}, Model: {llm_model}")
     from config import MAX_TOKENS
-    
     if not api_key and llm_provider not in ['ollama', 'lmstudio']:
         logger.error(f"API key not found for provider {llm_provider}")
         raise ValueError(f"Missing API key for {llm_provider}")
-    
+        
     try:
-        # Create full model name with provider prefix - which should be "gemini/" for Gemini models
-        # llm_provider should already be "gemini" from config.py's get_llm_config()
-        model_name = f"{llm_provider}/{llm_model}"
-        logger.info(f"Using unified model name: {model_name}")
-        
-        # Use the simplified dspy.LM factory API for all providers
-        lm_kwargs = {'api_key': api_key}
-        
-        # Add provider-specific configurations if needed
-        if llm_provider == 'openai':
-            lm_kwargs['max_tokens'] = MAX_TOKENS
-        elif llm_provider in ['ollama', 'lmstudio']:
-            # Local models may need base_url and don't require real API keys
-            lm_kwargs['api_key'] = 'not-needed'
-            base_url = os.environ.get('LOCAL_LLM_BASE_URL')
-            if base_url:
-                lm_kwargs['api_base'] = base_url
-        
-        # One unified call to dspy.LM for all providers
-        lm = dspy.LM(model_name, **lm_kwargs)
-        logger.info(f"Configured DSPy with {model_name}")
+        # Special handling for Ollama - it uses a different format in litellm
+        if llm_provider == 'ollama':
+            # Namespace the Ollama model so litellm can infer the provider
+            model_name = f"ollama/{llm_model}"
+            lm_kwargs = {
+                'api_key':      'not-needed',
+                'api_base':     os.environ.get('LOCAL_LLM_BASE_URL', 'http://localhost:11434'),
+                'max_tokens':   MAX_TOKENS
+            }
+            logger.info(f"Using Ollama model: {model_name}")
+            # Now we call the same factory as other providers
+            lm = dspy.LM(model_name, **lm_kwargs)
+        else:
+            # For other providers, use the standard approach
+            model_name = f"{llm_provider}/{llm_model}"
+            logger.info(f"Using unified model name: {model_name}")
+            
+            # Use the simplified dspy.LM factory API for all providers
+            lm_kwargs = {'api_key': api_key}
+            
+            # Add provider-specific configurations if needed
+            if llm_provider == 'openai':
+                lm_kwargs['max_tokens'] = MAX_TOKENS
+            elif llm_provider == 'lmstudio':
+                # Local models may need base_url and don't require real API keys
+                lm_kwargs['api_key'] = 'not-needed'
+                base_url = os.environ.get('LOCAL_LLM_BASE_URL')
+                if base_url:
+                    lm_kwargs['api_base'] = base_url
+            
+            # One unified call to dspy.LM for all providers
+            lm = dspy.LM(model_name, **lm_kwargs)
+            logger.info(f"Configured DSPy with model: {model_name}")
         
         # Set the LM as the default for DSPy
         dspy.configure(lm=lm)
+        
+        # Enable debug-level logging for DSPy if using Ollama 
+        # or if LOG_LEVEL is set to DEBUG
+        if llm_provider == 'ollama' or config['log_level'] == 'DEBUG':
+            logging.getLogger("dspy").setLevel(logging.DEBUG)
+            logger.info("Enabled DEBUG-level logging for DSPy")
+            
         logger.info("DSPy configured successfully")
     except Exception as e:
         logger.error(f"Failed to configure DSPy LM: {e}")

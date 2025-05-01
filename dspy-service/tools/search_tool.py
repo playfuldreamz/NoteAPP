@@ -1,3 +1,6 @@
+# Import patch first to ensure proper adapter configuration
+from modules import dspy_config_patch
+
 import dspy
 import requests
 import os
@@ -88,3 +91,20 @@ class SearchItemsTool(dspy.Tool):
 
     def __init__(self):
         super().__init__(search_items_func)
+
+    def __call__(self, query: str, user_id: str | int) -> dict:
+        """
+        Search for items matching the query for the given user.
+        
+        Args:
+            query (str): The search query
+            user_id (str | int): The ID of the user performing the search
+            
+        Returns:
+            dict: The search results after parsing from JSON
+        """
+        result_json = search_items_func(query=query, user_id=user_id)
+        # Parse the JSON string into a dictionary
+        if isinstance(result_json, str):
+            return json.loads(result_json)
+        return result_json

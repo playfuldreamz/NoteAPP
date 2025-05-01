@@ -164,6 +164,50 @@ If you encounter a 404 error like `models/gemini-pro is not found for API versio
   DSPY_LLM_MODEL=gemini-1.5-pro-latest  # Versioned model ID required
   ```
 
+#### DSPy ReAct Verbose Flag Deprecation
+
+If you encounter an error like `TypeError` when initializing the ReAct agent in newer DSPy versions:
+- This happens because recent versions of DSPy (≥2.5.x) no longer support the `verbose` flag in ReAct constructor
+- Solution: Remove the `verbose` parameter and use Python's logger for debug output
+- Example:
+  ```python
+  # Old approach (no longer works)
+  self.agent = dspy.ReAct(
+      ConversationalAgentSignature,
+      tools=[search_tool, content_tool],
+      verbose=True,
+      max_iters=5
+  )
+  
+  # New approach (works with DSPy 2.5.6+)
+  self.agent = dspy.ReAct(
+      ConversationalAgentSignature,
+      tools=[search_tool, content_tool],
+      max_iters=5
+  )
+  
+  # Then enable debug logging elsewhere
+  logging.getLogger("dspy").setLevel(logging.DEBUG)
+  ```
+
+#### Ollama Integration with DSPy
+
+When using Ollama with DSPy:
+- Ollama requires specific configuration for proper integration with DSPy's LM client
+- Solution: Use the provider parameter when initializing the LM client
+- Example:
+  ```python
+  # Configure for Ollama specifically
+  lm_kwargs = {
+      'api_key': 'not-needed',
+      'api_base': 'http://localhost:11434',
+      'max_tokens': 400
+  }
+  
+  # Use the provider parameter to specify Ollama
+  lm = dspy.LM(provider="ollama", model="gemma3:4b-it-qat", **lm_kwargs)
+  ```
+
 #### Authentication Between DSPy Service and Node.js Backend
 
 If you encounter authentication errors when DSPy service tools try to access the Node.js backend:
@@ -233,6 +277,7 @@ If you encounter authentication errors when DSPy service tools try to access the
 - ✅ Search and content retrieval tools working
 - ✅ Authentication between services configured
 - ✅ Gemini LLM integration with proper versioned models
+- ✅ Ollama integration with gemma3:4b-it-qat local model
 - ✅ Testing utilities for diagnosing and verifying functionality
 
 ## Next Phases

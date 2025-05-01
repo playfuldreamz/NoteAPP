@@ -8,12 +8,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # LLM Provider Configuration
-DEFAULT_LLM_PROVIDER = 'gemini'  # Options: openai, gemini, anthropic, ollama, lmstudio
+DEFAULT_LLM_PROVIDER = 'ollama'  # Options: openai, gemini, anthropic, ollama, lmstudio
 DEFAULT_LLM_MODELS = {
     'openai': 'gpt-4o-mini',
     'gemini': 'gemini-1.5-pro-latest',  # Versioned Gemini model ID
     'anthropic': 'claude-3-sonnet',
-    'ollama': 'llama3',
+    'ollama': 'gemma3:4b-it-qat',  # Using gemma3:4b-it-qat model from Ollama
     'lmstudio': 'Meta-Llama-3-8B-Instruct'
 }
 

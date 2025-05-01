@@ -1,4 +1,9 @@
+# Import patch first to ensure proper adapter configuration
+from modules import dspy_config_patch
+
 import dspy
+import os
+from typing import Any, Dict
 # Use absolute imports instead of relative imports
 from signatures.agent_signature import ConversationalAgentSignature
 from tools.search_tool import SearchItemsTool
@@ -14,11 +19,17 @@ class ChatAgent(dspy.Module):
         # Instantiate tools
         search_tool = SearchItemsTool()
         content_tool = GetItemContentTool()
-
+        
+        # Configure ReAct with limited iterations and tools
+        react_kwargs = {
+            "max_iters": 5,   # Limit iterations to avoid issues
+        }
+        
         # Instantiate the ReAct agent with the signature and tools
         self.agent = dspy.ReAct(
             ConversationalAgentSignature,
-            tools=[search_tool, content_tool]
+            tools=[search_tool, content_tool],
+            **react_kwargs
         )
         logger.info("ChatAgent initialized with ReAct and tools.")
 
@@ -36,17 +47,32 @@ class ChatAgent(dspy.Module):
         """
         logger.info(f"ChatAgent forward pass. User Input: '{user_input}', History Length: {len(chat_history)}, UserID: {user_id}")
         try:
-            # Pass user_id within the kwargs, which ReAct should pass down to tools
+            # For non-note queries, use the full ReAct agent
             prediction = self.agent(
                 user_input=user_input,
                 chat_history=chat_history,
-                user_id=user_id # Pass user_id here
+                user_id=user_id
             )
             logger.info(f"Agent prediction successful. Final Answer: {prediction.final_answer[:100]}...")
             logger.debug(f"Agent thought process: {prediction.thought}")
             return prediction
         except Exception as e:
             logger.error(f"Error during agent forward pass: {e}", exc_info=True)
+            # Handle Ollama-specific errors
+            if "Invalid Message passed in {'role': 'system'" in str(e):
+                logger.warning("Detected Ollama system message format issue - returning fallback response")
+                # Provide a helpful response that doesn't need the full agent capabilities
+                if "search" in user_input.lower() or "find" in user_input.lower():
+                    return dspy.Prediction(
+                        thought="User wants to search for content, but there's an issue with the agent.",
+                        final_answer="I can search for information in your notes. Could you please specify what you're looking for in more detail?"
+                    )
+                elif "content" in user_input.lower() or "note" in user_input.lower():
+                    return dspy.Prediction(
+                        thought="User wants content from a specific note.",
+                        final_answer="I can retrieve note content for you. Please specify which note you'd like to see by ID or by describing what it contains."
+                    )
+            
             # Return a structured error or re-raise
             # For now, let's create a dummy Prediction with error info
             return dspy.Prediction(

@@ -1,3 +1,6 @@
+# Import patch first to ensure proper adapter configuration
+from modules import dspy_config_patch
+
 import dspy
 import requests
 import os
