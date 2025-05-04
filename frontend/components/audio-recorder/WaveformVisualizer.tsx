@@ -210,8 +210,19 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       // Draw the top half of the waveform
       for (let i = 0; i < bufferLength; i++) {
         const v = dataArray[i] / 128.0; // Normalize data (0-255 -> 0.0-2.0)
-        const y = v * centerY; // Scale to canvas height (center is 1.0 * centerY)
-
+        
+        // Calculate distance from center (0 at center, 1 at edges)
+        const percentPosition = i / bufferLength;
+        const distanceFromCenter = Math.abs(percentPosition - 0.5) * 2;
+        
+        // Apply cosine falloff (1 at center, 0 at edges)
+        const falloff = Math.cos(distanceFromCenter * Math.PI/2);
+        
+        // Scale amplitude based on distance from center (keep centered at 1.0)
+        const scaledV = 1.0 + (v - 1.0) * falloff;
+        
+        const y = scaledV * centerY; // Scale to canvas height
+        
         ctx.lineTo(x, y);
         x += sliceWidth;
       }
