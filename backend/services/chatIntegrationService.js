@@ -7,7 +7,7 @@ class ChatIntegrationService {
      * Initialize a new chat turn with the Python chat service
      * @param {string} userInput - The user's message
      * @param {Array} chatHistory - Previous messages in the conversation
-     * @param {string} userId - The user's ID
+     * @param {string|number} userId - The user's ID
      * @param {string} token - JWT token for authentication
      * @returns {Promise<Object>} The chat service response
      */
@@ -15,12 +15,26 @@ class ChatIntegrationService {
         console.log(`[CHAT] Connecting to chat service at ${CHAT_SERVICE_URL}`);
         
         try {
-            const response = await axios.post(`${CHAT_SERVICE_URL}/chat`, {
-                userInput,
-                chatHistory,
-                userId,
+            // Ensure userId is a string and format the chat history correctly
+            const formattedChatHistory = chatHistory.map(msg => ({
+                role: String(msg.role || (msg.isUser ? 'user' : 'assistant')),
+                content: String(msg.content || '')
+            }));
+
+            // Prepare payload with correct types
+            const payload = {
+                userInput: String(userInput),
+                chatHistory: formattedChatHistory,
+                userId: String(userId),
                 token
-            });
+            };
+            
+            console.log('[CHAT] Sending payload:', JSON.stringify({
+                ...payload,
+                token: '***' // Redact token for logging
+            }, null, 2));
+            
+            const response = await axios.post(`${CHAT_SERVICE_URL}/chat`, payload);
             
             console.log('[CHAT] Received response from chat service');
             return response.data;
@@ -28,8 +42,13 @@ class ChatIntegrationService {
             console.error('[CHAT] Error connecting to chat service:', 
                 error.response?.status || 'No response',
                 error.response?.data || error.message);
-                
-            throw new Error(error.response?.data?.detail || 'Failed to get response from chat service');
+            
+            if (error.response?.data?.detail) {
+                console.error('[CHAT] Error details:', JSON.stringify(error.response.data.detail));
+                throw new Error(error.response.data.detail);
+            }
+            
+            throw new Error(error.message || 'Failed to get response from chat service');
         }
     }
 
