@@ -16,6 +16,7 @@ import ChatInput from '../../../components/chat/ChatInput';
 import LoadingIndicator from '../../../components/chat/LoadingIndicator';
 import StatusAlert from '../../../components/chat/StatusAlert';
 import { toast } from 'react-toastify';
+import { Menu, X } from 'lucide-react'; // Import icons for menu toggle
 
 export default function ChatPage() {
   // Chat service status
@@ -27,6 +28,9 @@ export default function ChatPage() {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [currentMessages, setCurrentMessages] = useState<ChatMessageType[]>([]);
+  
+  // Mobile sidebar state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Initialize by loading sessions and checking service health
   useEffect(() => {
@@ -77,6 +81,8 @@ export default function ChatPage() {
     setActiveChatId(newSession.id);
     setCurrentMessages([]);
     setError(null);
+    // Close sidebar on mobile after creating a new chat
+    setIsSidebarOpen(false);
   };
 
   // Handle selecting a chat
@@ -86,6 +92,8 @@ export default function ChatPage() {
       setActiveChatId(chatId);
       setCurrentMessages(session.messages);
       setError(null);
+      // Close sidebar on mobile after selecting a chat
+      setIsSidebarOpen(false);
     }
   };
 
@@ -174,6 +182,11 @@ export default function ChatPage() {
     }
   };
 
+  // Toggle sidebar visibility (for mobile)
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
   // Format chat data for sidebar display
   const formatChatsForSidebar = () => {
     return chatSessions.map(session => ({
@@ -183,10 +196,38 @@ export default function ChatPage() {
       messageCount: session.messages.length
     }));
   };
-  return (
-    <div className="flex h-[calc(100vh-10rem)] gap-4 p-2">
-      {/* Chat sidebar */}
-      <div className="w-64 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+  
+  // Get active chat title
+  const getActiveChatTitle = () => {
+    const activeChat = chatSessions.find(s => s.id === activeChatId);
+    return activeChat?.title || 'New Chat';
+  };
+    return (
+    <div className="flex flex-col md:flex-row h-[calc(100vh-10rem)] md:h-[calc(100vh-10rem)] relative">
+      {/* Mobile menu toggle button */}
+      <button 
+        onClick={toggleSidebar}
+        className="md:hidden fixed top-2 left-2 z-50 p-2 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 shadow-md"
+        aria-label={isSidebarOpen ? "Close menu" : "Open menu"}
+      >
+        {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+      
+      {/* Mobile chat title (only shown when sidebar is closed) */}
+      {!isSidebarOpen && (
+        <div className="md:hidden fixed top-2 left-12 right-2 z-40 text-center">
+          <h2 className="font-medium text-gray-700 dark:text-gray-300 truncate px-4">
+            {getActiveChatTitle()}
+          </h2>
+        </div>
+      )}
+      
+      {/* Chat sidebar - hidden on mobile unless toggled */}
+      <div 
+        className={`${
+          isSidebarOpen ? 'block' : 'hidden'
+        } md:block fixed md:static top-0 left-0 h-full w-full md:w-64 z-40 md:z-auto md:mr-3 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700`}
+      >
         <ChatSidebar
           chats={formatChatsForSidebar()}
           activeChatId={activeChatId}
@@ -196,13 +237,22 @@ export default function ChatPage() {
         />
       </div>
       
+      {/* Dark overlay when mobile sidebar is open */}
+      {isSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col ml-2">
-        <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-4 border border-gray-200 dark:border-gray-700">          {currentMessages.length === 0 ? (
+      <div className="flex-1 flex flex-col p-2 pt-12 md:pt-2 md:pl-3 w-full h-full">
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-2 sm:mb-4 border border-gray-200 dark:border-gray-700">
+          {currentMessages.length === 0 ? (
             <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-              <div className="text-center max-w-md px-6 py-8">
-                <h3 className="text-xl font-semibold mb-3">Chat with NoteApp Assistant</h3>
-                <p className="text-gray-600 dark:text-gray-300">
+              <div className="text-center max-w-md px-3 sm:px-6 py-4 sm:py-8">
+                <h3 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Chat with NoteApp Assistant</h3>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
                   Start a conversation with the NoteApp Assistant. Ask questions about your notes, 
                   request summaries, or get help with general topics.
                 </p>
@@ -212,7 +262,7 @@ export default function ChatPage() {
             <ChatMessageHistory messages={currentMessages} />
           )}
         </div>
-          <div className="relative px-1 pb-1">
+        <div className="relative px-1 pb-1 mt-auto">
           {/* Service status alert */}
           {isChatServiceHealthy === false && (
             <StatusAlert 
@@ -229,7 +279,7 @@ export default function ChatPage() {
             />
           )}
           
-          <div className="flex items-end gap-3 mt-2">
+          <div className="flex items-end gap-2">
             <ChatInput 
               onSendMessage={handleSendMessage} 
               isLoading={isLoading}

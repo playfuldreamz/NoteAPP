@@ -21,10 +21,9 @@ export default function ChatMessageHistory({ messages }: ChatMessageHistoryProps
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-  return (
-    <div className="p-5 overflow-y-auto max-h-full">
-      <div className="space-y-6">
+  }, [messages]);  return (
+    <div className="p-2 sm:p-4 overflow-y-auto max-h-full custom-scrollbar">
+      <div className="space-y-3 sm:space-y-5">
         {messages.map((message, index) => (
           <ChatMessage 
             key={index} 
