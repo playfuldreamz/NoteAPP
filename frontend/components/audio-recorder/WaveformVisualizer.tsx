@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 
 interface WaveformVisualizerProps {
   isRecording: boolean;
@@ -46,110 +46,33 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
   const selectedColors = colors[theme];
 
-  // Initialize or reinitialize audio analyzer
-  useEffect(() => {
-    if (!audioStream) {
-      // Clean up if stream is removed or becomes null
-      stopAnimation();
-      if (sourceNodeRef.current) {
-        sourceNodeRef.current.disconnect();
-        sourceNodeRef.current = null;
-      }
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-         // Don't close the context immediately if we might get a new stream
-         // Let the main cleanup handle it, or re-use if possible (though creating new is safer)
-      }
-      analyserRef.current = null;
-      dataArrayRef.current = null;
-      return;
+  // Define startAnimation and stopAnimation with useCallback
+  const stopAnimation = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
 
-    // Ensure existing context is closed before creating a new one
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(console.error);
-    }
-
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    const audioContext = new AudioContextClass();
-    const analyser = audioContext.createAnalyser();
-
-    // Configure analyser for time domain data
-    analyser.fftSize = 2048; // Standard value, provides 1024 data points
-    const bufferLength = analyser.frequencyBinCount; // = fftSize / 2
-    const dataArray = new Uint8Array(bufferLength);
-
-    // Connect the audio stream
-    const source = audioContext.createMediaStreamSource(audioStream);
-    source.connect(analyser);
-
-    // Store references
-    audioContextRef.current = audioContext;
-    analyserRef.current = analyser;
-    dataArrayRef.current = dataArray;
-    sourceNodeRef.current = source; // Store source node reference
-
-    // Start animation immediately if conditions are met
-    if (isRecording && !isPaused) {
-      startAnimation();
-    }
-
-    return () => {
-      // Cleanup function for when the audioStream changes or component unmounts
-      stopAnimation();
-      if (sourceNodeRef.current) {
-        try {
-          sourceNodeRef.current.disconnect();
-        } catch (e) {
-          console.warn("Error disconnecting source node:", e);
+    // Optionally clear canvas when stopped, or leave the last frame
+    requestAnimationFrame(() => { // Ensure clear happens after the last frame might have rendered
+        if (canvasRef.current) {
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // Optionally draw a flat center line when stopped
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = selectedColors.centerLine;
+                ctx.beginPath();
+                ctx.moveTo(0, canvas.height / 2);
+                ctx.lineTo(canvas.width, canvas.height / 2);
+                ctx.stroke();
+            }
         }
-        sourceNodeRef.current = null;
-      }
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(console.error);
-        audioContextRef.current = null; // Ensure ref is cleared
-      }
-       analyserRef.current = null;
-       dataArrayRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioStream]); // Rerun when audioStream changes
+    });
+  }, [selectedColors]);
 
-  // Control animation based on recording/paused state
-  useEffect(() => {
-    if (isRecording && !isPaused && audioStream && analyserRef.current) {
-      // Resume AudioContext if suspended (important for some browsers after inactivity)
-      if (audioContextRef.current?.state === 'suspended') {
-        audioContextRef.current.resume();
-      }
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-
-    // No direct cleanup needed here as the audioStream effect handles it.
-    // The stopAnimation call covers the visual part.
-  }, [isRecording, isPaused, audioStream]); // Dependencies include audioStream
-
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopAnimation();
-      // Ensure context is closed on final unmount
-      if (sourceNodeRef.current) {
-         try {
-           sourceNodeRef.current.disconnect();
-         } catch (e) {
-           console.warn("Error disconnecting source node:", e);
-         }
-      }
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(console.error);
-      }
-    };
-  }, []);
-
-  const startAnimation = () => {
+  const startAnimation = useCallback(() => {
     if (animationFrameRef.current) {
        // Already running
        return;
@@ -234,22 +157,6 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       // Line to the center-right edge to close the top half visually for filling
        ctx.lineTo(canvas.width, centerY);
 
-      // --- Optional: Draw bottom half explicitly for fill (or rely on closing path) ---
-      // If we just closePath, it draws a straight line back. For a mirrored fill:
-      // We need to iterate backwards to draw the bottom mirrored part.
-      // Let's try fill without explicit bottom path first, it's often sufficient.
-      // If fill looks wrong, uncomment and adapt this section:
-      /*
-      x = canvas.width; // Reset x for reverse drawing
-      for (let i = bufferLength - 1; i >= 0; i--) {
-         const v = dataArray[i] / 128.0;
-         const mirroredY = canvas.height - (v * centerY); // Mirror the y coordinate
-
-         ctx.lineTo(x, mirroredY);
-         x -= sliceWidth;
-      }
-      */
-
       // Close the path back to the start (center-left)
       ctx.closePath();
 
@@ -267,32 +174,107 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
     // Start the loop
     draw();
-  };
+  }, [selectedColors, stopAnimation]);
 
-  const stopAnimation = () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+  // Initialize or reinitialize audio analyzer
+  useEffect(() => {
+    if (!audioStream) {
+      // Clean up if stream is removed or becomes null
+      stopAnimation();
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+        sourceNodeRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+         // Don't close the context immediately if we might get a new stream
+         // Let the main cleanup handle it, or re-use if possible (though creating new is safer)
+      }
+      analyserRef.current = null;
+      dataArrayRef.current = null;
+      return;
     }
 
-    // Optionally clear canvas when stopped, or leave the last frame
-    requestAnimationFrame(() => { // Ensure clear happens after the last frame might have rendered
-        if (canvasRef.current) {
-            const canvas = canvasRef.current;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                // Optionally draw a flat center line when stopped
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = selectedColors.centerLine;
-                ctx.beginPath();
-                ctx.moveTo(0, canvas.height / 2);
-                ctx.lineTo(canvas.width, canvas.height / 2);
-                ctx.stroke();
-            }
+    // Ensure existing context is closed before creating a new one
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+    }
+
+    // Fix the 'any' type by properly typing the window API
+    const AudioContextClass = window.AudioContext || 
+                             ((window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+    const audioContext = new AudioContextClass();
+    const analyser = audioContext.createAnalyser();
+
+    // Configure analyser for time domain data
+    analyser.fftSize = 2048; // Standard value, provides 1024 data points
+    const bufferLength = analyser.frequencyBinCount; // = fftSize / 2
+    const dataArray = new Uint8Array(bufferLength);
+
+    // Connect the audio stream
+    const source = audioContext.createMediaStreamSource(audioStream);
+    source.connect(analyser);
+
+    // Store references
+    audioContextRef.current = audioContext;
+    analyserRef.current = analyser;
+    dataArrayRef.current = dataArray;
+    sourceNodeRef.current = source; // Store source node reference
+
+    // Start animation immediately if conditions are met
+    if (isRecording && !isPaused) {
+      startAnimation();
+    }
+
+    return () => {
+      // Cleanup function for when the audioStream changes or component unmounts
+      stopAnimation();
+      if (sourceNodeRef.current) {
+        try {
+          sourceNodeRef.current.disconnect();
+        } catch (e) {
+          console.warn("Error disconnecting source node:", e);
         }
-    });
-  };
+        sourceNodeRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+        audioContextRef.current = null; // Ensure ref is cleared
+      }
+       analyserRef.current = null;
+       dataArrayRef.current = null;
+    };
+  }, [audioStream, isRecording, isPaused, startAnimation, stopAnimation]); // Added missing dependencies
+
+  // Control animation based on recording/paused state
+  useEffect(() => {
+    if (isRecording && !isPaused && audioStream && analyserRef.current) {
+      // Resume AudioContext if suspended (important for some browsers after inactivity)
+      if (audioContextRef.current?.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+      startAnimation();
+    } else {
+      stopAnimation();
+    }
+  }, [isRecording, isPaused, audioStream, startAnimation, stopAnimation]); // Added missing dependencies
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopAnimation();
+      // Ensure context is closed on final unmount
+      if (sourceNodeRef.current) {
+         try {
+           sourceNodeRef.current.disconnect();
+         } catch (e) {
+           console.warn("Error disconnecting source node:", e);
+         }
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+      }
+    };
+  }, [stopAnimation]); // Added missing dependency
 
   return (
     <div className="waveform-container w-full" style={{ height: `${height}px` }}>
