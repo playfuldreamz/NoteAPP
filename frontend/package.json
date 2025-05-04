@@ -12,6 +12,7 @@
     "@heroicons/react": "^2.2.0",
     "@types/date-fns": "^2.6.3",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/uuid": "^10.0.0",
     "@wavesurfer/react": "^1.0.9",
     "axios": "^1.7.7",
     "chart.js": "^4.4.8",
@@ -32,6 +33,7 @@
     "react-toastify": "^11.0.3",
     "recharts": "^2.15.1",
     "remark-gfm": "^4.0.1",
+    "uuid": "^11.1.0",
     "wavesurfer.js": "^7.9.4",
     "zustand": "^5.0.1"
   },
