@@ -18,18 +18,18 @@ class GetNoteAppContentInput(BaseModel):
         description="The type of item ('note' or 'transcript')"
     )
 
-class BaseNoteAppTool(BaseTool):
+class BaseNoteAppTool(BaseTool, BaseModel):
     """Base class for NoteApp tools with authentication handling."""
-    
-    def __init__(self):
-        super().__init__()
-        self.jwt_token: Optional[str] = None
-        self.user_id: Optional[str] = None
+    jwt_token: Optional[str] = None
+    user_id: Optional[str] = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
     def set_auth(self, jwt_token: str, user_id: str) -> None:
         """Set authentication credentials for the tool."""
         self.jwt_token = jwt_token
-        self.user_id = user_id
+        self.user_id = user_id 
 
     def _get_headers(self) -> dict:
         """Get headers with authentication token."""

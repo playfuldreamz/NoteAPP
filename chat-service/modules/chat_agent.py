@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate, PromptTemplate
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain.agents import AgentExecutor, create_react_agent
 
@@ -9,19 +9,16 @@ class NoteAppChatAgent:
     """Agent for handling NoteApp chat interactions using LangChain."""
 
     def __init__(self, llm: BaseChatModel, tools: List[BaseTool]):
-        """Initialize the chat agent with an LLM and tools.
-        
-        Args:
-            llm: The language model to use
-            tools: List of tools available to the agent
-        """
+        """Initialize the chat agent with an LLM and tools."""
         self.llm = llm
         self.base_tools = tools
-        
-        # Create the prompt template for the agent
+          # Prompt specifically formatted for ReAct agent
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a helpful assistant for NoteApp, designed to help users find and understand their notes and transcripts. 
             You have access to the following tools: {tool_names}
+
+            Tool descriptions:
+            {tools}
             
             When users ask questions, use these tools to search through their content and provide relevant information.
             Always be concise and to the point in your responses.
@@ -31,24 +28,27 @@ class NoteAppChatAgent:
             1. If asked about specific content, use search_noteapp first
             2. Use get_noteapp_content to retrieve full details of relevant items
             3. Synthesize information from multiple sources when needed
-            4. If you can't find relevant information, say so clearly"""),
+            4. If you can't find relevant information, say so clearly
+            
+            For general greetings or simple messages, just respond directly without using tools.
+
+            Use the following format:
+            
+            Question: the input question you must answer
+            Thought: you should always think about what to do
+            Action: the action to take, should be one of [{tool_names}]
+            Action Input: the input to the action
+            Observation: the result of the action
+            ... (this Thought/Action/Action Input/Observation can repeat N times)
+            Thought: I now know the final answer
+            Final Answer: the final answer to the original input question
+            """),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
+            ("ai", "{agent_scratchpad}"),  # Using "ai" for agent_scratchpad
         ])
 
     async def invoke(self, user_input: str, chat_history: List[Dict], user_id: str, jwt_token: str) -> Dict[str, Any]:
-        """Process a user message and return a response.
-        
-        Args:
-            user_input: The user's message
-            chat_history: List of previous messages
-            user_id: The ID of the current user
-            jwt_token: JWT token for authentication
-        
-        Returns:
-            Dict containing the final answer
-        """
         # Format chat history into LangChain message format
         formatted_history = []
         for msg in chat_history:
@@ -60,9 +60,15 @@ class NoteAppChatAgent:
         # Initialize tools with authentication context
         request_tools = []
         for tool in self.base_tools:
-            # Assume tools have set_auth method to handle authentication
-            tool.set_auth(jwt_token=jwt_token, user_id=user_id)
+            try:
+                tool.set_auth(jwt_token=jwt_token, user_id=user_id)
+            except AttributeError:
+                pass  # Mock tools may not need auth
             request_tools.append(tool)
+
+        # Generate tool_names and tools strings for the prompt
+        tool_names = ", ".join([tool.name for tool in request_tools])
+        tools_descriptions = "\n".join([f"{tool.name}: {tool.description}" for tool in request_tools])
 
         # Create a new agent instance with the authenticated tools
         agent = create_react_agent(
@@ -71,27 +77,30 @@ class NoteAppChatAgent:
             prompt=self.prompt
         )
 
-        # Create the executor
+        # Create the executor with explicit scratchpad handling
         executor = AgentExecutor(
             agent=agent,
             tools=request_tools,
             verbose=True,
             handle_parsing_errors=True,
-            max_iterations=5  # Prevent infinite loops
-        )
-
-        # Prepare input for the agent
+            max_iterations=5
+        )        # Prepare input for the agent
         input_dict = {
             "input": user_input,
-            "chat_history": formatted_history
+            "chat_history": formatted_history,
+            "tool_names": tool_names,
+            "tools": tools_descriptions
         }
 
         try:
-            # Execute the agent
+            # Use .ainvoke for async operation
+            print(f"Input to executor: {input_dict}")
             result = await executor.ainvoke(input_dict)
             return {"final_answer": result["output"]}
         except Exception as e:
-            # Log the error and return a friendly message
+            import traceback
+            print(f"Error during agent invocation: {e}")
+            traceback.print_exc()
             return {
                 "final_answer": "I encountered an error while processing your request. Please try again or rephrase your question.",
                 "error": str(e)
