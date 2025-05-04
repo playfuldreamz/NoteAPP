@@ -41,17 +41,17 @@ export default function ChatInput({ onSendMessage, isLoading, disabled = false }
       handleSubmit(e);
     }
   };
-
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="relative flex">      <textarea
+      <div className="relative flex">
+        <textarea
           ref={textareaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type your message..."
           disabled={isLoading || disabled}
-          className="flex-1 min-h-[50px] max-h-[200px] pl-4 pr-12 py-3 rounded-lg resize-none border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-800 placeholder-gray-400"
+          className="flex-1 min-h-[50px] max-h-[200px] pl-4 pr-12 py-3 rounded-lg resize-none border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-800 placeholder-gray-400 shadow-sm"
           rows={1}
         />
         <button

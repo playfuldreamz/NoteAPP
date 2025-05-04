@@ -16,15 +16,14 @@ export interface ChatMessageProps {
 
 export default function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
-  
-  return (
+    return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div 
         className={`
-          max-w-[80%] md:max-w-[70%] rounded-lg px-4 py-3 
+          max-w-[80%] md:max-w-[70%] rounded-lg px-5 py-3.5 shadow-sm
           ${isUser 
-            ? 'bg-blue-100 dark:bg-blue-900/40 text-gray-800 dark:text-gray-100' 
-            : 'bg-gray-100 dark:bg-gray-700/40 text-gray-800 dark:text-gray-100'
+            ? 'bg-blue-100 dark:bg-blue-900/40 text-gray-800 dark:text-gray-100 border border-blue-200 dark:border-blue-800/40' 
+            : 'bg-gray-100 dark:bg-gray-700/40 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600/40'
           }
         `}
       >

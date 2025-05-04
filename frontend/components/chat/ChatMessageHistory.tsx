@@ -22,10 +22,9 @@ export default function ChatMessageHistory({ messages }: ChatMessageHistoryProps
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
   return (
-    <div className="p-4 overflow-y-auto max-h-full">
-      <div className="space-y-4">
+    <div className="p-5 overflow-y-auto max-h-full">
+      <div className="space-y-6">
         {messages.map((message, index) => (
           <ChatMessage 
             key={index} 

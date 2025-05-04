@@ -183,11 +183,10 @@ export default function ChatPage() {
       messageCount: session.messages.length
     }));
   };
-
   return (
-    <div className="flex h-[calc(100vh-10rem)]">
+    <div className="flex h-[calc(100vh-10rem)] gap-4 p-2">
       {/* Chat sidebar */}
-      <div className="w-64 border-r border-gray-200 dark:border-gray-700">
+      <div className="w-64 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <ChatSidebar
           chats={formatChatsForSidebar()}
           activeChatId={activeChatId}
@@ -198,13 +197,12 @@ export default function ChatPage() {
       </div>
       
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-4 border border-gray-200 dark:border-gray-700">
-          {currentMessages.length === 0 ? (
+      <div className="flex-1 flex flex-col ml-2">
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden mb-4 border border-gray-200 dark:border-gray-700">          {currentMessages.length === 0 ? (
             <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-              <div className="text-center max-w-md px-4">
-                <h3 className="text-xl font-semibold mb-2">Chat with NoteApp Assistant</h3>
-                <p>
+              <div className="text-center max-w-md px-6 py-8">
+                <h3 className="text-xl font-semibold mb-3">Chat with NoteApp Assistant</h3>
+                <p className="text-gray-600 dark:text-gray-300">
                   Start a conversation with the NoteApp Assistant. Ask questions about your notes, 
                   request summaries, or get help with general topics.
                 </p>
@@ -214,8 +212,7 @@ export default function ChatPage() {
             <ChatMessageHistory messages={currentMessages} />
           )}
         </div>
-        
-        <div className="relative">
+          <div className="relative px-1 pb-1">
           {/* Service status alert */}
           {isChatServiceHealthy === false && (
             <StatusAlert 
@@ -232,7 +229,7 @@ export default function ChatPage() {
             />
           )}
           
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-3 mt-2">
             <ChatInput 
               onSendMessage={handleSendMessage} 
               isLoading={isLoading}
