@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { API_BASE_URL } from '../config';
 
 // Types
 export interface ChatMessage {
@@ -18,9 +19,9 @@ export interface ChatSession {
 const STORAGE_KEY = 'noteapp_chat_sessions';
 
 /**
- * Get all chat sessions from localStorage
+ * Get chat sessions from localStorage (fallback method)
  */
-export function getChatSessions(): ChatSession[] {
+function getLocalChatSessions(): ChatSession[] {
   if (typeof window === 'undefined') return [];
   
   const sessionsJson = localStorage.getItem(STORAGE_KEY);
@@ -29,8 +30,43 @@ export function getChatSessions(): ChatSession[] {
   try {
     return JSON.parse(sessionsJson);
   } catch (e) {
-    console.error('Failed to parse chat sessions:', e);
+    console.error('Failed to parse chat sessions from localStorage:', e);
     return [];
+  }
+}
+
+/**
+ * Get all chat sessions from the API
+ */
+export async function getChatSessions(): Promise<ChatSession[]> {
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      console.warn('No authentication token found - reverting to localStorage');
+      return getLocalChatSessions();
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/chat-sessions`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        console.error('Authentication failed - invalid or expired token');
+        return getLocalChatSessions();
+      }
+      throw new Error(`Failed to fetch chat sessions: ${response.statusText}`);
+    }
+    
+    const sessions = await response.json();
+    return sessions;
+  } catch (error) {
+    console.error('Error fetching chat sessions:', error);
+    return getLocalChatSessions();
   }
 }
 
@@ -43,9 +79,9 @@ function saveChatSessions(sessions: ChatSession[]): void {
 }
 
 /**
- * Create a new chat session
+ * Create a new chat session in the API
  */
-export function createChatSession(): ChatSession {
+export async function createChatSession(): Promise<ChatSession> {
   const newSession: ChatSession = {
     id: uuidv4(),
     title: 'New Chat',
@@ -54,35 +90,103 @@ export function createChatSession(): ChatSession {
     messages: []
   };
   
-  const sessions = getChatSessions();
-  saveChatSessions([newSession, ...sessions]);
-  
-  return newSession;
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      console.warn('No authentication token found - saving to localStorage only');
+      const localSessions = getLocalChatSessions();
+      saveChatSessions([newSession, ...localSessions]);
+      return newSession;
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/chat-sessions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        id: newSession.id,
+        title: newSession.title
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to create chat session: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating chat session:', error);
+    // Fall back to localStorage
+    const localSessions = getLocalChatSessions();
+    saveChatSessions([newSession, ...localSessions]);
+    return newSession;
+  }
 }
 
 /**
  * Get a chat session by ID
  */
-export function getChatSession(id: string): ChatSession | null {
-  const sessions = getChatSessions();
-  return sessions.find(session => session.id === id) || null;
+export async function getChatSession(id: string): Promise<ChatSession | null> {
+  try {
+    const sessions = await getChatSessions();
+    return sessions.find(session => session.id === id) || null;
+  } catch (error) {
+    console.error('Error getting chat session:', error);
+    const localSessions = getLocalChatSessions();
+    return localSessions.find(session => session.id === id) || null;
+  }
 }
 
 /**
  * Update a chat session
  */
-export function updateChatSession(updatedSession: ChatSession): void {
-  const sessions = getChatSessions();
-  const index = sessions.findIndex(session => session.id === updatedSession.id);
-  
-  if (index !== -1) {
-    // Update the session with the new data and updated timestamp
-    sessions[index] = {
-      ...updatedSession,
-      updatedAt: new Date().toISOString()
-    };
+export async function updateChatSession(updatedSession: ChatSession): Promise<void> {
+  try {
+    const token = localStorage.getItem('token');
     
-    saveChatSessions(sessions);
+    if (!token) {
+      // Fall back to localStorage
+      const localSessions = getLocalChatSessions();
+      const index = localSessions.findIndex(session => session.id === updatedSession.id);
+      if (index !== -1) {
+        localSessions[index] = {
+          ...updatedSession,
+          updatedAt: new Date().toISOString()
+        };
+        saveChatSessions(localSessions);
+      }
+      return;
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/chat-sessions/${updatedSession.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        title: updatedSession.title
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to update chat session: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error updating chat session:', error);
+    // Fall back to localStorage
+    const localSessions = getLocalChatSessions();
+    const index = localSessions.findIndex(session => session.id === updatedSession.id);
+    if (index !== -1) {
+      localSessions[index] = {
+        ...updatedSession,
+        updatedAt: new Date().toISOString()
+      };
+      saveChatSessions(localSessions);
+    }
   }
 }
 
@@ -100,27 +204,88 @@ export function generateChatTitle(message: string): string {
 /**
  * Delete a chat session
  */
-export function deleteChatSession(id: string): void {
-  const sessions = getChatSessions();
-  const filteredSessions = sessions.filter(session => session.id !== id);
-  saveChatSessions(filteredSessions);
+export async function deleteChatSession(id: string): Promise<void> {
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      // Fall back to localStorage
+      const localSessions = getLocalChatSessions();
+      const filteredSessions = localSessions.filter(session => session.id !== id);
+      saveChatSessions(filteredSessions);
+      return;
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/chat-sessions/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to delete chat session: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error deleting chat session:', error);
+    // Fall back to localStorage
+    const localSessions = getLocalChatSessions();
+    const filteredSessions = localSessions.filter(session => session.id !== id);
+    saveChatSessions(filteredSessions);
+  }
 }
 
 /**
  * Add a message to a chat session
  */
-export function addMessageToChatSession(
+export async function addMessageToChatSession(
+  sessionId: string, 
+  message: ChatMessage
+): Promise<ChatSession | null> {
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      // Fall back to localStorage
+      return addMessageToLocalChatSession(sessionId, message);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/chat-sessions/${sessionId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(message)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to add message to chat session: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error adding message to chat session:', error);
+    // Fall back to localStorage
+    return addMessageToLocalChatSession(sessionId, message);
+  }
+}
+
+/**
+ * Helper function to add a message to a local chat session
+ */
+function addMessageToLocalChatSession(
   sessionId: string, 
   message: ChatMessage
 ): ChatSession | null {
-  const sessions = getChatSessions();
-  const index = sessions.findIndex(session => session.id === sessionId);
+  const localSessions = getLocalChatSessions();
+  const index = localSessions.findIndex(session => session.id === sessionId);
   
   if (index !== -1) {
     // Add message to the session
     const updatedSession = {
-      ...sessions[index],
-      messages: [...sessions[index].messages, message],
+      ...localSessions[index],
+      messages: [...localSessions[index].messages, message],
       updatedAt: new Date().toISOString()
     };
     
@@ -129,8 +294,8 @@ export function addMessageToChatSession(
       updatedSession.title = generateChatTitle(message.content);
     }
     
-    sessions[index] = updatedSession;
-    saveChatSessions(sessions);
+    localSessions[index] = updatedSession;
+    saveChatSessions(localSessions);
     
     return updatedSession;
   }

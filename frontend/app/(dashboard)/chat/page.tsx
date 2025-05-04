@@ -31,24 +31,34 @@ export default function ChatPage() {
   
   // Mobile sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
   // Initialize by loading sessions and checking service health
   useEffect(() => {
-    // Load chat sessions from localStorage
-    const sessions = getChatSessions();
-    setChatSessions(sessions);
-    
-    // If there are sessions, set the first one as active
-    // Otherwise create a new session
-    if (sessions.length > 0) {
-      setActiveChatId(sessions[0].id);
-      setCurrentMessages(sessions[0].messages);
-    } else {
-      const newSession = createChatSession();
-      setChatSessions([newSession]);
-      setActiveChatId(newSession.id);
-      setCurrentMessages([]);
-    }
+    // Load chat sessions from API
+    const loadSessions = async () => {
+      try {
+        setIsLoading(true);
+        const sessions = await getChatSessions();
+        setChatSessions(sessions);
+        
+        // If there are sessions, set the first one as active
+        // Otherwise create a new session
+        if (sessions.length > 0) {
+          setActiveChatId(sessions[0].id);
+          setCurrentMessages(sessions[0].messages);
+        } else {
+          const newSession = await createChatSession();
+          setChatSessions([newSession]);
+          setActiveChatId(newSession.id);
+          setCurrentMessages([]);
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load chat sessions';
+        console.error('Error loading chat sessions:', err);
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
     // Check chat service health
     const checkHealth = async () => {
@@ -61,6 +71,7 @@ export default function ChatPage() {
       }
     };
     
+    loadSessions();
     checkHealth();
   }, []);
 
@@ -73,51 +84,73 @@ export default function ChatPage() {
       return acc;
     }, []);
   };
-
   // Handle creating a new chat
-  const handleNewChat = () => {
-    const newSession = createChatSession();
-    setChatSessions(prevSessions => [newSession, ...prevSessions]);
-    setActiveChatId(newSession.id);
-    setCurrentMessages([]);
-    setError(null);
-    // Close sidebar on mobile after creating a new chat
-    setIsSidebarOpen(false);
+  const handleNewChat = async () => {
+    try {
+      setIsLoading(true);
+      const newSession = await createChatSession();
+      setChatSessions(prevSessions => [newSession, ...prevSessions]);
+      setActiveChatId(newSession.id);
+      setCurrentMessages([]);
+      setError(null);
+      // Close sidebar on mobile after creating a new chat
+      setIsSidebarOpen(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create new chat';
+      console.error('Error creating new chat:', err);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle selecting a chat
-  const handleSelectChat = (chatId: string) => {
-    const session = chatSessions.find(s => s.id === chatId);
-    if (session) {
-      setActiveChatId(chatId);
-      setCurrentMessages(session.messages);
-      setError(null);
-      // Close sidebar on mobile after selecting a chat
-      setIsSidebarOpen(false);
+  const handleSelectChat = async (chatId: string) => {
+    try {
+      const session = chatSessions.find(s => s.id === chatId);
+      if (session) {
+        setActiveChatId(chatId);
+        setCurrentMessages(session.messages);
+        setError(null);
+        // Close sidebar on mobile after selecting a chat
+        setIsSidebarOpen(false);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to select chat';
+      console.error('Error selecting chat:', err);
+      setError(errorMessage);
     }
   };
 
   // Handle deleting a chat
-  const handleDeleteChat = (chatId: string) => {
-    deleteChatSession(chatId);
-    const updatedSessions = chatSessions.filter(s => s.id !== chatId);
-    setChatSessions(updatedSessions);
-    
-    // If the active chat is deleted, select another one
-    if (chatId === activeChatId) {
-      if (updatedSessions.length > 0) {
-        setActiveChatId(updatedSessions[0].id);
-        setCurrentMessages(updatedSessions[0].messages);
-      } else {
-        // If no sessions left, create a new one
-        const newSession = createChatSession();
-        setChatSessions([newSession]);
-        setActiveChatId(newSession.id);
-        setCurrentMessages([]);
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+      setIsLoading(true);
+      await deleteChatSession(chatId);
+      const updatedSessions = chatSessions.filter(s => s.id !== chatId);
+      setChatSessions(updatedSessions);
+      
+      // If the active chat is deleted, select another one
+      if (chatId === activeChatId) {
+        if (updatedSessions.length > 0) {
+          setActiveChatId(updatedSessions[0].id);
+          setCurrentMessages(updatedSessions[0].messages);
+        } else {
+          // If no sessions left, create a new one
+          const newSession = await createChatSession();
+          setChatSessions([newSession]);
+          setActiveChatId(newSession.id);
+          setCurrentMessages([]);
+        }
       }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete chat';
+      console.error('Error deleting chat:', err);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
-
   // Handle sending a new message
   const handleSendMessage = async (message: string) => {
     if (!message.trim() || !activeChatId) return;
@@ -138,18 +171,20 @@ export default function ChatPage() {
     setCurrentMessages(updatedMessages);
     
     // Add message to the chat session
-    const updatedSession = addMessageToChatSession(activeChatId, userMessage);
-    if (updatedSession) {
-      // Update the sessions list with the updated session
-      setChatSessions(prevSessions => 
-        prevSessions.map(s => s.id === activeChatId ? updatedSession : s)
-      );
-    }
-    
     setIsLoading(true);
-    setError(null);
     
     try {
+      const updatedSession = await addMessageToChatSession(activeChatId, userMessage);
+      
+      if (updatedSession) {
+        // Update the sessions list with the updated session
+        setChatSessions(prevSessions => 
+          prevSessions.map(s => s.id === activeChatId ? updatedSession : s)
+        );
+      }
+      
+      setError(null);
+      
       // Format chat history for API (excluding the latest user message)
       const chatHistory = formatChatHistoryForAPI(currentMessages);
       
@@ -167,7 +202,8 @@ export default function ChatPage() {
       setCurrentMessages(messagesWithResponse);
       
       // Add assistant message to the chat session
-      const finalUpdatedSession = addMessageToChatSession(activeChatId, assistantMessage);
+      const finalUpdatedSession = await addMessageToChatSession(activeChatId, assistantMessage);
+      
       if (finalUpdatedSession) {
         setChatSessions(prevSessions => 
           prevSessions.map(s => s.id === activeChatId ? finalUpdatedSession : s)
