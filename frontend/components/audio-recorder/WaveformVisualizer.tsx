@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface WaveformVisualizerProps {
   isRecording: boolean;
@@ -139,7 +139,9 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       if (sourceNodeRef.current) {
          try {
            sourceNodeRef.current.disconnect();
-         } catch (e) { /* Ignore */ }
+         } catch (e) {
+           console.warn("Error disconnecting source node:", e);
+         }
       }
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(console.error);
@@ -215,11 +217,13 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         const percentPosition = i / bufferLength;
         const distanceFromCenter = Math.abs(percentPosition - 0.5) * 2;
         
-        // Apply cosine falloff (1 at center, 0 at edges)
-        const falloff = Math.cos(distanceFromCenter * Math.PI/2);
+        // Apply power function for sharper falloff (more reactive center)
+        // Using Math.pow() creates a sharper transition from center to edges
+        const falloff = Math.pow(Math.cos(distanceFromCenter * Math.PI/2), 1.5);
         
-        // Scale amplitude based on distance from center (keep centered at 1.0)
-        const scaledV = 1.0 + (v - 1.0) * falloff;
+        // Apply more amplification in the center for enhanced reactivity
+        const centerAmplification = 1.2; // Boost the center reactivity
+        const scaledV = 1.0 + (v - 1.0) * falloff * (distanceFromCenter < 0.3 ? centerAmplification : 1.0);
         
         const y = scaledV * centerY; // Scale to canvas height
         
