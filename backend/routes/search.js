@@ -5,7 +5,6 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
-const { isDspyServiceRequest } = require('../utils/dspyUtils');
 const semanticSearchService = require('../services/SemanticSearchService');
 
 /**
@@ -17,11 +16,6 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     const { query, limit = 10 } = req.body;
     const userId = req.user.id;
-    
-    // Handle DSPy service requests with special logging
-    if (req.user.isDspyService) {
-      console.log(`DSPy service searching for "${query}" for user ${userId}`);
-    }
     
     // Validate query
     if (!query || typeof query !== 'string') {

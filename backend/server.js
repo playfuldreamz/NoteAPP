@@ -30,7 +30,6 @@ const aiEmbeddingConfigRoutes = require('./routes/ai/embedding-config');
 const openaiKeyStatusRoutes = require('./routes/ai/openai-key-status');
 const maskedKeyRoutes = require('./routes/ai/masked-key');
 const embeddingRegenerationRoutes = require('./routes/ai/embedding-regeneration');
-const dspyProxyRoutes = require('./routes/ai/dspy_proxy');
 const chatProxyRoutes = require('./routes/chat_proxy'); // Add chat proxy routes
 const chatSessionsRoutes = require('./routes/chat_sessions'); // Add chat sessions routes
 const actionItemsRoutes = require('./routes/actionItems');
@@ -70,7 +69,6 @@ app.use('/api/ai/embedding-config', authenticateToken, aiEmbeddingConfigRoutes);
 app.use('/api/ai/openai-key-status', authenticateToken, openaiKeyStatusRoutes);
 app.use('/api/ai/masked-key', authenticateToken, maskedKeyRoutes);
 app.use('/api/ai/embedding-regeneration', authenticateToken, embeddingRegenerationRoutes);
-app.use('/api', dspyProxyRoutes); // Mount the DSPy proxy routes (prefix with /api)
 app.use('/api/chat', authenticateToken, chatProxyRoutes); // Mount chat routes with authentication
 app.use('/api/chat-sessions', chatSessionsRoutes); // Mount chat sessions routes (already has auth middleware)
 app.use('/api/action-items', authenticateToken, actionItemsRoutes);
