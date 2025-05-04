@@ -31,7 +31,8 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings }) => 
     availableProviders,
     getProviderSettings,
     updateProviderSettings,
-    activeProvider, // Include activeProvider
+    activeProvider,
+    isInitializing, // Add isInitializing state
   } = useTranscription();
 
   const { isRecording } = useRecording(); // Add this to get recording state
@@ -201,7 +202,11 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings }) => 
               </option>
             ))}
           </select>          <div className="flex items-center text-xs mt-1 h-4">
-            {selectedProvider === 'realtimestt' ? (
+            {isInitializing ? (
+              <span className="flex items-center text-blue-500">
+                <Loader className="w-3 h-3 mr-1 animate-spin" /> Initializing...
+              </span>
+            ) : selectedProvider === 'realtimestt' ? (
               <>
                 <span className="mr-1">Status:</span>
                 {isValidatingKey ? (

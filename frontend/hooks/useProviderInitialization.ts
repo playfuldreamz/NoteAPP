@@ -17,20 +17,28 @@ interface UseProviderInitializationProps {
   currentProvider: ProviderType;
   getProviderSettings: (type: ProviderType) => ProviderSettings | undefined;
   setActiveProvider: (provider: ProviderType) => void;
+  setCurrentProvider: (provider: ProviderType) => void; // Add setCurrentProvider
   setIsInitialized: (initialized: boolean) => void;
   setError: (error: Error | null) => void;
+  setIsInitializing?: (isInitializing: boolean) => void; // Add optional initializing state
 }
 
 export function useProviderInitialization({
   currentProvider,
   getProviderSettings,
   setActiveProvider,
+  setCurrentProvider,
   setIsInitialized,
-  setError
+  setError,
+  setIsInitializing
 }: UseProviderInitializationProps) {
 
   const initializeProvider = useCallback(async (type: ProviderType) => {
     try {
+      if (setIsInitializing) {
+        setIsInitializing(true);
+      }
+      
       setError(null);
       setIsInitialized(false);
 
@@ -69,14 +77,17 @@ export function useProviderInitialization({
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to initialize provider');
-      setError(error);
-      
-      // Special handling for RealtimeSTT failures to avoid excessive error messages
+      setError(error);        // Special handling for RealtimeSTT failures to avoid excessive error messages
       if (type === 'realtimestt') {
         console.warn('RealtimeSTT server not available, falling back to WebSpeech provider');
         
-        // Update state to reflect the fallback
+        // Update both active provider and current provider to reflect the fallback
         setActiveProvider('webspeech');
+        
+        // This was missing - also set the current provider (UI state) to match the active provider
+        if (currentProvider === 'realtimestt') {
+          setCurrentProvider('webspeech');
+        }
         
         // Don't show error toast for initial fallback from RealtimeSTT on page load
         if (!window.location.pathname.includes('login')) {
@@ -86,18 +97,22 @@ export function useProviderInitialization({
         // Fall back to WebSpeech
         return initializeProvider('webspeech');
       }
-      
-      // Show error only for non-realtimestt providers
+        // Show error only for non-realtimestt providers
       toast.error(error.message);
       
       // Fall back to WebSpeech if available and not already trying it
       if (type !== 'webspeech') {
         console.warn('Falling back to WebSpeech provider');
         setActiveProvider('webspeech');
+        setCurrentProvider('webspeech');
         return initializeProvider('webspeech');
       }
+    } finally {
+      if (setIsInitializing && type === 'webspeech') {
+        setIsInitializing(false);
+      }
     }
-  }, [currentProvider, getProviderSettings, setActiveProvider, setIsInitialized, setError]);
+  }, [currentProvider, getProviderSettings, setActiveProvider, setCurrentProvider, setIsInitialized, setError, setIsInitializing]);
 
   return { initializeProvider };
 }

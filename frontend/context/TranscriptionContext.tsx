@@ -23,6 +23,7 @@ interface TranscriptionContextType {
   initializeProvider: (type: ProviderType) => Promise<void>;
   availableProviders: ProviderType[];
   isInitialized: boolean;
+  isInitializing: boolean; // Add initializing state
   error: Error | null;
   updateProviderSettings: (type: ProviderType, settings: ProviderSettings, showToast?: boolean) => Promise<void>;
   getProviderSettings: (type: ProviderType) => ProviderSettings | undefined;
@@ -39,6 +40,7 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
   const [currentProvider, setCurrentProvider] = useState<ProviderType>('realtimestt');
   const [activeProvider, setActiveProvider] = useState<ProviderType>('realtimestt');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true); // Add initializing state
   const [error, setError] = useState<Error | null>(null);
 
   // Use our custom hooks
@@ -51,8 +53,10 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
     currentProvider,
     getProviderSettings,
     setActiveProvider,
+    setCurrentProvider, // Pass setter for currentProvider
     setIsInitialized,
-    setError
+    setError,
+    setIsInitializing // Pass setter for isInitializing
   });
 
   // Initialize provider on mount or when currentProvider changes
@@ -79,13 +83,13 @@ export function TranscriptionProviderContext({ children }: { children: React.Rea
       TranscriptionProviderFactory.cleanup();
     };
   }, [initializeProvider, currentProvider]);
-
   const value = {
     provider: currentProvider,
     setProvider: setCurrentProvider,
     initializeProvider,
     availableProviders,
     isInitialized,
+    isInitializing,
     error,
     updateProviderSettings,
     getProviderSettings,
