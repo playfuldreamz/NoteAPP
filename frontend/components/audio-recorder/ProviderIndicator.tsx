@@ -2,13 +2,12 @@ import React from 'react';
 import type { ProviderType } from '../../services/transcription/types';
 import { useTranscription } from '../../context/TranscriptionContext';
 
-const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-  'webspeech': 'Web Speech',
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {  'webspeech': 'Web Speech',
   'assemblyai': 'AssemblyAI',
   'deepgram': 'Deepgram',
   'whisper': 'Whisper',
   'azure': 'Azure Speech',
-  'realtimestt': 'RealtimeSTT'
+  'realtimestt': 'RealtimeSTT (Local Server)'
 };
 
 const ProviderIndicator: React.FC = () => {
@@ -17,9 +16,9 @@ const ProviderIndicator: React.FC = () => {
   const getProviderDisplayName = (provider: ProviderType): string => {
     return PROVIDER_DISPLAY_NAMES[provider] || provider;
   };
-
   const getStatusColor = () => {
     if (isInitializing) return 'bg-yellow-500 animate-pulse';
+    if (activeProvider === 'realtimestt') return 'bg-blue-500';
     return activeProvider === 'webspeech' ? 'bg-green-500' : 'bg-blue-500';
   };
 

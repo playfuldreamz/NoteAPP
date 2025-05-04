@@ -106,9 +106,9 @@ export function useProviderInitialization({
         setActiveProvider('webspeech');
         setCurrentProvider('webspeech');
         return initializeProvider('webspeech');
-      }
-    } finally {
-      if (setIsInitializing && type === 'webspeech') {
+      }    } finally {
+      // Set isInitializing to false after initialization completes, regardless of provider type
+      if (setIsInitializing) {
         setIsInitializing(false);
       }
     }
