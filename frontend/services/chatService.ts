@@ -57,6 +57,7 @@ export async function checkChatServiceHealth(): Promise<boolean> {
     const token = localStorage.getItem('token');
     
     if (!token) {
+      console.log('[CHAT] No token available for health check');
       return false;
     }
     
@@ -67,13 +68,16 @@ export async function checkChatServiceHealth(): Promise<boolean> {
     });
     
     if (!response.ok) {
+      console.log(`[CHAT] Health check failed with status: ${response.status}`);
       return false;
     }
     
     const data = await response.json();
-    return data.healthy === true;
+    const isHealthy = data.status === 'healthy';
+    console.log(`[CHAT] Health check result: ${isHealthy ? 'Healthy' : 'Unhealthy'}`);
+    return isHealthy;
   } catch (error) {
-    console.error('Error checking chat service health:', error);
+    console.error('[CHAT] Error checking chat service health:', error);
     return false;
   }
 }

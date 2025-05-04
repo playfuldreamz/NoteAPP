@@ -6,7 +6,8 @@ const dbPath = path.join(__dirname, '../database.sqlite');
 let db;
 
 try {
-  db = new Database(dbPath, { verbose: console.log }); // Add options if needed
+  // Disable verbose logging to clean up output
+  db = new Database(dbPath); // Remove the verbose logging option
   db.pragma('journal_mode = WAL'); // Enable Write-Ahead Logging for better concurrency
 
   // Load sqlite-vec extension automatically

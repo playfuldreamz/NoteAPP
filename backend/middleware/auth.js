@@ -9,8 +9,8 @@ const generateToken = (payload) => {
 };
 
 const authenticateToken = (req, res, next) => {
-  // Simple logging for auth requests
-  console.log(`[AUTH] Request: ${req.method} ${req.path}`);
+  // Use originalUrl which should contain the full path
+  console.log(`[AUTH] Request: ${req.method} ${req.originalUrl}`);
   
   // For all web requests, require JWT authentication
   const authHeader = req.headers['authorization'];
