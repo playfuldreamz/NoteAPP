@@ -11,6 +11,7 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@types/date-fns": "^2.6.3",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "@wavesurfer/react": "^1.0.9",
     "axios": "^1.7.7",
     "chart.js": "^4.4.8",
@@ -26,8 +27,11 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.2",
     "react-hot-toast": "^2.5.1",
+    "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^15.6.1",
     "react-toastify": "^11.0.3",
     "recharts": "^2.15.1",
+    "remark-gfm": "^4.0.1",
     "wavesurfer.js": "^7.9.4",
     "zustand": "^5.0.1"
   },

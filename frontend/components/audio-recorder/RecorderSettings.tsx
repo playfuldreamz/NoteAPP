@@ -24,15 +24,14 @@ const isKeyRequiredProvider = (provider: ProviderType): boolean => {
   return provider !== 'webspeech' && provider !== 'realtimestt';
 };
 
-const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings }) => {
-  const {
+const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings }) => {  const {
     provider: selectedProvider,
     setProvider,
     initializeProvider,
     availableProviders,
     getProviderSettings,
     updateProviderSettings,
-    // Removed unused activeProvider
+    activeProvider, // Include activeProvider
   } = useTranscription();
 
   const { isRecording } = useRecording(); // Add this to get recording state
@@ -215,7 +214,11 @@ const RecorderSettings: React.FC<RecorderSettingsProps> = ({ showSettings }) => 
                   </span>
                 ) : (
                   <span className="flex items-center text-red-500">
-                    <AlertCircle className="w-3 h-3 mr-1" /> Server Unavailable
+                    <AlertCircle className="w-3 h-3 mr-1" /> 
+                    Server Unavailable
+                    {selectedProvider !== activeProvider && (
+                      <span className="ml-1 text-gray-500">(Using {PROVIDER_DISPLAY_NAMES[activeProvider]} instead)</span>
+                    )}
                   </span>
                 )}
               </>
