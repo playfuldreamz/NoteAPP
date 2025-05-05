@@ -5,7 +5,8 @@ import { sendChatMessage, checkChatServiceHealth } from '../../../services/chatS
 import { 
   getChatSessions, 
   createChatSession, 
-  deleteChatSession, 
+  deleteChatSession,
+  updateChatSession,
   addMessageToChatSession,
   ChatMessage as ChatMessageType,
   ChatSession
@@ -121,7 +122,6 @@ export default function ChatPage() {
       setError(errorMessage);
     }
   };
-
   // Handle deleting a chat
   const handleDeleteChat = async (chatId: string) => {
     try {
@@ -151,7 +151,39 @@ export default function ChatPage() {
       setIsLoading(false);
     }
   };
-  // Handle sending a new message
+
+  // Handle renaming a chat session
+  const handleRenameChat = async (chatId: string, newTitle: string) => {
+    try {
+      // Find the chat session to update
+      const sessionToUpdate = chatSessions.find(s => s.id === chatId);
+      
+      if (!sessionToUpdate) {
+        toast.error('Chat session not found');
+        return;
+      }
+      
+      // Update session with new title
+      const updatedSession = {
+        ...sessionToUpdate,
+        title: newTitle
+      };
+      
+      // Call API to update the session
+      await updateChatSession(updatedSession);
+      
+      // Update state
+      setChatSessions(prevSessions => 
+        prevSessions.map(s => s.id === chatId ? {...s, title: newTitle} : s)
+      );
+      
+      toast.success('Chat renamed successfully');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to rename chat';
+      console.error('Error renaming chat:', err);
+      toast.error(errorMessage);
+    }
+  };// Handle sending a new message
   const handleSendMessage = async (message: string) => {
     if (!message.trim() || !activeChatId) return;
     if (!isChatServiceHealthy) {
@@ -263,13 +295,13 @@ export default function ChatPage() {
         className={`${
           isSidebarOpen ? 'block' : 'hidden'
         } md:block fixed md:static top-0 left-0 h-full w-full md:w-64 z-40 md:z-auto md:mr-3 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700`}
-      >
-        <ChatSidebar
+      >        <ChatSidebar
           chats={formatChatsForSidebar()}
           activeChatId={activeChatId}
           onNewChat={handleNewChat}
           onSelectChat={handleSelectChat}
           onDeleteChat={handleDeleteChat}
+          onRenameChat={handleRenameChat}
         />
       </div>
       
