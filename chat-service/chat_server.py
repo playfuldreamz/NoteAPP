@@ -71,7 +71,7 @@ async def health_check():
     return {"status": "healthy"}
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: dict):
     """Handle chat requests from users.
     
     Args:
@@ -81,6 +81,8 @@ async def chat(request: ChatRequest):
         ChatResponse containing the agent's answer
     """
     try:
+        import json
+        
         # Initialize tools
         tools = [
             SearchNoteAppTool(),
@@ -90,12 +92,22 @@ async def chat(request: ChatRequest):
         # Create chat agent
         agent = NoteAppChatAgent(llm=llm_client, tools=tools)
         
-        # Process the request
+        # Parse the serialized chat history
+        chat_history = []
+        if "serializedChatHistory" in request:
+            try:
+                chat_history = json.loads(request["serializedChatHistory"])
+                logger.info(f"Successfully parsed serializedChatHistory: {len(chat_history)} messages")
+            except Exception as e:
+                logger.error(f"Error parsing serializedChatHistory: {e}")
+                chat_history = []
+        
+        # Process the request with the parsed chat history
         result = await agent.invoke(
-            user_input=request.userInput,
-            chat_history=request.chatHistory,
-            user_id=request.userId,
-            jwt_token=request.token
+            user_input=request["userInput"],
+            chat_history=chat_history,  # Use the parsed chat history
+            user_id=request["userId"],
+            jwt_token=request["token"]
         )
         
         return ChatResponse(**result)

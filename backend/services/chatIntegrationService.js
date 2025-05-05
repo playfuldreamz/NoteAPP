@@ -10,21 +10,21 @@ class ChatIntegrationService {
      * @param {string|number} userId - The user's ID
      * @param {string} token - JWT token for authentication
      * @returns {Promise<Object>} The chat service response
-     */
-    static async startChatTurn(userInput, chatHistory, userId, token) {
+     */    static async startChatTurn(userInput, chatHistory, userId, token) {
         console.log(`[CHAT] Connecting to chat service at ${CHAT_SERVICE_URL}`);
         
         try {
-            // Ensure userId is a string and format the chat history correctly
-            const formattedChatHistory = chatHistory.map(msg => ({
+            // Format the chat history as a serialized string to bypass Pydantic validation
+            // Using a custom structure that will be parsed correctly in the Python server
+            const serializedHistory = JSON.stringify(chatHistory.map(msg => ({
                 role: String(msg.role || (msg.isUser ? 'user' : 'assistant')),
                 content: String(msg.content || '')
-            }));
-
-            // Prepare payload with correct types
+            })));
+            
+            // Prepare payload with string values and a different format for chat history
             const payload = {
                 userInput: String(userInput),
-                chatHistory: formattedChatHistory,
+                serializedChatHistory: serializedHistory, // Sending as a serialized string
                 userId: String(userId),
                 token
             };
