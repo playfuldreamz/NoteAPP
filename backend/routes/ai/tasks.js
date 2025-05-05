@@ -47,7 +47,7 @@ router.post('/enhance-transcription', async (req, res) => {
 
 // Generate title for content
 router.post('/summarize', async (req, res) => {
-  const { content } = req.body;
+  const { content, isChatTitle } = req.body;
   
   if (!content) {
     return res.status(400).json({ error: 'Content is required' });
@@ -58,7 +58,8 @@ router.post('/summarize', async (req, res) => {
     const provider = await AIProviderFactory.createProvider(config.provider, config);
     const summarizationTask = new SummarizationTask(provider);
     
-    const title = await summarizationTask.summarize(content);
+    // Pass the isChatTitle flag to customize the prompt if it's a chat title
+    const title = await summarizationTask.summarize(content, isChatTitle === true);
     res.json({ title });
   } catch (error) {
     console.error('Content summarization error:', error);
@@ -74,8 +75,10 @@ router.post('/summarize', async (req, res) => {
         code: 'INVALID_API_KEY'
       });
     }
-    
-    res.status(500).json({ error: 'Failed to generate title' });
+      res.status(500).json({ 
+      error: 'Failed to generate title',
+      title: content.length > 60 ? content.substring(0, 57) + '...' : content
+    });
   }
 });
 

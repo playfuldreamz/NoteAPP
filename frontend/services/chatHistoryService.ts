@@ -192,9 +192,42 @@ export async function updateChatSession(updatedSession: ChatSession): Promise<vo
 
 /**
  * Auto-generate a title for a chat based on the first user message
+ * Uses AI if available, falls back to using the message content directly
  */
-export function generateChatTitle(message: string): string {
-  // Truncate message if it's too long
+export async function generateChatTitle(message: string): Promise<string> {
+  try {
+    // Try to use AI summarization
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/ai/tasks/summarize`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            content: message,
+            isChatTitle: true  // Indicate this is for a chat title
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.title) {
+            return data.title;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to generate AI title for chat, falling back to message content', error);
+        // Continue with fallback approach
+      }
+    }
+  } catch (error) {
+    console.warn('Error in generateChatTitle:', error);
+  }
+
+  // Fallback: Use the message itself (truncated if needed)
   if (message.length > 60) {
     return message.substring(0, 57) + '...';
   }
@@ -274,10 +307,10 @@ export async function addMessageToChatSession(
 /**
  * Helper function to add a message to a local chat session
  */
-function addMessageToLocalChatSession(
+async function addMessageToLocalChatSession(
   sessionId: string, 
   message: ChatMessage
-): ChatSession | null {
+): Promise<ChatSession | null> {
   const localSessions = getLocalChatSessions();
   const index = localSessions.findIndex(session => session.id === sessionId);
   
@@ -291,7 +324,7 @@ function addMessageToLocalChatSession(
     
     // Update title if it's still "New Chat" and this is the first user message
     if (updatedSession.title === 'New Chat' && message.role === 'user' && updatedSession.messages.length <= 2) {
-      updatedSession.title = generateChatTitle(message.content);
+      updatedSession.title = await generateChatTitle(message.content);
     }
     
     localSessions[index] = updatedSession;

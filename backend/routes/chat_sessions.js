@@ -184,7 +184,7 @@ router.delete('/:id', (req, res) => {
  * POST /api/chat-sessions/:id/messages
  * Add a message to a chat session
  */
-router.post('/:id/messages', (req, res) => {
+router.post('/:id/messages', async (req, res) => {
   try {
     const userId = req.user.id;
     const sessionId = req.params.id;
@@ -225,9 +225,7 @@ router.post('/:id/messages', (req, res) => {
       WHERE id = ?
     `);
     
-    updateSessionStmt.run(timestamp, sessionId);
-    
-    // Update title if it's still "New Chat" and this is a user message
+    updateSessionStmt.run(timestamp, sessionId);      // Update title if it's still "New Chat" and this is a user message
     let updatedTitle = session.title;
     if (session.title === 'New Chat' && role === 'user') {
       // Get count of messages to check if this is among the first messages
@@ -238,8 +236,38 @@ router.post('/:id/messages', (req, res) => {
       const { count } = countStmt.get(sessionId);
       
       if (count <= 2) {  // If this is the first or second message
-        // Truncate title if it's too long
-        updatedTitle = content.length > 60 ? content.substring(0, 57) + '...' : content;
+        try {
+          // Try to use AI to generate a title
+          const AIConfigManager = require('../services/ai/config');
+          const AIProviderFactory = require('../services/ai/factory');
+          const SummarizationTask = require('../services/ai/tasks/summarization');
+          
+          try {
+            const config = await AIConfigManager.getUserConfig(userId);
+            
+            // Check if the user has an AI provider configured
+            if (config && config.provider && config.provider !== 'none') {
+              const provider = await AIProviderFactory.createProvider(config.provider, config);
+              const summarizationTask = new SummarizationTask(provider);
+              
+              // Pass true to indicate this is for a chat title specifically
+              updatedTitle = await summarizationTask.summarize(content, true);
+              console.log('Generated AI title for chat:', updatedTitle);
+            } else {
+              console.log('User has no AI provider configured, using message content');
+              // Use message content as fallback
+              updatedTitle = content.length > 60 ? content.substring(0, 57) + '...' : content;
+            }
+          } catch (aiError) {
+            console.warn('AI title generation failed, using message content as fallback:', aiError.message);
+            // Fallback to using the content as the title
+            updatedTitle = content.length > 60 ? content.substring(0, 57) + '...' : content;
+          }
+        } catch (error) {
+          console.error('Error in title generation process:', error);
+          // Use message content as title if any error occurred
+          updatedTitle = content.length > 60 ? content.substring(0, 57) + '...' : content;
+        }
         
         const updateTitleStmt = db.prepare(`
           UPDATE chat_sessions 

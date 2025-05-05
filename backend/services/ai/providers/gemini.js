@@ -75,10 +75,13 @@ class GeminiProvider extends AIProvider {
       original: transcript
     };
   }
-
-  async summarizeContent(content) {
+  async summarizeContent(content, isChatTitle = false) {
     const model = await this.getModel();
-    const prompt = `Generate a concise title (maximum 8 words) for this content. Return ONLY the title without any bullet points, options, explanations, or additional formatting:\n${content}`;
+    
+    // Use different prompts for chat titles vs regular content summaries
+    const prompt = isChatTitle 
+      ? `Generate a concise and informative title (3-6 words) for this chat message. The title should capture the essence of what the user is asking or discussing. Return ONLY the title without any punctuation, bullet points, quotes, or additional text:\n${content}`
+      : `Generate a concise title (maximum 8 words) for this content. Return ONLY the title without any bullet points, options, explanations, or additional formatting:\n${content}`;
     
     const result = await model.generateContent(prompt);
     if (result.response.promptFeedback?.blockReason) {

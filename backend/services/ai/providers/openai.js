@@ -46,19 +46,20 @@ Do not add any explanations or additional content.`;
       original: transcript
     };
   }
-
-  async summarizeContent(content) {
+  async summarizeContent(content, isChatTitle = false) {
     if (!this.client) {
       throw new Error('OpenAI client not initialized');
     }
 
+    // Different system prompts for chat titles vs regular content summaries
+    const systemPrompt = isChatTitle
+      ? "Generate a concise and informative title (3-6 words) for this chat message. The title should capture the essence of what the user is asking or discussing. Return ONLY the title without any punctuation, bullet points, quotes, or additional text."
+      : "Generate a concise title for the given content. Return only the title without any additional text or explanations.";
+
     const completion = await this.client.chat.completions.create({
       model: "gpt-4",
       messages: [
-        { 
-          role: "system", 
-          content: "Generate a concise title for the given content. Return only the title without any additional text or explanations." 
-        },
+        { role: "system", content: systemPrompt },
         { role: "user", content }
       ],
       temperature: 0.3
