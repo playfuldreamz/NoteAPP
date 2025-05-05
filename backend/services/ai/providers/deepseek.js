@@ -49,19 +49,20 @@ Do not add any explanations or additional content.`;
       original: transcript
     };
   }
-
-  async summarizeContent(content) {
+  async summarizeContent(content, isChatTitle = false) {
     if (!this.client) {
       throw new Error('DeepSeek client not initialized');
     }
 
+    // Different system prompts for chat titles vs regular content summaries
+    const systemPrompt = isChatTitle
+      ? "Generate a concise and informative title (3-6 words) for this chat message. The title should capture the essence of what the user is asking or discussing. Return ONLY the title without any punctuation, bullet points, quotes, or additional text."
+      : "Generate a concise title (maximum 8 words) for this content. Return ONLY the title without any bullet points, options, explanations, quotes or additional formatting:";
+
     const completion = await this.client.chat.completions.create({
       model: "deepseek-chat",
       messages: [
-        { 
-          role: "system", 
-          content: "Generate a concise title (maximum 8 words) for this content. Return ONLY the title without any bullet points, options, explanations, quotes or additional formatting:" 
-        },
+        { role: "system", content: systemPrompt },
         { role: "user", content }
       ],
       temperature: 0.3

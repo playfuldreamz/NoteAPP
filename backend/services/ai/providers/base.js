@@ -25,13 +25,13 @@ class AIProvider {
   async enhanceTranscription(transcript, language) {
     throw new Error("Method 'enhanceTranscription' must be implemented");
   }
-
   /**
    * Summarize content to generate a title or brief description
    * @param {string} content - The content to summarize
+   * @param {boolean} isChatTitle - Whether this is for a chat title (affects prompt)
    * @returns {Promise<string>}
    */
-  async summarizeContent(content) {
+  async summarizeContent(content, isChatTitle = false) {
     throw new Error("Method 'summarizeContent' must be implemented");
   }
 
