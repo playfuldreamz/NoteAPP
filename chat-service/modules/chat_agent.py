@@ -12,7 +12,7 @@ class NoteAppChatAgent:
         """Initialize the chat agent with an LLM and tools."""
         self.llm = llm
         self.base_tools = tools
-          # Prompt specifically formatted for ReAct agent
+        # Prompt specifically formatted for ReAct agent
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a helpful assistant for NoteApp, designed to help users find and understand their notes and transcripts.
             You have access to the following tools: {tool_names}
@@ -40,6 +40,18 @@ class NoteAppChatAgent:
             - Respond naturally without using tools
             
             IMPORTANT: Don't restrict yourself to only providing information from notes. If the user clearly wants your general knowledge or opinions, provide them directly.
+
+            TOOL USAGE GUIDE:
+              For search_noteapp tool:
+            Action: search_noteapp
+            Action Input: "your search query" 
+            
+            For get_noteapp_content tool:
+            Action: get_noteapp_content
+            Action Input: {{"item_id": 15, "item_type": "note"}}
+            
+            Note: For get_noteapp_content, the item_id must be a number (not a string), and item_type must be exactly "note" or "transcript".
+            Never use free text descriptions like "ID of relevant item, i.e., 15" or similar.
 
             Use the following format:
             

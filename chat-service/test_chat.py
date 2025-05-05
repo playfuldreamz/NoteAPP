@@ -33,12 +33,18 @@ class MockGetNoteAppContentTool(Tool):
             description="Mock retrieval of full content of a note or transcript by ID."
         )
     
-    def get_content(self, note_id: str) -> dict:
+    def get_content(self, item_id, item_type='note') -> dict:
         """Return mock content for a note ID."""
+        try:
+            # Convert to int if it's a string
+            item_id = int(item_id)
+        except (ValueError, TypeError):
+            return "Error: item_id must be a valid integer"
+            
         return {
-            "id": note_id,
-            "title": f"Note {note_id}",
-            "content": f"Full content for note {note_id}: This is a mock note about the requested topic."
+            "id": item_id,
+            "title": f"{item_type.capitalize()} {item_id}",
+            "content": f"Full content for {item_type} {item_id}: This is a mock {item_type} about the requested topic."
         }
     
     def set_auth(self, jwt_token: str, user_id: str):
