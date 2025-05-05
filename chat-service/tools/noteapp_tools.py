@@ -57,9 +57,12 @@ class SearchNoteAppTool(BaseNoteAppTool):
                 f"{NOTEAPP_BACKEND_URL}/api/search",
                 headers=self._get_headers(),
                 json={"query": query}
-            )
+            )            
             response.raise_for_status()
-            results = response.json()
+            data = response.json()
+            
+            # Extract results from the response structure
+            results = data.get('results', [])
 
             if not results:
                 return "No matching notes or transcripts found."
