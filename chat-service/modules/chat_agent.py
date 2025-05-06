@@ -43,13 +43,13 @@ class NoteAppChatAgent:
             IMPORTANT: Don't restrict yourself to only providing information from notes. If the user clearly wants your general knowledge or opinions, provide them directly.
 
             TOOL USAGE GUIDE:
-              For search_noteapp tool:
-            Action: search_noteapp
-            Action Input: "your search query" 
+            For search_noteapp tool:
+            - Action: search_noteapp
+            -   Action Input: "your search query" 
             
             For get_noteapp_content tool:
-            Action: get_noteapp_content
-            Action Input: {{"item_id": 15, "item_type": "note"}}
+            - Action: get_noteapp_content
+            - Action Input: {{"item_id": 15, "item_type": "note"}}
             
             Note: For get_noteapp_content, the item_id must be a number (not a string), and item_type must be exactly "note" or "transcript".
             Never use free text descriptions like "ID of relevant item, i.e., 15" or similar.

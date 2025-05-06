@@ -55,7 +55,7 @@ async def interactive_chat():
     """Run an interactive chat session with the NoteAppChatAgent."""
     try:
         # Initialize components
-        llm = ChatOllama(model="phi4-mini:latest")
+        llm = ChatOllama(model="qwen3:latest")
         tools = [MockSearchNoteAppTool(), MockGetNoteAppContentTool()]
         agent = NoteAppChatAgent(llm, tools)
 
