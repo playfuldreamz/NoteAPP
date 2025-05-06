@@ -17,9 +17,15 @@
       {
         "name": "next"
       }
-    ],
-    "paths": {
+    ],    "paths": {
+      "@/*": ["./"],
       "@components/*": ["./components/*"],
+      "@styles/*": ["./styles/*"],
+      "@hooks/*": ["./hooks/*"],
+      "@utils/*": ["./utils/*"],
+      "@services/*": ["./services/*"],
+      "@types/*": ["./types/*"],
+      "@context/*": ["./context/*"],
       "*": ["./*"]
     }
   },
