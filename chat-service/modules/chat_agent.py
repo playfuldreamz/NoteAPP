@@ -56,7 +56,8 @@ class NoteAppChatAgent:
 
             Use the following format:
             
-            Question: the input question you must answer            Thought: you should always think about what to do
+            Question: the input question you must answer            
+            Thought: you should always think about what to do
             Action: the action to take, should be one of [{tool_names}] or "None" if no tool is needed
             Action Input: the input to the action (skip if Action is "None")
             Observation: the result of the action (skip if Action is "None")
