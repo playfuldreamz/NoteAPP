@@ -1,0 +1,38 @@
+/* Custom styles for proper Markdown rendering in chat messages */
+
+/* Ensure ordered lists display with numbers */
+.prose ol {
+  list-style-type: decimal !important;
+  margin-left: 1rem !important;
+  padding-left: 1rem !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+/* Ensure unordered lists display with bullets */
+.prose ul {
+  list-style-type: disc !important;
+  margin-left: 1rem !important;
+  padding-left: 1rem !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+/* Style list items */
+.prose li {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+  display: list-item !important;
+}
+
+/* Style paragraphs */
+.prose p {
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+/* Fix spacing for paragraphs in list items */
+.prose li > p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}

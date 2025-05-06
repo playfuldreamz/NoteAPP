@@ -216,8 +216,7 @@ export default function ChatPage() {
       }
       
       setError(null);
-      
-      // Format chat history for API (excluding the latest user message)
+        // Format chat history for API (excluding the latest user message)
       const chatHistory = formatChatHistoryForAPI(currentMessages);
       
       // Send message to backend

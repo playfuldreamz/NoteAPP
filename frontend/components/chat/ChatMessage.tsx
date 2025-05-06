@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
+import './ChatMarkdown.css';
 
 export interface ChatMessageProps {
   message: {
@@ -36,11 +37,10 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             </span>
           )}
         </div>
-        
-        {isUser ? (
+          {isUser ? (
           <div className="whitespace-pre-wrap text-sm sm:text-base">{message.content}</div>
         ) : (
-          <div className="prose dark:prose-invert prose-sm sm:prose-base max-w-none break-words">
+          <div className="prose dark:prose-invert prose-sm sm:prose-base max-w-none break-words prose-ol:list-decimal prose-ul:list-disc prose-ol:pl-5 prose-ul:pl-5 prose-li:pl-0 prose-li:my-1">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
