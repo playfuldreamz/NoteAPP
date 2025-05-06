@@ -61,16 +61,30 @@ class SearchNoteAppTool(BaseNoteAppTool):
             data = response.json()
             
             # Extract results from the response structure
-            results = data.get('results', [])            
+            results = data.get('results', [])              
             if not results:
                 return "No matching notes or transcripts found."
 
             formatted_results = ["Here are the relevant items I found:"]
+            has_relevant_items = False
+            
             for item in results:
+                relevance = item.get('relevance', 0)
+                relevance_display = f"[Relevance: {relevance:.2f}]"
+                
+                # Check if title contains query terms (case insensitive)
+                title_match = False
+                if any(term.lower() in item['title'].lower() for term in query.lower().split()):
+                    title_match = True
+                    relevance_display += " [TITLE MATCH]"
+                    has_relevant_items = True
+                
                 formatted_results.append(
-                    f"- {item['type'].capitalize()} (ID: {item['id']}): {item['title']} "
-                    f"[Relevance: {item.get('relevance', 'N/A'):.2f}]"
+                    f"- {item['type'].capitalize()} (ID: {item['id']}): {item['title']} {relevance_display}"
                 )
+            
+            if has_relevant_items:
+                formatted_results.append("\nRELEVANT ITEMS FOUND! You should examine the content of these items.")
             
             # Add guidance on how to use get_noteapp_content
             formatted_results.append("\nTo view the full content of an item, use the get_noteapp_content tool with:")

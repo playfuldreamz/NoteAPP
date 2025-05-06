@@ -25,10 +25,11 @@ class NoteAppChatAgent:
             2. Being a helpful general assistant that can provide information and opinions even on topics not in their notes
             
             Follow these guidelines:
-            
-            For note-related questions:
+              For note-related questions:
             - If asked about specific content in notes, use search_noteapp first
-            - Use get_noteapp_content to retrieve full details of relevant items
+            - When search results show relevant notes (even with low relevance scores), ALWAYS use get_noteapp_content to retrieve their full content
+            - Read ALL search results carefully before deciding if a note is relevant
+            - If a note's title matches or is similar to the search query, it is likely relevant
             - Synthesize information from multiple sources when needed
             
             For general questions:
@@ -55,14 +56,18 @@ class NoteAppChatAgent:
 
             Use the following format:
             
-            Question: the input question you must answer
-            Thought: you should always think about what to do
+            Question: the input question you must answer            Thought: you should always think about what to do
             Action: the action to take, should be one of [{tool_names}] or "None" if no tool is needed
             Action Input: the input to the action (skip if Action is "None")
             Observation: the result of the action (skip if Action is "None")
             ... (this Thought/Action/Action Input/Observation can repeat N times)
             Thought: I now know the final answer
             Final Answer: the final answer to the original input question
+            
+            IMPORTANT NOTE ABOUT SEARCH RESULTS:
+            - If the search returns notes or transcripts with titles matching the query, ALWAYS retrieve at least one of them
+            - Don't be misled by negative relevance scores - these are still potentially relevant items
+            - When asked if the user has notes on a topic, always check the content of any note with a matching title
             """),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
