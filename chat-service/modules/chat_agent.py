@@ -110,8 +110,10 @@ class NoteAppChatAgent:
             tools=request_tools,
             verbose=True,
             handle_parsing_errors=True,
-            max_iterations=5
-        )        # Prepare input for the agent
+            max_iterations=20
+        )
+
+        # Prepare input for the agent
         input_dict = {
             "input": user_input,
             "chat_history": formatted_history,
