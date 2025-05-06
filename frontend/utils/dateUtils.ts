@@ -64,17 +64,20 @@ export const formatUTCTimestampToLongLocal = (timestampInput: string): string =>
         });
       }
       return timestampInput; // Return original if all parsing fails
-    }
-
-    // Format using the user's locale and timezone for long date and time
-    return date.toLocaleString(undefined, {
+    }    // Format using the user's locale and timezone for long date and time
+    const dateStr = date.toLocaleDateString(undefined, {
       year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      // timeZoneName: 'short' // Optional: include timezone abbreviation
+      month: 'numeric', 
+      day: 'numeric'
     });
+    
+    const timeStr = date.toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    
+    return `${dateStr} {${timeStr}}`;
   } catch (error) {
     console.error('Error formatting long UTC timestamp string:', timestampInput, error);
     return timestampInput;

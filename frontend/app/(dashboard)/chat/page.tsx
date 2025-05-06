@@ -18,6 +18,7 @@ import LoadingIndicator from '../../../components/chat/LoadingIndicator';
 import StatusAlert from '../../../components/chat/StatusAlert';
 import { toast } from 'react-toastify';
 import { Menu, X } from 'lucide-react'; // Import icons for menu toggle
+import { formatUTCTimestampToLongLocal } from '../../../utils/dateUtils'; // Import date formatting utility
 
 export default function ChatPage() {
   // Chat service status
@@ -31,21 +32,33 @@ export default function ChatPage() {
   const [currentMessages, setCurrentMessages] = useState<ChatMessageType[]>([]);
   
   // Mobile sidebar state
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  // Initialize by loading sessions and checking service health
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);  // Initialize by loading sessions and checking service health
   useEffect(() => {
     // Load chat sessions from API
     const loadSessions = async () => {
       try {
         setIsLoading(true);
         const sessions = await getChatSessions();
-        setChatSessions(sessions);
+        
+        // Format timestamps in all chat sessions
+        const formattedSessions = sessions.map(session => ({
+          ...session,
+          messages: session.messages.map(msg => ({
+            ...msg,
+            // Format timestamp if it exists and is in ISO format
+            timestamp: msg.timestamp && msg.timestamp.includes('T') ? 
+              formatUTCTimestampToLongLocal(msg.timestamp) : 
+              msg.timestamp
+          }))
+        }));
+        
+        setChatSessions(formattedSessions);
         
         // If there are sessions, set the first one as active
         // Otherwise create a new session
-        if (sessions.length > 0) {
-          setActiveChatId(sessions[0].id);
-          setCurrentMessages(sessions[0].messages);
+        if (formattedSessions.length > 0) {
+          setActiveChatId(formattedSessions[0].id);
+          setCurrentMessages(formattedSessions[0].messages);
         } else {
           const newSession = await createChatSession();
           setChatSessions([newSession]);
@@ -104,14 +117,23 @@ export default function ChatPage() {
       setIsLoading(false);
     }
   };
-
   // Handle selecting a chat
   const handleSelectChat = async (chatId: string) => {
     try {
       const session = chatSessions.find(s => s.id === chatId);
       if (session) {
         setActiveChatId(chatId);
-        setCurrentMessages(session.messages);
+        
+        // Format any unformatted timestamps when selecting a chat
+        const messagesWithFormattedTimestamps = session.messages.map(msg => ({
+          ...msg,
+          // Format timestamp if it exists and is in ISO format
+          timestamp: msg.timestamp && msg.timestamp.includes('T') ? 
+            formatUTCTimestampToLongLocal(msg.timestamp) : 
+            msg.timestamp
+        }));
+        
+        setCurrentMessages(messagesWithFormattedTimestamps);
         setError(null);
         // Close sidebar on mobile after selecting a chat
         setIsSidebarOpen(false);
@@ -190,9 +212,9 @@ export default function ChatPage() {
       toast.error('Chat service is unavailable. Please try again later.');
       return;
     }
-    
-    // Add user message to state
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      // Add user message to state
+    const now = new Date();
+    const timestamp = formatUTCTimestampToLongLocal(now.toISOString());
     const userMessage: ChatMessageType = {
       role: 'user',
       content: message,
@@ -221,12 +243,11 @@ export default function ChatPage() {
       
       // Send message to backend
       const response = await sendChatMessage(message, chatHistory);
-      
-      // Add assistant response to state
+        // Add assistant response to state
       const assistantMessage: ChatMessageType = {
         role: 'assistant',
         content: response.final_answer,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        timestamp: formatUTCTimestampToLongLocal(new Date().toISOString())
       };
       
       const messagesWithResponse = [...updatedMessages, assistantMessage];
