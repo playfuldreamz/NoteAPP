@@ -21,18 +21,43 @@ class NoteAppChatAgent:
 
     async def _is_casual_conversation(self, user_input: str, chat_history: List[HumanMessage | AIMessage]) -> bool:
         """Determines if the user input is likely casual conversation."""
-        # First, check against common casual phrases
+        # First, check against common casual phrases and patterns
         casual_phrases = [
             "how are you", "how's it going", "what's up", "hey", "hi", "hello",
             "good morning", "good afternoon", "good evening", "good night",
             "thanks", "thank you", "thx", "ty", "cool", "nice", "great",
             "ok", "okay", "k", "bye", "goodbye", "see you", "later",
-            "yes", "no", "yeah", "nah", "sure"
+            "yes", "no", "yeah", "nah", "sure", "good", "fine", "not bad",
+            "what about you", "and you", "same here", "me too"
         ]
         
+        # Add common response patterns
+        casual_patterns = [
+            r"(?i).*\b(good|fine|ok|okay)\b.*(?:\b(what|how) about you\b)",  # "good, what about you"
+            r"(?i).*\b(and|about) you\b.*",  # "...and you?", "what about you?"
+            r"(?i)^(good|fine|great|ok|okay|not bad)$",  # Single word status responses
+            r"(?i).*\b(thanks|thank you)\b.*",  # Any form of thanks
+            r"(?i).*\b(bye|goodbye|see you|later)\b.*"  # Any form of goodbye
+        ]
         normalized_input = user_input.lower().strip().replace("?", "").replace("!", "").replace(".", "")
+        
+        # Check exact matches in casual phrases
         if normalized_input in casual_phrases:
             return True
+            
+        # Check regex patterns
+        for pattern in casual_patterns:
+            if re.search(pattern, normalized_input):
+                return True
+                
+        # Check if this is a response to a previous casual message
+        if len(chat_history) > 0 and isinstance(chat_history[-1], AIMessage):
+            last_ai_msg = chat_history[-1].content.lower()
+            # If the AI's last message was a question
+            if any(q in last_ai_msg for q in ["how are you", "how's your", "what about you", "and you"]):
+                # And user's response is short (typical for casual replies)
+                if len(normalized_input.split()) <= 4:
+                    return True
 
         # For less obvious cases, use LLM to classify
         try:
