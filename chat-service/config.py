@@ -12,7 +12,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # LLM Configuration
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen3:latest")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama3.1:8b")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 # NoteApp Backend Configuration

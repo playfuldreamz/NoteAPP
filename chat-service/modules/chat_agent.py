@@ -1,12 +1,64 @@
 from typing import List, Dict, Any
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate, PromptTemplate
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain.agents import AgentExecutor, create_react_agent
+import re
 
 class NoteAppChatAgent:
     """Agent for handling NoteApp chat interactions using LangChain."""
+    
+    def _clean_response(self, text: str) -> str:
+        """Cleans the LLM response by removing LaTeX and other artifacts."""
+        # Remove LaTeX-style boxing
+        text = re.sub(r'\$\\boxed{', '', text)
+        text = re.sub(r'}\$', '', text)
+        text = re.sub(r'\$\{', '', text)  # Handle partial LaTeX
+        text = re.sub(r'\}', '', text)    # Handle remaining braces
+        text = text.strip()
+        return text
+
+    async def _is_casual_conversation(self, user_input: str, chat_history: List[HumanMessage | AIMessage]) -> bool:
+        """Determines if the user input is likely casual conversation."""
+        # First, check against common casual phrases
+        casual_phrases = [
+            "how are you", "how's it going", "what's up", "hey", "hi", "hello",
+            "good morning", "good afternoon", "good evening", "good night",
+            "thanks", "thank you", "thx", "ty", "cool", "nice", "great",
+            "ok", "okay", "k", "bye", "goodbye", "see you", "later",
+            "yes", "no", "yeah", "nah", "sure"
+        ]
+        
+        normalized_input = user_input.lower().strip().replace("?", "").replace("!", "").replace(".", "")
+        if normalized_input in casual_phrases:
+            return True
+
+        # For less obvious cases, use LLM to classify
+        try:
+            messages = [
+                SystemMessage(content="You are a message classifier. Determine if the message is casual conversation or small talk. Respond with exactly 'true' or 'false'."),
+                HumanMessage(content=f"Is this message casual conversation: '{user_input}'")
+            ]
+            response = await self.llm.ainvoke(messages)
+            return response.content.strip().lower() == "true"
+        except Exception as e:
+            print(f"Error in casual conversation classification: {e}")
+            return False
+
+    async def _get_casual_response(self, user_input: str, chat_history: List[HumanMessage | AIMessage]) -> str:
+        """Generates a direct response for casual conversation."""
+        try:
+            messages = [
+                SystemMessage(content="You are a friendly assistant. Respond naturally to casual conversation. Keep responses concise and engaging."),
+                *chat_history[-2:],  # Include recent context
+                HumanMessage(content=user_input)
+            ]
+            response = await self.llm.ainvoke(messages)
+            return self._clean_response(response.content)
+        except Exception as e:
+            print(f"Error generating casual response: {e}")
+            return "I'm here to help! How can I assist you?"
 
     def __init__(self, llm: BaseChatModel, tools: List[BaseTool]):
         """Initialize the chat agent with an LLM and tools."""
@@ -72,7 +124,7 @@ class NoteAppChatAgent:
             """),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
-            ("ai", "{agent_scratchpad}"),  # Using "ai" for agent_scratchpad
+            ("ai", "{agent_scratchpad}")  # Using "ai" for agent_scratchpad
         ])
 
     async def invoke(self, user_input: str, chat_history: List[Dict], user_id: str, jwt_token: str) -> Dict[str, Any]:
@@ -83,6 +135,15 @@ class NoteAppChatAgent:
                 formatted_history.append(AIMessage(content=msg["content"]))
             else:
                 formatted_history.append(HumanMessage(content=msg["content"]))
+
+        # Check for casual conversation
+        try:
+            if await self._is_casual_conversation(user_input, formatted_history):
+                print("Detected casual conversation, bypassing agent framework.")
+                casual_response = await self._get_casual_response(user_input, formatted_history)
+                return {"final_answer": casual_response}
+        except Exception as e:
+            print(f"Error during casual conversation check: {e}. Proceeding with full agent.")
 
         # Initialize tools with authentication context
         request_tools = []
@@ -125,12 +186,14 @@ class NoteAppChatAgent:
             # Use .ainvoke for async operation
             print(f"Input to executor: {input_dict}")
             result = await executor.ainvoke(input_dict)
-            return {"final_answer": result["output"]}
+            final_answer = self._clean_response(result["output"])
+            return {"final_answer": final_answer}
         except Exception as e:
             import traceback
             print(f"Error during agent invocation: {e}")
             traceback.print_exc()
+            error_message = self._clean_response("I encountered an error while processing your request. Please try again or rephrase your question.")
             return {
-                "final_answer": "I encountered an error while processing your request. Please try again or rephrase your question.",
+                "final_answer": error_message,
                 "error": str(e)
             }
