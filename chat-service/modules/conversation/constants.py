@@ -2,17 +2,47 @@ from typing import Dict, List, Pattern
 import re
 
 # Confidence thresholds
-MIN_CONFIDENCE_THRESHOLD = 0.6
-PATTERN_MATCH_CONFIDENCE = 0.9
-CONTEXT_MATCH_CONFIDENCE = 0.7
+MIN_CONFIDENCE_THRESHOLD = 0.35   # Lowered to catch more edge cases
+PATTERN_MATCH_CONFIDENCE = 0.75   # Adjusted for better pattern matching
+CONTEXT_MATCH_CONFIDENCE = 0.65   # Adjusted for context awareness
+
+# Message history configuration
+MAX_RECENT_MESSAGES = 5          # Increased for better context
+MAX_HISTORY_TOKENS = 32000       # Half of 64k to leave room for response
+SUMMARY_TRIGGER_LENGTH = 8       # Increased for longer conversations
+
+# Message summarization settings
+SUMMARY_MAX_LENGTH = 200         # Increased for better context preservation
+SUMMARY_MIN_MESSAGES = 3         # Adjusted for longer conversations
+SUMMARY_RETENTION_POLICY = {
+    "user_messages": 0.7,        # Increased retention of user messages
+    "assistant_messages": 0.5,   # Adjusted assistant message retention
+    "key_context": 1.0          # Always keep task-related or key information
+}
+
+# Token management
+TOKEN_LIMITS = {
+    "message": 4000,  # Max tokens per individual message
+    "summary": 2000,  # Max tokens for summary section
+    "context": 6000,  # Max tokens for contextual information
+    "response": 2000,  # Max tokens for response generation
+}
+
+# Context preservation weights
+CONTEXT_WEIGHTS = {
+    "task_related": 1.0,  # Task-specific content
+    "user_intent": 0.8,  # User's expressed intentions
+    "topic_chains": 0.7,  # Related topic sequences
+    "casual_chat": 0.3,  # General conversation
+}
 
 # Weight configurations
 WEIGHTS: Dict[str, float] = {
     "exact_match": 1.0,
-    "pattern_match": 0.8,
-    "context_continuation": 0.9,  # Increased to give more weight to conversation flow
-    "message_length": 0.3,
-    "llm_classification": 0.5
+    "pattern_match": 0.75,
+    "context_continuation": 0.85,  # Increased for better flow
+    "message_length": 0.4,        # Reduced impact of message length
+    "llm_classification": 0.6     # Increased LLM influence
 }
 
 # Casual conversation patterns

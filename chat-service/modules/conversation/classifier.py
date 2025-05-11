@@ -21,7 +21,18 @@ class ConversationClassifier:
         normalized_text = self.normalizer.normalize(context.current_message)
         characteristics = self.normalizer.get_characteristics(context.current_message)
 
-        # Check for exact matches first (fastest path)
+        # Fast path: Check if message has obvious casual characteristics
+        if (characteristics.get("has_repeated_chars") or 
+            characteristics.get("starts_lowercase") or 
+            characteristics.get("length", 100) < 5):  # Very short messages are likely casual
+            return ClassificationResult(
+                is_casual=True,
+                confidence=0.8,
+                reasons=["Message characteristics suggest casual conversation"],
+                weights={"characteristics": 0.8}
+            )
+
+        # Check for exact matches (also fast path)
         if exact_match := self.pattern_matcher.check_exact_matches(normalized_text):
             return ClassificationResult(
                 is_casual=True,

@@ -9,8 +9,11 @@ import traceback
 from .conversation import (
     ConversationClassifier,
     ResponseGenerator,
-    ConversationContext
+    ConversationContext,
+    MessageAnalyzer,
+    IntentType
 )
+from .conversation.history import MessageHistoryManager
 
 class NoteAppChatAgent:
     """Agent for handling NoteApp chat interactions using LangChain."""
@@ -23,51 +26,55 @@ class NoteAppChatAgent:
         # Initialize conversation handlers
         self.classifier = ConversationClassifier(llm=llm)
         self.response_generator = ResponseGenerator(llm=llm)
+        self.message_analyzer = MessageAnalyzer()
+        self.history_manager = MessageHistoryManager()
         
-        # Prompt specifically formatted for ReAct agent
+        # Enhanced ReAct prompt with explicit format requirements and examples
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a helpful assistant for NoteApp, designed to help users find and understand their notes and transcripts.
+
             You have access to the following tools: {tool_names}
 
             Tool descriptions: {tools}
-            
-            Follow these guidelines:
-            
+
+            Follow these strict guidelines:
+
+            For ALL responses, you MUST follow the ReAct format:
+            Thought: Explain your reasoning about what to do next
+            Action: Specify which tool to use (or "None" for direct response)
+            Action Input: Exact parameters to pass to the tool
+            Observation: The tool's response or [None if no tool used]
+            ... (repeat Thought/Action/Action Input/Observation as needed)
+            Final Answer: Your complete response to the user
+
             For note-related questions:
-            - Use search_noteapp first to find relevant content
-            - Always use get_noteapp_content to retrieve full note content
-            - Read ALL search results carefully
-            - Check note titles for relevance
-            - Synthesize information from multiple sources
-            
-            When presenting information:
-            - Never just say "yes/no" - provide details
-            - Summarize key points
-            - Structure responses for readability
-            - Highlight important items
-            - Maintain friendly tone
-            - Suggest follow-up topics
-            
+            1. Start with search_noteapp to find relevant content
+            2. Use get_noteapp_content to retrieve full note contents
+            3. Read ALL search results carefully
+            4. Check note titles for relevance
+            5. Synthesize information from multiple sources
+
             For casual conversation:
-            - Respond naturally without tools
-            - Keep the friendly tone
-            
-            TOOL USAGE:
-            search_noteapp:
-            - Action Input: "your search query"
-            
-            get_noteapp_content:
-            - Action Input: {{"item_id": number, "item_type": "note"}}
-            
-            Use format:
-            Question: <input question>
-            Thought: <reasoning>
-            Action: <tool_name or "None">
-            Action Input: <parameters>
-            Observation: <result>
-            ... (repeat as needed)
-            Thought: <final reasoning>
-            Final Answer: <response>"""),
+            1. Use Thought and Final Answer only (no actions needed)
+            2. Keep a natural, friendly tone
+            3. Consider context from previous messages
+
+            EXAMPLE 1 - Notes query:
+            Human: Do I have any notes about Python?
+            Thought: I should search for notes related to Python first
+            Action: search_noteapp
+            Action Input: "Python programming language tutorials notes"
+            Observation: [search results...]
+            Thought: I found some relevant notes, let me get the contents
+            Action: get_noteapp_content
+            Action Input: {{"item_id": 123, "item_type": "note"}}
+            Observation: [note contents...]
+            Final Answer: Yes! I found several notes about Python...
+
+            EXAMPLE 2 - Casual conversation:
+            Human: How are you doing today?
+            Thought: This is a casual greeting, I should respond naturally
+            Final Answer: I'm doing great, thanks for asking! How are you?"""),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             ("ai", "{agent_scratchpad}")
@@ -75,13 +82,15 @@ class NoteAppChatAgent:
 
     async def invoke(self, user_input: str, chat_history: List[Dict], user_id: str, jwt_token: str) -> Dict[str, Any]:
         """Process user input and return appropriate response."""
-        # Format chat history into LangChain message format
-        formatted_history = []
+        # Add messages to history manager
         for msg in chat_history:
-            if msg.get("role") == "assistant":
-                formatted_history.append(AIMessage(content=msg["content"]))
-            else:
-                formatted_history.append(HumanMessage(content=msg["content"]))
+            self.history_manager.add_message(msg)
+        
+        # Add current user message
+        self.history_manager.add_message({"role": "user", "content": user_input})
+
+        # Get formatted history from manager
+        formatted_history = self.history_manager.get_formatted_history()
 
         # Create conversation context
         context = ConversationContext(
@@ -89,17 +98,39 @@ class NoteAppChatAgent:
             current_message=user_input
         )
 
-        # Check for casual conversation using our new classifier
-        try:
-            classification = await self.classifier.classify(context)
-            if classification.is_casual:
-                print(f"Detected casual conversation (confidence: {classification.confidence:.2f})")
-                print(f"Reasons: {', '.join(classification.reasons)}")
-                casual_response = await self.response_generator.generate_response(context)
-                return {"final_answer": casual_response}
-        except Exception as e:
-            print(f"Error during casual conversation check: {e}. Proceeding with full agent.")
+        # Debug token stats
+        token_stats = self.history_manager.get_token_stats()
+        print(f"Token stats: {token_stats}")
 
+        # Analyze message intent and features
+        try:
+            analysis = self.message_analyzer.analyze(user_input, context)
+            print(f"Message Analysis: Intent={analysis.intent.value}, Confidence={analysis.confidence:.2f}")
+            print(f"Requires tools: {analysis.requires_tool}, Tools: {analysis.required_tools}")
+            print(f"Keywords: {analysis.keywords}")
+            
+            # Enhanced casual conversation and creative request detection
+            should_use_casual = (
+                # Standard casual conversation criteria
+                (analysis.intent in [IntentType.EMOTIONAL, IntentType.CASUAL] and 
+                 analysis.confidence >= 0.4 and   # Lowered threshold for better coverage
+                 not analysis.requires_tool and   # No tools needed
+                 (len(user_input.split()) < 20    # Allow longer messages
+                  or analysis.confidence > 0.8))  # High confidence overrides length
+                or
+                # Creative requests and message composition criteria
+                (any(word in user_input.lower() for word in ['craft', 'write', 'create', 'compose', 'draft']) and
+                 any(word in user_input.lower() for word in ['message', 'msg', 'messga', 'text', 'note', 'wish']))
+            )
+            
+            if should_use_casual:
+                casual_response = await self.response_generator.generate_response(context)
+                self.history_manager.add_message({"role": "assistant", "content": casual_response})
+                return {"final_answer": casual_response}
+            
+        except Exception as e:
+            print(f"Error during message analysis: {e}. Proceeding with full agent.")
+            
         # Initialize tools with authentication context
         request_tools = []
         for tool in self.base_tools:
@@ -107,7 +138,16 @@ class NoteAppChatAgent:
                 tool.set_auth(jwt_token=jwt_token, user_id=user_id)
             except AttributeError:
                 pass  # Mock tools may not need auth
-            request_tools.append(tool)
+            
+            # Only include tools that were detected as required, or all tools if no specific tools were detected
+            if not analysis.required_tools or tool.name in analysis.required_tools:
+                request_tools.append(tool)
+
+        if not request_tools:
+            # If no tools are available, fall back to casual response
+            casual_response = await self.response_generator.generate_response(context)
+            self.history_manager.add_message({"role": "assistant", "content": casual_response})
+            return {"final_answer": casual_response}
 
         # Generate tool descriptions for the prompt
         tool_names = ", ".join([tool.name for tool in request_tools])
@@ -136,15 +176,19 @@ class NoteAppChatAgent:
                 "tool_names": tool_names,
                 "tools": tools_descriptions
             }
-            
+
             print(f"Input to executor: {input_dict}")
             result = await executor.ainvoke(input_dict)
-            return {"final_answer": result["output"]}
+            assistant_response = result["output"]
+            self.history_manager.add_message({"role": "assistant", "content": assistant_response})
+            return {"final_answer": assistant_response}
             
         except Exception as e:
             print(f"Error during agent invocation: {e}")
             traceback.print_exc()
+            error_response = "I encountered an error while processing your request. Please try again or rephrase your question."
+            self.history_manager.add_message({"role": "assistant", "content": error_response})
             return {
-                "final_answer": "I encountered an error while processing your request. Please try again or rephrase your question.",
+                "final_answer": error_response,
                 "error": str(e)
             }
