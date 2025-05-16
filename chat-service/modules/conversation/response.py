@@ -44,7 +44,13 @@ class ResponseGenerator:
                     HumanMessage(content=context.current_message)
                 ]
                 response = await self.llm.ainvoke(messages)
-                return response.content
+                # Remove <think> tags
+                response_content = response.content
+                if "<think>" in response_content and "</think>" in response_content:
+                    start_index = response_content.find("<think>")
+                    end_index = response_content.find("</think>") + len("</think>")
+                    response_content = response_content.replace(response_content[start_index:end_index], "").strip()
+                return response_content
 
             except Exception as e:
                 print(f"Error generating LLM response: {e}")
