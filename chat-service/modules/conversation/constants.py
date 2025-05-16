@@ -7,17 +7,19 @@ PATTERN_MATCH_CONFIDENCE = 0.75   # Adjusted for better pattern matching
 CONTEXT_MATCH_CONFIDENCE = 0.65   # Adjusted for context awareness
 
 # Message history configuration
-MAX_RECENT_MESSAGES = 5          # Increased for better context
+MAX_RECENT_MESSAGES = 8          # Keep more recent context
 MAX_HISTORY_TOKENS = 32000       # Half of 64k to leave room for response
-SUMMARY_TRIGGER_LENGTH = 8       # Increased for longer conversations
+SUMMARY_TRIGGER_LENGTH = 12      # Trigger summary less frequently
 
 # Message summarization settings
-SUMMARY_MAX_LENGTH = 200         # Increased for better context preservation
-SUMMARY_MIN_MESSAGES = 3         # Adjusted for longer conversations
+SUMMARY_MAX_LENGTH = 300         # Allow longer summaries for better context
+SUMMARY_MIN_MESSAGES = 5         # More messages before summarizing
 SUMMARY_RETENTION_POLICY = {
-    "user_messages": 0.7,        # Increased retention of user messages
-    "assistant_messages": 0.5,   # Adjusted assistant message retention
-    "key_context": 1.0          # Always keep task-related or key information
+    "user_messages": 0.85,       # Higher retention for user context
+    "assistant_messages": 0.7,   # Higher retention for assistant responses
+    "key_context": 1.0,         # Always keep key information
+    "task_related": 0.9,        # High retention for task-related content
+    "code_blocks": 0.95         # Near-complete retention of code examples
 }
 
 # Token management

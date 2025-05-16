@@ -1,5 +1,5 @@
 """Manages conversation message history and summarization."""
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Set
 from dataclasses import dataclass
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from .constants import (
@@ -137,72 +137,327 @@ class MessageHistoryManager:
         self._update_token_count()
 
     def _generate_summary(self, messages: List[Dict]) -> str:
-        """Generate a concise summary of messages.
-        
+        """Generate a structured summary of messages with improved retention and formatting.
+
         Args:
             messages: List of messages to summarize
             
         Returns:
-            Summarized text
+            Formatted summary text
         """
-        # Simple concatenation for now - in practice, you'd want to use an LLM
+        summary_sections = {
+            'task': [],
+            'code': [],
+            'error': [],
+            'important': [],
+            'conversation': []
+        }
+        
+        # First pass: Categorize messages
+        code_block = False
+        for msg in messages:
+            content = msg['content']
+            role = msg['role']
+            weight = SUMMARY_RETENTION_POLICY[
+                'task_related' if self._is_task_related(content)
+                else 'code_blocks' if '```' in content
+                else 'user_messages' if role == 'user'
+                else 'assistant_messages'
+            ]
+            
+            if '```' in content:
+                code_block = not code_block
+                if code_block:
+                    code_desc = content.split('```')[0].strip()
+                    if code_desc:
+                        summary_sections['code'].append(f"Code: {code_desc}")
+            
+            # Check task-related content
+            if self._is_task_related(content):
+                summary_sections['task'].append(
+                    f"{role}: {self._truncate_text(content, 100)}"
+                )
+            
+            # Check for errors/warnings
+            elif any(kw in content.lower() for kw in ['error', 'warning', 'fail', 'issue']):
+                summary_sections['error'].append(
+                    f"{role}: {self._truncate_text(content, 80)}"
+                )
+            
+            # Check for important statements
+            elif weight >= 0.8 and any(kw in content.lower() 
+                for kw in ['important', 'key', 'must', 'should', 'note']):
+                summary_sections['important'].append(
+                    f"{role}: {self._truncate_text(content, 80)}"
+                )
+            
+            # Add to general conversation if significant
+            elif weight >= 0.7:
+                summary_sections['conversation'].append(
+                    f"{role}: {self._truncate_text(content, 60)}"
+                )
+        
+        # Build final summary with sections
         summary_parts = []
         
-        for msg in messages:
-            weight = (SUMMARY_RETENTION_POLICY['user_messages'] 
-                    if msg['role'] == 'user' 
-                    else SUMMARY_RETENTION_POLICY['assistant_messages'])
+        if summary_sections['task']:
+            summary_parts.extend([
+                "\nTask Context:",
+                *summary_sections['task'][:3]
+            ])
             
-            content = msg['content']
-            # Only include first part of long messages
-            if len(content.split()) > 50:
-                content = " ".join(content.split()[:50]) + "..."
-                
-            if weight >= 0.8:  # High importance messages
-                summary_parts.append(f"{msg['role']}: {content}")
-
+        if summary_sections['error']:
+            summary_parts.extend([
+                "\nErrors/Warnings:",
+                *summary_sections['error'][:2]
+            ])
+            
+        if summary_sections['code']:
+            summary_parts.extend([
+                "\nCode Context:",
+                *summary_sections['code'][:3]
+            ])
+            
+        if summary_sections['important']:
+            summary_parts.extend([
+                "\nImportant Points:",
+                *summary_sections['important'][:3]
+            ])
+            
+        if summary_sections['conversation']:
+            summary_parts.extend([
+                "\nConversation Context:",
+                *summary_sections['conversation'][:3]
+            ])
+        
         return "\n".join(summary_parts)
+        
+    def _is_task_related(self, text: str) -> bool:
+        """Check if text is task-related."""
+        text = text.lower()
+        task_indicators = [
+            'create', 'update', 'delete', 'modify', 'implement',
+            'add', 'remove', 'change', 'fix', 'improve'
+        ]
+        return (
+            any(indicator in text for indicator in task_indicators) or
+            (any(q in text for q in ['can you', 'could you']) and
+             any(act in text for act in ['help', 'please', 'need']))
+        )
+        
+    def _truncate_text(self, text: str, max_length: int) -> str:
+        """Truncate text to max_length while preserving word boundaries."""
+        if len(text) <= max_length:
+            return text
+            
+        truncated = text[:max_length]
+        last_space = truncated.rfind(' ')
+        if last_space > 0:
+            truncated = truncated[:last_space]
+
+        return truncated + "..."
 
     def _extract_key_points(self, messages: List[Dict]) -> List[str]:
-        """Extract key points from messages.
-        
+        """Extract key points from messages using improved heuristics.
+
         Args:
             messages: List of messages to analyze
             
         Returns:
             List of key points
         """
-        # Simple implementation - in practice, use LLM or NLP
         key_points = []
+        code_block = False
+        consecutive_context = []
+        
         for msg in messages:
-            if msg['role'] == 'user' and '?' in msg['content']:
-                # Capture questions as key points
-                key_points.append(msg['content'])
-            elif msg['role'] == 'assistant' and any(kw in msg['content'].lower() 
-                                                  for kw in ['important', 'key', 'must', 'should']):
-                # Capture important statements
-                key_points.append(msg['content'])
+            content = msg['content'].lower()
+            
+            # Track code blocks
+            if '```' in content:
+                code_block = not code_block
+                if code_block and len(content.split('```')) > 1:
+                    # Add brief code summary
+                    code_desc = content.split('```')[0].strip()
+                    if code_desc:
+                        key_points.append(f"Code example: {code_desc}")
+            
+            # Identify task-related content
+            if msg['role'] == 'user':
+                if any(kw in content for kw in ['can you', 'could you', 'please', 'help']):
+                    task = content.replace('can you', '').replace('could you', '').replace('please', '').strip()
+                    key_points.append(f"Task requested: {task[:100]}")
+                elif '?' in content:
+                    key_points.append(f"Question: {content[:100]}")
+            
+            # Track important assistant responses
+            elif msg['role'] == 'assistant':
+                if any(kw in content for kw in [
+                    'important', 'key', 'must', 'should', 'warning', 'error', 'note',
+                    'recommend', 'suggest', 'best practice', 'critical'
+                ]):
+                    # Extract the important statement
+                    for line in content.split('\n'):
+                        if any(kw in line.lower() for kw in [
+                            'important', 'key', 'must', 'should', 'warning', 'error',
+                            'note', 'recommend', 'suggest', 'best practice', 'critical'
+                        ]):
+                            key_points.append(line.strip()[:100])
+            
+            # Track conversation context
+            consecutive_context.append(msg)
+            if len(consecutive_context) >= 3:
+                # Check for thematic consistency
+                themes = set()
+                for ctx_msg in consecutive_context[-3:]:
+                    themes.update(self._extract_themes(ctx_msg['content']))
+                if len(themes) >= 2:
+                    key_points.append(f"Context theme: {', '.join(list(themes)[:3])}")
+                consecutive_context = consecutive_context[-3:]
                 
-        return key_points[:5]  # Limit to top 5 key points
+        # Deduplicate and limit
+        seen = set()
+        unique_points = []
+        for point in key_points:
+            normalized = point.lower()
+            if normalized not in seen:
+                seen.add(normalized)
+                unique_points.append(point)
+                
+        return unique_points[:7]  # Increased limit for better context
+        
+    def _extract_themes(self, text: str) -> Set[str]:
+        """Extract main themes from text.
+        
+        Args:
+            text: Text to analyze
+            
+        Returns:
+            Set of identified themes
+        """
+        # Simple keyword-based theme extraction
+        themes = set()
+        text = text.lower()
+        
+        theme_keywords = {
+            'code': ['function', 'class', 'method', 'variable', 'import', 'return'],
+            'error': ['error', 'exception', 'failed', 'bug', 'issue', 'problem'],
+            'task': ['create', 'update', 'delete', 'modify', 'implement', 'add'],
+            'question': ['how', 'what', 'why', 'when', 'where', 'can', 'could'],
+            'data': ['json', 'array', 'object', 'string', 'number', 'boolean'],
+            'api': ['endpoint', 'request', 'response', 'api', 'rest', 'server'],
+            'ui': ['component', 'style', 'css', 'html', 'layout', 'design'],
+        }
+        
+        for theme, keywords in theme_keywords.items():
+            if any(kw in text for kw in keywords):
+                themes.add(theme)
+
+        return themes
 
     def _format_summaries(self) -> str:
-        """Format all summaries into a single context message.
-        
+        """Format all summaries into a structured context message.
+
         Returns:
-            Formatted summary text
+            Formatted summary text with improved organization
         """
         if not self.summaries:
             return ""
 
-        parts = ["Previous conversation context:"]
-        for summary in self.summaries:
-            parts.append(f"\nSummary {summary.start_index}-{summary.end_index}:")
-            parts.append(summary.summary)
-            if summary.key_points:
-                parts.append("\nKey points:")
-                parts.extend(f"- {point}" for point in summary.key_points)
+        # Organize summaries into sections
+        sections = {
+            'tasks': [],
+            'code': [],
+            'questions': [],
+            'important': [],
+            'context': []
+        }
 
-        return "\n".join(parts)
+        # Process all summaries to categorize content
+        for summary in self.summaries:
+            for point in summary.key_points:
+                point = point.strip()
+                
+                # Categorize based on content markers
+                if any(marker in point.lower() for marker in ['task', 'todo', 'implement']):
+                    sections['tasks'].append(point)
+                elif 'code example:' in point.lower():
+                    sections['code'].append(point)
+                elif '?' in point:
+                    sections['questions'].append(point)
+                elif any(marker in point.lower() for marker in ['important', 'key', 'must', 'should']):
+                    sections['important'].append(point)
+                elif 'context theme:' in point.lower():
+                    sections['context'].append(point)
+
+        # Build formatted output
+        output = ["=== Conversation Summary ==="]
+
+        # Add each non-empty section
+        if sections['tasks']:
+            output.extend(["\n=== Active Tasks ==="] + 
+                        [f"• {task}" for task in sections['tasks'][:3]])
+
+        if sections['code']:
+            output.extend(["\n=== Code Context ==="] + 
+                        [f"• {code}" for code in sections['code'][:2]])
+
+        if sections['important']:
+            output.extend(["\n=== Key Points ==="] + 
+                        [f"• {point}" for point in sections['important'][:3]])
+
+        if sections['questions']:
+            output.extend(["\n=== Recent Questions ==="] + 
+                        [f"• {q}" for q in sections['questions'][:2]])
+
+        if sections['context']:
+            output.extend(["\n=== Discussion Themes ==="] + 
+                        [f"• {theme}" for theme in sections['context'][:2]])
+
+        # Add recent conversation flow
+        if self.summaries:
+            output.append("\n=== Recent Activity ===")
+            for summary in reversed(self.summaries[-2:]):
+                output.append(f"\nExchange {summary.start_index}-{summary.end_index}:")
+                output.append(self._format_conversation_flow(summary))
+
+        return "\n".join(output)
+
+    def _format_conversation_flow(self, summary: MessageSummary) -> str:
+        """Format a summary into a readable conversation flow.
+        
+        Args:
+            summary: The message summary to format
+            
+        Returns:
+            Formatted conversation flow
+        """
+        # Split into user and assistant messages
+        user_msgs = []
+        assistant_msgs = []
+        
+        for line in summary.summary.split("\n"):
+            if line.startswith("user:"):
+                user_msgs.append(line.replace("user:", "👤").strip())
+            elif line.startswith("assistant:"):
+                assistant_msgs.append(line.replace("assistant:", "🤖").strip())
+        
+        # Format into condensed flow
+        flow = []
+        
+        # Add user messages first
+        if user_msgs:
+            flow.append("User discussed:")
+            flow.extend(f"  {msg[:100]}..." if len(msg) > 100 else f"  {msg}" 
+                       for msg in user_msgs[:2])
+        
+        # Add assistant responses
+        if assistant_msgs:
+            flow.append("Assistant provided:")
+            flow.extend(f"  {msg[:100]}..." if len(msg) > 100 else f"  {msg}"
+                       for msg in assistant_msgs[:2])
+        
+        return "\n".join(flow)
 
     def _count_tokens(self, text: str) -> int:
         """Count tokens in text.
