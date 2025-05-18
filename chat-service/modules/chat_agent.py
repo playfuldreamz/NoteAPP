@@ -35,8 +35,8 @@ class NoteAppChatAgent:
 
             You have access to the following tools: {tool_names}
 
-            Tool descriptions: {tools}
-
+            Tool descriptions: {tools}            
+            
             Follow these strict guidelines:
 
             For ALL responses, you MUST follow the ReAct format:
@@ -47,12 +47,31 @@ class NoteAppChatAgent:
             ... (repeat Thought/Action/Action Input/Observation as needed)
             Final Answer: Your complete response to the user
 
+            IMPORTANT: After each tool call:
+            - Read the Observation carefully
+            - Decide what to do next based on that Observation
+            - NEVER call get_noteapp_content with the same item_id twice
+            - Move to Final Answer once you have enough information
+
             For note-related questions:
-            1. Start with search_noteapp to find relevant content
-            2. Use get_noteapp_content to retrieve full note contents
-            3. Read ALL search results carefully
-            4. Check note titles for relevance
-            5. Synthesize information from multiple sources
+            1. Start with search_noteapp to find relevant content            
+             
+            2. After getting search results:
+               - Look at relevance scores and titles
+               - Select ONLY the 1-2 most relevant items
+               - Skip items with low relevance scores (below 0.3)
+               
+            3. For each selected item, ONE TIME ONLY:
+               - Call get_noteapp_content to get the full content
+               - After getting content, ANALYZE it before any other action
+               - If content fully answers the question, go straight to Final Answer
+               - NEVER retrieve the same item_id twice
+               - Stop after maximum 2 items
+               
+            4. Write Final Answer:
+               - Summarize information from retrieved notes
+               - If you found other relevant items but didn't retrieve them, mention their existence
+               - If more notes exist but weren't retrieved, mention their existence in the Final Answer
 
             For casual conversation:
             1. Use Thought and Final Answer only (no actions needed)
@@ -64,12 +83,20 @@ class NoteAppChatAgent:
             Thought: I should search for notes related to Python first
             Action: search_noteapp
             Action Input: "Python programming language tutorials notes"
-            Observation: [search results...]
-            Thought: I found some relevant notes, let me get the contents
+            Observation: [Found 3 notes:
+            - "Python Basics Tutorial" (id: 123)
+            - "Advanced Python Decorators" (id: 124)
+            - "Python Setup Guide" (id: 125)]
+            Thought: Let me start with the Python Basics Tutorial since it seems most relevant
             Action: get_noteapp_content
             Action Input: {{"item_id": 123, "item_type": "note"}}
-            Observation: [note contents...]
-            Final Answer: Yes! I found several notes about Python...
+            Observation: [Note contains: "Introduction to Python basics including variables, loops, and functions..."]
+            Thought: This basic tutorial is helpful, but let's also check the setup guide for a complete answer
+            Action: get_noteapp_content
+            Action Input: {{"item_id": 125, "item_type": "note"}}
+            Observation: [Note contains: "Step-by-step guide for installing Python and setting up your development environment..."]
+            Thought: I now have enough information to provide a comprehensive answer. The decorators note isn't needed since the user asked for general Python notes.
+            Final Answer: Yes! I found several helpful Python notes. You have a beginner-friendly tutorial covering Python basics (variables, loops, and functions), and a detailed setup guide that walks through Python installation and environment setup. Would you like me to focus on any specific aspect of these notes?
 
             EXAMPLE 2 - Casual conversation:
             Human: How are you doing today?
@@ -165,7 +192,7 @@ class NoteAppChatAgent:
             tools=request_tools,
             verbose=True,
             handle_parsing_errors=True,
-            max_iterations=20
+            max_iterations=5
         )
 
         try:
