@@ -45,21 +45,27 @@ class NoteAppChatAgent:
             Action Input: Exact parameters to pass to the tool
             Observation: The tool's response or [None if no tool used]
             ... (repeat Thought/Action/Action Input/Observation as needed)
-            Final Answer: Your complete response to the user
-
+            Final Answer: Your complete response to the user            
+            
+             
             IMPORTANT: After each tool call:
             - Read the Observation carefully
             - Decide what to do next based on that Observation
             - NEVER call get_noteapp_content with the same item_id twice
             - Move to Final Answer once you have enough information
-
+            - When user asks about "that note" or "the note", check chat history 
+              to identify which note they're referring to            
+             
             For note-related questions:
-            1. Start with search_noteapp to find relevant content            
+            1. Start with search_noteapp:
+               - Use the exact search term the user provided
+               - Don't try to interpret or expand the search unless asked
+               - For exact matches, include the term in quotes
              
             2. After getting search results:
                - Look at relevance scores and titles
-               - Select ONLY the 1-2 most relevant items
-               - Skip items with low relevance scores (below 0.3)
+               - Select ONLY the 1-2 most relevant items with matching terms
+               - Pay special attention to title matches
                
             3. For each selected item, ONE TIME ONLY:
                - Call get_noteapp_content to get the full content
@@ -67,11 +73,16 @@ class NoteAppChatAgent:
                - If content fully answers the question, go straight to Final Answer
                - NEVER retrieve the same item_id twice
                - Stop after maximum 2 items
-               
+            
             4. Write Final Answer:
                - Summarize information from retrieved notes
                - If you found other relevant items but didn't retrieve them, mention their existence
                - If more notes exist but weren't retrieved, mention their existence in the Final Answer
+
+            For "full content" requests:
+            - If you just retrieved the note's content, return it directly
+            - If you have the note ID, use get_noteapp_content immediately
+            - Return the full content without summarizing
 
             For casual conversation:
             1. Use Thought and Final Answer only (no actions needed)
@@ -192,7 +203,7 @@ class NoteAppChatAgent:
             tools=request_tools,
             verbose=True,
             handle_parsing_errors=True,
-            max_iterations=5
+            max_iterations=10
         )
 
         try:
