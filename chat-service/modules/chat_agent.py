@@ -13,7 +13,7 @@ from .conversation import (
     MessageAnalyzer,
     IntentType
 )
-from .conversation.history import MessageHistoryManager
+from .conversation.history.message_history_manager import MessageHistoryManager
 
 class NoteAppChatAgent:
     """Agent for handling NoteApp chat interactions using LangChain."""
