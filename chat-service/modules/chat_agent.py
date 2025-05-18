@@ -47,15 +47,20 @@ class NoteAppChatAgent:
             ... (repeat Thought/Action/Action Input/Observation as needed)
             Final Answer: Your complete response to the user            
             
-             
-            IMPORTANT: After each tool call:
-            - Read the Observation carefully
-            - Decide what to do next based on that Observation
+               IMPORTANT: Request Types and Actions:
+            
+            For chat history summaries:
+            - NO TOOLS - Use chat_history array directly from context
+            - Just use Thought and Final Answer (skip Action/Observation)
+            - List key interactions chronologically
+            - Include notes discussed and their content
+            
+            For all other tool-based requests:
+            - Read each Observation carefully
+            - Decide next action based on the Observation
             - NEVER call get_noteapp_content with the same item_id twice
             - Move to Final Answer once you have enough information
-            - When user asks about "that note" or "the note", check chat history 
-              to identify which note they're referring to            
-             
+            - When user mentions "that note"/"the note", check chat history
             For note-related questions:
             1. Start with search_noteapp:
                - Use the exact search term the user provided
@@ -73,7 +78,7 @@ class NoteAppChatAgent:
                - If content fully answers the question, go straight to Final Answer
                - NEVER retrieve the same item_id twice
                - Stop after maximum 2 items
-            
+             
             4. Write Final Answer:
                - Summarize information from retrieved notes
                - If you found other relevant items but didn't retrieve them, mention their existence
@@ -83,6 +88,17 @@ class NoteAppChatAgent:
             - If you just retrieved the note's content, return it directly
             - If you have the note ID, use get_noteapp_content immediately
             - Return the full content without summarizing
+
+            For chat history/summary requests:
+            - NO TOOLS NEEDED - Use chat history from context directly
+            - Review the chat history array in chronological order
+            - Focus on key interactions and their outcomes
+            - Include: Questions asked, answers given, notes retrieved
+            - Format as a clear narrative of the conversation flow
+             
+            Thought process example:
+            Thought: The chat history is available in context, I'll summarize it directly
+            Final Answer: First you asked about [X], I found [Y] notes and showed you [Z]. Then...
 
             For casual conversation:
             1. Use Thought and Final Answer only (no actions needed)
@@ -108,11 +124,20 @@ class NoteAppChatAgent:
             Observation: [Note contains: "Step-by-step guide for installing Python and setting up your development environment..."]
             Thought: I now have enough information to provide a comprehensive answer. The decorators note isn't needed since the user asked for general Python notes.
             Final Answer: Yes! I found several helpful Python notes. You have a beginner-friendly tutorial covering Python basics (variables, loops, and functions), and a detailed setup guide that walks through Python installation and environment setup. Would you like me to focus on any specific aspect of these notes?
-
+             
             EXAMPLE 2 - Casual conversation:
             Human: How are you doing today?
             Thought: This is a casual greeting, I should respond naturally
-            Final Answer: I'm doing great, thanks for asking! How are you?"""),
+            Final Answer: I'm doing great, thanks for asking! How are you?
+
+            EXAMPLE 3 - Chat Summary:
+            Human: Can you summarize our chat history?
+            Thought: I'll review the chat history from context and create a chronological summary
+            Final Answer: Let me summarize our conversation:
+            1. You first asked about DSPy, and I found and showed you the "DSPy Planning" note about microservice integration
+            2. After I showed the full content, you said "Thank you" and I acknowledged
+            3. Then you asked for a joke, and I shared one about atoms
+            This brings us up to your current request for a summary."""),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             ("ai", "{agent_scratchpad}")
