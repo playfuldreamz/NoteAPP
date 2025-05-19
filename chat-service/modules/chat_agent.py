@@ -45,9 +45,37 @@ class NoteAppChatAgent:
             Action Input: Exact parameters to pass to the tool
             Observation: The tool's response or [None if no tool used]
             ... (repeat Thought/Action/Action Input/Observation as needed)
-            Final Answer: Your complete response to the user            
+            Final Answer: Your complete response to the user
             
-               IMPORTANT: Request Types and Actions:
+            IMPORTANT: Search Result Handling:
+            
+            When evaluating search results:
+            1. Check the relevance score of each result (range: -1.0 to 1.0)
+               - > 0.7: Highly relevant - prioritize these results
+               - 0.3 to 0.7: Moderately relevant - include if they match the query
+               - 0.0 to 0.3: Marginally relevant - only include if nothing better exists
+               - < 0.0: Likely irrelevant - exclude these
+               
+            2. If no results have relevance >= {min_relevance} (currently set to -0.3):
+               - Acknowledge the lack of relevant results
+               - Suggest alternative search terms or broader queries
+               - Example response: "I couldn't find any relevant notes on that topic. Would you like to try a different search term or broader query?"
+            
+            3. When to stop searching:
+               - After 2-3 search attempts with similar queries
+               - If you see the same low-relevance results multiple times
+               - If the user seems to be satisfied with the current results
+               - If you've already found 1-2 highly relevant notes that answer the query
+            
+            4. For low-relevance results:
+               - Be transparent about the limitations of the search
+               - Ask clarifying questions to narrow down the search
+               - Suggest alternative approaches (e.g., different keywords, time-based search)
+               - Example: "I found some notes, but they might not be exactly what you're looking for. Would you like me to try a different search approach?"
+            
+            5. Always verify that search results actually address the user's query before presenting them
+            
+            IMPORTANT: Request Types and Actions:
             
             For chat history summaries:
             - NO TOOLS - Use chat_history array directly from context
@@ -68,16 +96,21 @@ class NoteAppChatAgent:
                - For exact matches, include the term in quotes
              
             2. After getting search results:
-               - Look at relevance scores and titles
-               - Select ONLY the 1-2 most relevant items with matching terms
-               - Pay special attention to title matches
+               - First, evaluate the relevance scores of all results
+               - Filter out results with relevance < {min_relevance} (currently -0.3)
+               - Sort remaining results by relevance (highest first)
+               - Select the top 1-2 most relevant items that directly match the query
+               - If no items meet the relevance threshold, see Search Result Handling above
+               - Pay special attention to title matches and exact phrase matches
                
             3. For each selected item, ONE TIME ONLY:
                - Call get_noteapp_content to get the full content
                - After getting content, ANALYZE it before any other action
+               - Verify the content actually answers the user's question
                - If content fully answers the question, go straight to Final Answer
+               - If content is irrelevant despite the title match, note this and consider other results
                - NEVER retrieve the same item_id twice
-               - Stop after maximum 2 items
+               - Stop after maximum 2 items to avoid excessive API calls
              
             4. Write Final Answer:
                - Summarize information from retrieved notes
@@ -216,7 +249,19 @@ class NoteAppChatAgent:
         tool_names = ", ".join([tool.name for tool in request_tools])
         tools_descriptions = "\n".join([f"{tool.name}: {tool.description}" for tool in request_tools])
 
-        # Create agent and executor
+        # Add search-specific parameters if search tool is being used
+        search_instructions = ""
+        if any(tool.name == "search_noteapp" for tool in request_tools):
+            search_instructions = """
+            When processing search results:
+            1. Check the relevance score of each result
+            2. If no results have relevance >= -0.3, respond with:
+               "I couldn't find any relevant notes on that topic. Would you like to try a different search term?"
+            3. If you see the same results multiple times, don't keep searching with the same query
+            4. If you've reached the maximum attempts, summarize what you found and suggest refining the search
+            """
+
+        # Create agent and executor with enhanced configuration
         agent = create_react_agent(
             llm=self.llm,
             tools=request_tools,
@@ -228,23 +273,55 @@ class NoteAppChatAgent:
             tools=request_tools,
             verbose=True,
             handle_parsing_errors=True,
-            max_iterations=10
+            max_iterations=5,  # Reduced from 10 to prevent long-running searches
+            return_intermediate_steps=True  # For better error handling
         )
 
         try:
-            # Execute agent with input
+            # Prepare input with enhanced context
             input_dict = {
                 "input": user_input,
                 "chat_history": formatted_history,
                 "tool_names": tool_names,
-                "tools": tools_descriptions
+                "tools": tools_descriptions,
+                "search_instructions": search_instructions,
+                "max_search_attempts": "3",
+                "min_relevance": "-0.3"
             }
 
             print(f"Input to executor: {input_dict}")
-            result = await executor.ainvoke(input_dict)
-            assistant_response = result["output"]
-            self.history_manager.add_message({"role": "assistant", "content": assistant_response})
-            return {"final_answer": assistant_response}
+            
+            try:
+                result = await executor.ainvoke(input_dict)
+                
+                # Clean up the output to fix any formatting issues
+                assistant_response = result["output"]
+                if "Action:" in assistant_response and "Observation:" in assistant_response:
+                    # Handle malformed output by taking the last part after the last Observation
+                    parts = assistant_response.split("Observation:")
+                    assistant_response = parts[-1].strip()
+                    
+                    # If the response is empty or just contains tool output, provide a fallback
+                    if not assistant_response or assistant_response.startswith("{"):
+                        assistant_response = "I found some information, but I'm having trouble formatting it. Here's what I can share:"
+                        if result.get("intermediate_steps"):
+                            for step in result["intermediate_steps"]:
+                                if len(step) > 1 and isinstance(step[1], str):
+                                    assistant_response += "\n\n" + step[1][:500]  # Limit length
+                
+                self.history_manager.add_message({"role": "assistant", "content": assistant_response})
+                return {"final_answer": assistant_response}
+                
+            except Exception as e:
+                print(f"Error processing agent response: {e}")
+                # Return a more specific error message if we can identify the issue
+                if "maximum recursion" in str(e).lower() or "max iterations" in str(e).lower():
+                    error_msg = "I had trouble finding a complete answer. The search might be too broad. Could you try being more specific?"
+                else:
+                    error_msg = "I encountered an issue while processing your request. Let me try that again."
+                    
+                self.history_manager.add_message({"role": "assistant", "content": error_msg})
+                return {"final_answer": error_msg, "error": str(e)}
             
         except Exception as e:
             print(f"Error during agent invocation: {e}")
