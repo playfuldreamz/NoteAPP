@@ -1,7 +1,7 @@
 """Manages conversation message history and summarization."""
-from typing import List, Dict, Optional
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from ..constants import MAX_RECENT_MESSAGES, MAX_HISTORY_TOKENS, SUMMARY_TRIGGER_LENGTH
+from typing import List, Dict, Optional, Union
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, trim_messages
+from ..constants import MAX_RECENT_MESSAGES, MAX_HISTORY_TOKENS, SUMMARY_TRIGGER_LENGTH, TOKEN_LIMITS
 from .message_summary import MessageSummary
 from .token_counter import TokenCounter, SimpleTokenCounter, TokenizedTokenCounter
 from .summarizer import MessageSummarizer
@@ -27,6 +27,9 @@ class MessageHistoryManager:
         self.summaries: List[MessageSummary] = []  # Summarized sections
         self.current_token_count = 0
         self.total_tokens_processed = 0
+        
+        # Add compatibility with LangChain's trim_messages
+        self.token_counter_function = self.token_counter  # Alias for compatibility
 
     def add_message(self, message: Dict) -> None:
         """Add a new message to the history.
@@ -46,27 +49,42 @@ class MessageHistoryManager:
         if self._should_summarize():
             self._create_summary()
 
-    def get_formatted_history(self) -> List[AIMessage | HumanMessage]:
-        """Get the formatted message history for the LLM.
+    def get_formatted_history(self) -> List[Union[AIMessage, HumanMessage, SystemMessage]]:
+        """Get the formatted message history for the LLM, trimmed to token limits.
         
         Returns:
-            List of formatted messages including summaries and recent messages.
+            List of formatted messages including summaries and recent messages,
+            trimmed to fit within token limits.
         """
-        formatted_history = []
-
-        # Add active summaries first
+        # Convert messages to LangChain message format
+        langchain_messages = []
+        
+        # Add system message with summaries if available
         if self.summaries:
-            formatted_history.append(SystemMessage(content=self._format_summaries()))
-
+            summary_text = self._format_summaries()
+            if summary_text:
+                langchain_messages.append(SystemMessage(content=summary_text))
+        
         # Add recent messages
         recent_messages = self.messages[-MAX_RECENT_MESSAGES:] if len(self.messages) > MAX_RECENT_MESSAGES else self.messages
         for msg in recent_messages:
             if msg['role'] == 'assistant':
-                formatted_history.append(AIMessage(content=msg['content']))
+                langchain_messages.append(AIMessage(content=msg['content']))
             else:
-                formatted_history.append(HumanMessage(content=msg['content']))
-
-        return formatted_history
+                langchain_messages.append(HumanMessage(content=msg['content']))
+        
+        # Trim messages to fit within token limits
+        trimmed_messages = trim_messages(
+            langchain_messages,
+            strategy="last",  # Keep most recent messages
+            token_counter=self.token_counter,
+            max_tokens=MAX_HISTORY_TOKENS - TOKEN_LIMITS["response"],  # Leave room for response
+            start_on="human",  # Ensure we start with a human message
+            end_on=("human",),  # End on a human message
+            include_system=True  # Always include system messages
+        )
+        
+        return list(trimmed_messages)
 
     def get_token_stats(self) -> Dict[str, int]:
         """Get current token statistics.
