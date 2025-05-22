@@ -324,6 +324,14 @@ class NoteAppChatAgent:
         fetched_content_map = state.get("fetched_content_map", {})
         search_results_summary = state.get("search_results", [])
 
+        # Define extract_subject at the beginning of the method
+        def extract_subject(query):
+            m = re.search(r"do i have (any )?notes (on|about|regarding) (.*?)[?]?$", query, re.IGNORECASE)
+            if m:
+                return m.group(3).strip()
+            # fallback: just return the query
+            return query.strip()
+
         # 1. Prepare context from fetched content
         context_from_fetched_content = ""
         if fetched_content_map:
@@ -340,19 +348,49 @@ class NoteAppChatAgent:
             for item in search_results_summary[:3]:
                 context_from_search_results += f"- {item['type'].capitalize()} (ID: {item['id']}): {item['title']} [Relevance: {item['relevance']:.2f}]\n"
 
-        # 3. Construct the prompt for the LLM
-        prompt_messages = [
-            SystemMessage(
-                content="You are NoteApp's helpful assistant. Your task is to answer the user's question based on the preceding conversation history, which includes their original query and any information retrieved from tools (like search results or note content).\n"
-                        "Please synthesize a comprehensive and direct answer.\n"
-                        "If you use information from a specific note or transcript, mention its title or ID.\n"
-                        "If no relevant information was found by the tools, clearly state that and, if appropriate, ask for clarification or suggest alternatives.\n"
-                        "Do not refer to the tools themselves in your final answer unless it's to explain why you couldn't find something."
-                        f"{context_from_fetched_content}"
-                        # Optionally add summary of other search results:
-                        f"{context_from_search_results}"
+        # 3. Add the raw tool output as plain text if available (from ToolMessage)
+        tool_output_text = ""
+        for msg in current_conversation_messages:
+            if isinstance(msg, ToolMessage):
+                tool_output_text += f"\nTool Output:\n{msg.content}\n"
+
+        # --- Custom fallback for no relevant notes ---
+        # Only use a hard fallback if the LLM fails to generate a response
+        MIN_RELEVANCE_THRESHOLD = 0.0
+        has_relevant_results = False
+        if search_results_summary:
+            for item in search_results_summary:
+                if item.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD:
+                    has_relevant_results = True
+                    break
+
+        # 4. Construct the prompt for the LLM
+        if not has_relevant_results:
+            # No relevant notes found, instruct LLM to inform the user
+            subject = extract_subject(user_input)
+            system_prompt = (
+                "You are NoteApp's helpful assistant. The user asked: '"
+                f"{user_input}"
+                "'.\nNo relevant notes or transcripts were found for this request.\n"
+                f"Politely inform the user that you could not find any relevant notes about '{subject}', and suggest they add a note or clarify their request.\n"
+                f"Always mention the subject ('{subject}') in your response.\n"
+                "Do not attempt to answer the question directly.\n"
+                "Your response should be plain text, without any markdown formatting.\n" # Added instruction
             )
-        ]
+        else:
+            system_prompt = (
+                "You are NoteApp's helpful assistant. Your task is to answer the user's question based on the preceding conversation history, "
+                "which includes their original query and any information retrieved from tools (like search results or note content).\n"
+                "Please synthesize a comprehensive and direct answer.\n"
+                "If you use information from a specific note or transcript, mention its title or ID.\n"
+                "If no relevant information was found by the tools, politely inform the user that you could not find any relevant notes, and suggest they add a note or clarify their request.\n"
+                "Always mention the main subject of the user's query in your response.\n"
+                "Do not refer to the tools themselves in your final answer unless it's to explain why you couldn't find something.\n"
+                f"{context_from_fetched_content}"
+                f"{context_from_search_results}"
+                f"{tool_output_text}"
+            )
+        prompt_messages = [SystemMessage(content=system_prompt)]
         prompt_messages.extend(current_conversation_messages)
 
         print(f"DEBUG: Messages being sent to LLM for synthesis: {prompt_messages}")
@@ -362,15 +400,37 @@ class NoteAppChatAgent:
             answer = response.content
             print(f"Synthesized Answer from LLM: {answer}")
 
+            # Fallback: If the answer is empty, try a more explicit prompt or return a helpful message
+            llm_message = answer
+            try:
+                parsed = json.loads(answer)
+                if isinstance(parsed, dict) and "message" in parsed:
+                    llm_message = parsed["message"]
+            except Exception:
+                pass
+
+            if not llm_message or not llm_message.strip():
+                # extract_subject is now defined in the outer scope
+                subject = extract_subject(user_input)
+                fallback = (
+                    f"I'm sorry, I could not find any relevant notes about {subject}. "
+                    "If you want to add a note or clarify your request, please let me know."
+                )
+                return {
+                    "messages": [AIMessage(content=fallback)],
+                    "final_answer": fallback,
+                    "error_message": None
+                }
+
             return {
-                "messages": [AIMessage(content=answer)],
-                "final_answer": answer,
+                "messages": [AIMessage(content=llm_message)],
+                "final_answer": llm_message,
                 "error_message": None
             }
         except Exception as e:
             print(f"Error in _synthesize_answer_node LLM call: {e}")
             traceback.print_exc()
-            fallback = "I'm sorry, I had trouble putting together an answer based on the information I found."
+            fallback = "I'm sorry, I could not find any relevant notes for your request. If you want to add a note or clarify your request, please let me know."
             return {
                 "messages": [AIMessage(content=fallback)],
                 "final_answer": fallback,
@@ -610,7 +670,18 @@ class NoteAppChatAgent:
             assistant_response = None
             error_msg = None
 
-            if isinstance(final_state_result, dict):
+            # Handle the case where the output is a dict with a single node key (e.g. 'synthesize_answer')
+            if isinstance(final_state_result, dict) and len(final_state_result) == 1:
+                node_data = list(final_state_result.values())[0]
+                if isinstance(node_data, dict):
+                    assistant_response = node_data.get('final_answer')
+                    error_msg = node_data.get('error_message')
+                    if not assistant_response and not error_msg:
+                        last_messages = node_data.get('messages', [])
+                        ai_messages = [m for m in last_messages if isinstance(m, AIMessage)]
+                        if ai_messages:
+                            assistant_response = ai_messages[-1].content
+            elif isinstance(final_state_result, dict):
                 assistant_response = final_state_result.get('final_answer')
                 error_msg = final_state_result.get('error_message')
                 if not assistant_response and not error_msg:
