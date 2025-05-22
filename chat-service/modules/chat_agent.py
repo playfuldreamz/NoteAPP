@@ -500,6 +500,7 @@ class NoteAppChatAgent:
                 "which includes their original query and any information retrieved from tools (like search results or note content).\n"
                 "Please synthesize a comprehensive and direct answer. Do not use markdown like asterisks for lists if the original content does not use them; try to preserve original formatting if presenting content directly.\n"
                 "If you use information from a specific note or transcript, mention its title or ID.\n"
+                "If the user asked a question like 'do I have notes on X?' and you found relevant notes, confirm their existence and ask if the user would like to see the content of any specific item, even if you have already fetched some content internally. List the titles of the top 1-2 relevant items found.\n"
                 "If, after reviewing all provided context (search results and fetched content), no information truly addresses the user's query, "
                 "then politely state that you couldn't find the specific information they were looking for, even if some items were found by search.\n"
                 "Always mention the main subject of the user's query in your response.\n"
