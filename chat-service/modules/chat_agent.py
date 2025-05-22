@@ -95,30 +95,10 @@ class NoteAppChatAgent:
 
         workflow_builder.add_edge("casual_chat", END)
         workflow_builder.add_edge("synthesize_answer", END)
-        workflow_builder.add_edge("handle_error", END)
-
-        # Compile the graph with the passed-in, active checkpointer
+        workflow_builder.add_edge("handle_error", END)        # Compile the graph with the passed-in, active checkpointer
         self.app = workflow_builder.compile(checkpointer=checkpointer)
 
-    # Placeholder for node functions (Phase 2)
-    def _analyze_input_node(self, state: GraphState) -> Dict[str, Any]:
-        pass  # Implementation moved to nodes_initial.py
-
-    # Node implementations moved to nodes_tool_interaction.py
-    def _search_notes_node(self, state: GraphState) -> Dict[str, Any]:
-        pass  # Implementation moved to nodes_tool_interaction.py
-
-    def _get_content_node(self, state: GraphState) -> Dict[str, Any]:
-        pass  # Implementation moved to nodes_tool_interaction.py
-
-    # Node implementations moved to nodes_synthesis.py
-    async def _synthesize_answer_node(self, state: GraphState) -> Dict[str, Any]:
-        pass  # Implementation moved to nodes_synthesis.py
-
-    def _handle_error_node(self, state: GraphState) -> Dict[str, Any]:
-        pass  # Implementation moved to nodes_synthesis.py
-
-    # --- Routing Functions (Phase 3) ---
+    # --- Routing Functions ---
     def _route_after_analysis(self, state: GraphState) -> str:
         """Route to next node after input analysis."""
         return route_after_analysis(state)
