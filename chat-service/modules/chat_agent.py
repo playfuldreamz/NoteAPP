@@ -1,63 +1,25 @@
-from typing import List, Dict, Any, Optional, TypedDict as PydanticTypedDict # Use Pydantic's TypedDict for dataclass_transform
-from typing_extensions import Annotated # For add_messages
-
+from typing import List, Dict, Any, Optional
+from functools import partial
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage # Added ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 import traceback
-import re # For parsing tool output
-import json # For parsing tool output if it's structured
+import re
+import json
 
 from langgraph.graph import StateGraph, END
-from langgraph.graph.message import add_messages
-from langgraph.checkpoint.base import BaseCheckpointSaver # For type hinting
+from langgraph.checkpoint.base import BaseCheckpointSaver
+
+from .agent.graph_state import GraphState
+from .agent.nodes_initial import analyze_input_node, casual_chat_node
+from .agent.nodes_tool_interaction import search_notes_node, get_content_node
 
 from .conversation import (
-    ConversationClassifier,
     ResponseGenerator,
-    ConversationContext, # May need to adapt or replace its usage
+    ConversationContext,
     MessageAnalyzer,
     IntentType
 )
-# MessageHistoryManager might be removed or used differently later for pre-graph summarization
-# from .conversation.history.message_history_manager import MessageHistoryManager
-
-# --- Define Graph State ---
-class GraphState(PydanticTypedDict):
-    """
-    Represents the state of our graph.
-
-    Attributes:
-        messages: The list of messages accumulated so far.
-        user_input: The current input from the user.
-        user_id: The ID of the user for authentication and context.
-        jwt_token: JWT token for authenticated tool calls.
-        initial_analysis: Results from the MessageAnalyzer.
-        search_query: The query to be used for searching notes.
-        search_results: A list of dictionaries representing search results.
-        item_id_to_fetch: The ID of the note/transcript to fetch content for.
-        item_type_to_fetch: The type ('note' or 'transcript') of the item to fetch.
-        fetched_content_map: A dictionary mapping item_ids (e.g., "note_123") to their fetched content.
-        final_answer: The final response to be delivered to the user.
-        error_message: Any error message encountered during processing.
-        iteration_count: To prevent infinite loops if logic gets stuck.
-        casual_exchange_count: Tracks the number of consecutive casual exchanges.
-    """
-    messages: Annotated[List[Any], add_messages] # Can be HumanMessage, AIMessage, ToolMessage
-    user_input: str
-    user_id: str
-    jwt_token: str
-    initial_analysis: Optional[Dict[str, Any]] = None # Store MessageAnalysis output
-    search_query: Optional[str] = None
-    search_results: Optional[List[Dict]] = None
-    item_id_to_fetch: Optional[int] = None
-    item_type_to_fetch: Optional[str] = None
-    fetched_content_map: Annotated[Dict[str, str], lambda x, y: {**x, **y}] # Simple dict merge
-    final_answer: Optional[str] = None
-    error_message: Optional[str] = None
-    iteration_count: int = 0 # To prevent potential infinite loops during development
-    casual_exchange_count: int = 0
-
 
 class NoteAppChatAgent:
     """Agent for handling NoteApp chat interactions using LangGraph."""
@@ -65,26 +27,36 @@ class NoteAppChatAgent:
     def __init__(self, llm: BaseChatModel, tools: List[BaseTool], checkpointer: BaseCheckpointSaver):
         """Initialize the chat agent with an LLM, tools, and LangGraph workflow."""
         self.llm = llm
-        self.base_tools = {tool.name: tool for tool in tools} # Store tools in a dict for easy access
+        self.base_tools = {tool.name: tool for tool in tools}
 
-        # Initialize conversation handlers (can be used by nodes)
-        # self.classifier = ConversationClassifier(llm=llm) # Removed
+        # Initialize conversation handlers
+        self.message_analyzer = MessageAnalyzer()
         self.response_generator = ResponseGenerator(llm=llm)
-        self.message_analyzer = MessageAnalyzer() # MessageAnalyzer instantiates its own IntentClassifier
-        # self.history_manager = MessageHistoryManager() # Removed
 
         # --- Build the LangGraph Workflow ---
         workflow_builder = StateGraph(GraphState)
 
-        # Define Nodes (we'll implement these functions in Phase 2)
-        workflow_builder.add_node("analyze_input", self._analyze_input_node)
-        workflow_builder.add_node("search_notes", self._search_notes_node)
-        workflow_builder.add_node("get_content", self._get_content_node)
+        # Define Nodes using the new standalone functions with dependencies
+        workflow_builder.add_node(
+            "analyze_input",
+            partial(analyze_input_node, message_analyzer=self.message_analyzer)
+        )
+        workflow_builder.add_node(
+            "casual_chat",
+            partial(casual_chat_node, response_generator=self.response_generator)
+        )
+        workflow_builder.add_node(
+            "search_notes",
+            partial(search_notes_node, base_tools=self.base_tools)
+        )
+        workflow_builder.add_node(
+            "get_content",
+            partial(get_content_node, base_tools=self.base_tools)
+        )
         workflow_builder.add_node("synthesize_answer", self._synthesize_answer_node)
-        workflow_builder.add_node("casual_chat", self._casual_chat_node)
         workflow_builder.add_node("handle_error", self._handle_error_node)
 
-        # Define Edges (we'll implement routing logic in Phase 3)
+        # Define Edges
         workflow_builder.set_entry_point("analyze_input")
 
         workflow_builder.add_conditional_edges(
@@ -93,7 +65,7 @@ class NoteAppChatAgent:
             {
                 "search_notes": "search_notes",
                 "casual_chat": "casual_chat",
-                "synthesize_answer": "synthesize_answer", # e.g., if no tools needed
+                "synthesize_answer": "synthesize_answer",
                 "handle_error": "handle_error"
             }
         )
@@ -102,7 +74,7 @@ class NoteAppChatAgent:
             self._route_after_search,
             {
                 "get_content": "get_content",
-                "synthesize_answer": "synthesize_answer", # No relevant results or error
+                "synthesize_answer": "synthesize_answer",
                 "handle_error": "handle_error"
             }
         )
@@ -110,7 +82,7 @@ class NoteAppChatAgent:
             "get_content",
             self._route_after_get_content,
             {
-                "get_content": "get_content", # Loop to get more content (different item)
+                "get_content": "get_content",
                 "synthesize_answer": "synthesize_answer",
                 "handle_error": "handle_error"
             }
@@ -125,261 +97,7 @@ class NoteAppChatAgent:
 
     # Placeholder for node functions (Phase 2)
     def _analyze_input_node(self, state: GraphState) -> Dict[str, Any]:
-        print("--- Executing Node: analyze_input ---")
-        user_input = state["user_input"]
-        messages = state["messages"]
-        iteration_count = state.get("iteration_count", 0) + 1
-
-        if iteration_count > 5: # Safety break for too many iterations without resolution
-            print("--- Max iterations reached in analyze_input. Routing to error. ---")
-            return {
-                "error_message": "I seem to be stuck in a loop. Could you please rephrase your request?",
-                "iteration_count": iteration_count
-            }
-
-        # Prepare ConversationContext for MessageAnalyzer
-        conversation_context_for_analyzer = ConversationContext(
-            chat_history=messages[:-1], # All but the current user message
-            current_message=user_input
-        )
-
-        try:
-            analysis_result_obj = self.message_analyzer.analyze(user_input, conversation_context_for_analyzer)
-            analysis_dict = {
-                "intent": analysis_result_obj.intent.value,
-                "sentiment": analysis_result_obj.sentiment.value,
-                "confidence": analysis_result_obj.confidence,
-                "syntax_has_question": analysis_result_obj.syntax.has_question,
-                "keywords": analysis_result_obj.keywords,
-                "requires_tool": analysis_result_obj.requires_tool,
-                "required_tools": analysis_result_obj.required_tools,
-                "requires_context": analysis_result_obj.requires_context
-            }
-            print(f"Message Analysis Result: {analysis_dict}")
-
-            update_payload: Dict[str, Any] = {
-                "initial_analysis": analysis_dict,
-                "iteration_count": iteration_count,
-                "search_query": None # Initialize search_query to None
-            }
-
-            intent_val = analysis_dict["intent"]
-            keywords = analysis_dict["keywords"]
-            requires_tool = analysis_dict["requires_tool"]
-            required_tools_list = analysis_dict.get("required_tools", [])
-
-            # Case 1: Standard search intent
-            if intent_val in [IntentType.QUERY_NOTES.value, IntentType.SEARCH_REQUEST.value] and keywords:
-                update_payload["search_query"] = user_input
-                print(f"Search query (from intent): {update_payload['search_query']}")
-            # Case 2: 'Get content' type of action, extract title for search
-            elif intent_val == IntentType.ACTION.value and "get_noteapp_content" in required_tools_list:
-                user_input_lower = user_input.lower()
-                match = re.search(r"(?:content of|full text of|details of) (?:the )?(.*?) note", user_input_lower)
-                if match:
-                    note_title_to_search = match.group(1).strip()
-                    if note_title_to_search:
-                        update_payload["search_query"] = note_title_to_search
-                        print(f"Search query (extracted for get_content): {note_title_to_search}")
-                elif keywords:
-                    update_payload["search_query"] = " ".join(keywords)
-                    print(f"Search query (keywords for get_content): {update_payload['search_query']}")
-                else:
-                    update_payload["search_query"] = user_input
-                    print(f"Search query (full input for get_content): {update_payload['search_query']}")
-            elif requires_tool and not update_payload["search_query"] and keywords:
-                update_payload["search_query"] = " ".join(keywords)
-                print(f"Search query (general tool requirement with keywords): {update_payload['search_query']}")
-
-            return update_payload
-
-        except Exception as e:
-            print(f"Error in _analyze_input_node: {e}")
-            traceback.print_exc()
-            return {
-                "error_message": f"Error during input analysis: {str(e)}",
-                "iteration_count": iteration_count
-            }
-
-    def _search_notes_node(self, state: GraphState) -> Dict[str, Any]:
-        print("--- Executing Node: search_notes ---")
-        search_query = state.get("search_query")
-        user_id = state["user_id"]
-        jwt_token = state["jwt_token"]
-        # iteration_count = state.get("iteration_count", 0) # Not incremented here
-
-        if not search_query:
-            print("--- No search query found in state. Routing to error. ---")
-            return {"error_message": "No search query was provided for searching notes.", "casual_exchange_count": 0}
-
-        try:
-            search_tool = self.base_tools.get("search_noteapp")
-            if not search_tool:
-                print("--- search_noteapp tool not found. ---")
-                return {"error_message": "Search tool is not available.", "casual_exchange_count": 0}
-
-            # Set authentication for the tool
-            if hasattr(search_tool, "set_auth"):
-                search_tool.set_auth(jwt_token=jwt_token, user_id=user_id)
-            else:
-                print("Warning: search_noteapp tool does not have set_auth method.")
-
-            print(f"Invoking search_noteapp tool with query: '{search_query}'")
-            tool_output_str = search_tool.run(search_query)
-            print(f"Raw output from search_noteapp: {tool_output_str[:200]}...")
-
-            # --- Parse the tool_output_str to extract structured search results ---
-            parsed_results = []
-            item_pattern = re.compile(
-                r"-\s*(Note|Transcript)\s*\(ID:\s*(\d+)\):\s*(.*?)\s*\[Relevance:\s*(-?\d+\.\d+)\].*?(?:\[TITLE MATCH\])?"
-            )
-            for line in tool_output_str.split('\n'):
-                match = item_pattern.match(line.strip())
-                if match:
-                    item_type, item_id_str, title, relevance_str = match.groups()
-                    try:
-                        parsed_results.append({
-                            "id": int(item_id_str),
-                            "type": item_type.lower(),
-                            "title": title.strip(),
-                            "relevance": float(relevance_str)
-                        })
-                    except ValueError:
-                        print(f"Warning: Could not parse item_id or relevance for line: {line}")
-
-            print(f"Parsed search results: {parsed_results}")
-
-            # --- Determine first item to fetch ---
-            item_id_for_next_step: Optional[int] = None
-            item_type_for_next_step: Optional[str] = None
-            fetched_map_in_state = state.get("fetched_content_map", {}) 
-
-            MIN_RELEVANCE_THRESHOLD = 0.0 
-            relevant_results_for_first_fetch = sorted(
-                [res for res in parsed_results if res.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD],
-                key=lambda x: x.get("relevance", -1.0),
-                reverse=True
-            )
-
-            if relevant_results_for_first_fetch:
-                for item in relevant_results_for_first_fetch:
-                    item_id = item.get("id")
-                    item_type = item.get("type")
-                    if item_id is not None and item_type:
-                        content_key = f"{item_type}_{item_id}"
-                        if content_key not in fetched_map_in_state:
-                            item_id_for_next_step = item_id
-                            item_type_for_next_step = item_type
-                            print(f"--- _search_notes_node determined first item to fetch: {content_key} ---")
-                            break
-            
-            tool_message = ToolMessage(content=tool_output_str, tool_call_id="search_noteapp_0")
-
-            return_payload = {
-                "messages": [tool_message],
-                "search_results": parsed_results,
-                "item_id_to_fetch": item_id_for_next_step,
-                "item_type_to_fetch": item_type_for_next_step,
-                "error_message": None,
-                "casual_exchange_count": 0 # Reset casual exchange count
-            }
-            
-            return return_payload
-
-        except Exception as e:
-            print(f"Error in _search_notes_node: {e}")
-            traceback.print_exc()
-            error_message_content = f"Error while searching notes: {str(e)}"
-            tool_error_message = ToolMessage(content=error_message_content, tool_call_id="search_noteapp_error_0", is_error=True)
-            return {
-                "messages": [tool_error_message],
-                "error_message": error_message_content,
-                "search_results": [],
-                "item_id_to_fetch": None,
-                "item_type_to_fetch": None,
-                "casual_exchange_count": 0 # Reset casual exchange count
-            }
-
-    def _get_content_node(self, state: GraphState) -> Dict[str, Any]:
-        print("--- Executing Node: get_content ---")
-        item_id = state.get("item_id_to_fetch")
-        item_type = state.get("item_type_to_fetch")
-        user_id = state["user_id"]
-        jwt_token = state["jwt_token"]
-        fetched_map = state.get("fetched_content_map", {})
-
-        # If item_id and item_type are not set, try to pick the next relevant, unfetched item
-        if item_id is None or item_type is None:
-            print("--- item_id/type not in state, attempting to pick next from search_results ---")
-            search_results = state.get("search_results", [])
-            MIN_RELEVANCE_THRESHOLD = 0.01  # Stricter threshold to avoid irrelevant fetches
-            next_item_details = None
-            if search_results:
-                sorted_relevant_results = sorted(
-                    [res for res in search_results if res.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD],
-                    key=lambda x: x.get("relevance", -1.0),
-                    reverse=True
-                )
-                for item_data in sorted_relevant_results:
-                    _id = item_data.get("id")
-                    _type = item_data.get("type")
-                    content_key = f"{_type}_{_id}"
-                    if _id is not None and _type and content_key not in fetched_map:
-                        next_item_details = item_data
-                        break
-            if next_item_details:
-                item_id = next_item_details["id"]
-                item_type = next_item_details["type"]
-                print(f"--- Picked next item to fetch: {item_type}_{item_id} ---")
-            else:
-                print("--- No suitable next item to fetch from search_results. ---")
-                return {"error_message": "No more relevant items to fetch content for."}
-
-        if item_id is None or item_type is None:
-            print("--- item_id_to_fetch or item_type_to_fetch still not found. Error. ---")
-            return {"error_message": "Missing item ID or type to fetch content after trying to pick next."}
-
-        # After picking item_id/item_type if needed, always define content_key here
-        content_key = f"{item_type}_{item_id}"
-
-        if content_key in state.get("fetched_content_map", {}):
-            print(f"--- Content for {content_key} already fetched. Skipping. ---")
-            return {
-                "item_id_to_fetch": None,
-                "item_type_to_fetch": None
-            }
-
-        # After picking item_id/item_type if needed, get the tool
-        get_content_tool = self.base_tools.get("get_noteapp_content")
-        if not get_content_tool:
-            print("--- get_noteapp_content tool not found. ---")
-            return {"error_message": "Get content tool is not available."}
-
-        # Set authentication for the tool
-        if hasattr(get_content_tool, "set_auth"):
-            get_content_tool.set_auth(jwt_token=jwt_token, user_id=user_id)
-        else:
-            print("Warning: get_noteapp_content tool does not have set_auth method.")
-
-        # Prepare the input for the tool.
-        # Your GetNoteAppContentTool._run expects a JSON string.
-        tool_input_dict = {"item_id": item_id, "item_type": item_type}
-        tool_input_json_str = json.dumps(tool_input_dict)
-        print(f"Invoking get_noteapp_content tool with input: {tool_input_json_str}")
-        tool_output_str = get_content_tool.run(tool_input_json_str) # Pass JSON string
-        print(f"Raw output from get_noteapp_content: {tool_output_str[:200]}...")
-
-        # Add a ToolMessage to the messages list
-        tool_message = ToolMessage(content=tool_output_str, tool_call_id=f"get_content_{item_id}")
-        updated_fetched_content = {content_key: tool_output_str}
-
-        return {
-            "messages": [tool_message],
-            "fetched_content_map": updated_fetched_content,
-            "item_id_to_fetch": None, # Clear after fetching
-            "item_type_to_fetch": None, # Clear after fetching
-            "error_message": None
-        }
+        pass  # Implementation moved to nodes_initial.py    # Node implementations moved to nodes_tool_interaction.py
 
     async def _synthesize_answer_node(self, state: GraphState) -> Dict[str, Any]:
         print("--- Executing Node: synthesize_answer ---")
@@ -540,34 +258,7 @@ class NoteAppChatAgent:
             }
 
     async def _casual_chat_node(self, state: GraphState) -> Dict[str, Any]:
-        print("--- Executing Node: casual_chat ---")
-        user_input = state["user_input"]
-        messages = state["messages"]
-        casual_exchange_count = state.get("casual_exchange_count", 0) + 1
-
-
-        conversation_context_for_casual_chat = ConversationContext(
-            chat_history=[msg for msg in messages[:-1] if isinstance(msg, (HumanMessage, AIMessage))],
-            current_message=user_input
-        )
-
-        try:
-            casual_reply = await self.response_generator.generate_response(conversation_context_for_casual_chat)
-            print(f"Casual Reply Generated: {casual_reply}")
-            return {
-                "messages": [AIMessage(content=casual_reply)],
-                "final_answer": casual_reply,
-                "casual_exchange_count": casual_exchange_count
-            }
-        except Exception as e:
-            print(f"Error in _casual_chat_node: {e}")
-            traceback.print_exc()
-            fallback_reply = "I'm not sure how to respond to that right now, but I'm here to help with your notes!"
-            return {
-                "messages": [AIMessage(content=fallback_reply)],
-                "final_answer": fallback_reply,
-                "error_message": f"Error during casual chat generation: {str(e)}"
-            }
+        pass  # Implementation moved to nodes_initial.py
 
     def _handle_error_node(self, state: GraphState) -> Dict[str, Any]:
         print("--- Executing Node: handle_error ---")
