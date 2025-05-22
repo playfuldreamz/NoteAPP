@@ -144,27 +144,52 @@ class NoteAppChatAgent:
         )
 
         try:
-            analysis_result = self.message_analyzer.analyze(user_input, conversation_context_for_analyzer)
-            print(f"Message Analysis Result: Intent={analysis_result.intent.value}, Confidence={analysis_result.confidence:.2f}, RequiresTool={analysis_result.requires_tool}")
+            analysis_result_obj = self.message_analyzer.analyze(user_input, conversation_context_for_analyzer)
+            analysis_dict = {
+                "intent": analysis_result_obj.intent.value,
+                "sentiment": analysis_result_obj.sentiment.value,
+                "confidence": analysis_result_obj.confidence,
+                "syntax_has_question": analysis_result_obj.syntax.has_question,
+                "keywords": analysis_result_obj.keywords,
+                "requires_tool": analysis_result_obj.requires_tool,
+                "required_tools": analysis_result_obj.required_tools,
+                "requires_context": analysis_result_obj.requires_context
+            }
+            print(f"Message Analysis Result: {analysis_dict}")
 
             update_payload: Dict[str, Any] = {
-                "initial_analysis": {
-                    "intent": analysis_result.intent.value,
-                    "sentiment": analysis_result.sentiment.value,
-                    "confidence": analysis_result.confidence,
-                    "syntax_has_question": analysis_result.syntax.has_question,
-                    "keywords": analysis_result.keywords,
-                    "requires_tool": analysis_result.requires_tool,
-                    "required_tools": analysis_result.required_tools,
-                    "requires_context": analysis_result.requires_context
-                },
-                "iteration_count": iteration_count
+                "initial_analysis": analysis_dict,
+                "iteration_count": iteration_count,
+                "search_query": None # Initialize search_query to None
             }
 
-            # If intent is to query notes or search, set up the search query
-            if analysis_result.intent in [IntentType.QUERY_NOTES, IntentType.SEARCH_REQUEST] and analysis_result.keywords:
+            intent_val = analysis_dict["intent"]
+            keywords = analysis_dict["keywords"]
+            requires_tool = analysis_dict["requires_tool"]
+            required_tools_list = analysis_dict.get("required_tools", [])
+
+            # Case 1: Standard search intent
+            if intent_val in [IntentType.QUERY_NOTES.value, IntentType.SEARCH_REQUEST.value] and keywords:
                 update_payload["search_query"] = user_input
-                print(f"Search query set to: {update_payload['search_query']}")
+                print(f"Search query (from intent): {update_payload['search_query']}")
+            # Case 2: 'Get content' type of action, extract title for search
+            elif intent_val == IntentType.ACTION.value and "get_noteapp_content" in required_tools_list:
+                user_input_lower = user_input.lower()
+                match = re.search(r"(?:content of|full text of|details of) (?:the )?(.*?) note", user_input_lower)
+                if match:
+                    note_title_to_search = match.group(1).strip()
+                    if note_title_to_search:
+                        update_payload["search_query"] = note_title_to_search
+                        print(f"Search query (extracted for get_content): {note_title_to_search}")
+                elif keywords:
+                    update_payload["search_query"] = " ".join(keywords)
+                    print(f"Search query (keywords for get_content): {update_payload['search_query']}")
+                else:
+                    update_payload["search_query"] = user_input
+                    print(f"Search query (full input for get_content): {update_payload['search_query']}")
+            elif requires_tool and not update_payload["search_query"] and keywords:
+                update_payload["search_query"] = " ".join(keywords)
+                print(f"Search query (general tool requirement with keywords): {update_payload['search_query']}")
 
             return update_payload
 
@@ -283,143 +308,184 @@ class NoteAppChatAgent:
         jwt_token = state["jwt_token"]
         fetched_map = state.get("fetched_content_map", {})
 
+        # If item_id and item_type are not set, try to pick the next relevant, unfetched item
         if item_id is None or item_type is None:
-            print("--- item_id_to_fetch or item_type_to_fetch not found in state. Routing to error. ---")
-            return {"error_message": "Missing item ID or type to fetch content."}
-
-        # Construct the key for the fetched_content_map
-        content_key = f"{item_type}_{item_id}"
-        if content_key in fetched_map:
-            print(f"--- Content for {content_key} already fetched. Skipping. ---")
-            # This case should ideally be prevented by routing logic,
-            # but it's a good safeguard. We don't want to add another ToolMessage.
-            # We might just pass through or decide to synthesize if this happens.
-            # For now, let's assume routing handles this and this node is only called for new content.
-            # If routing *can* lead here, we need to decide what to do.
-            # Let's proceed as if it's new content to fetch.
-            pass # Or, if this indicates an issue, route to error or synthesize.
-
-        try:
-            get_content_tool = self.base_tools.get("get_noteapp_content")
-            if not get_content_tool:
-                print("--- get_noteapp_content tool not found. ---")
-                return {"error_message": "Get content tool is not available."}
-
-            # Set authentication for the tool
-            if hasattr(get_content_tool, "set_auth"):
-                get_content_tool.set_auth(jwt_token=jwt_token, user_id=user_id)
+            print("--- item_id/type not in state, attempting to pick next from search_results ---")
+            search_results = state.get("search_results", [])
+            MIN_RELEVANCE_THRESHOLD = 0.01  # Stricter threshold to avoid irrelevant fetches
+            next_item_details = None
+            if search_results:
+                sorted_relevant_results = sorted(
+                    [res for res in search_results if res.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD],
+                    key=lambda x: x.get("relevance", -1.0),
+                    reverse=True
+                )
+                for item_data in sorted_relevant_results:
+                    _id = item_data.get("id")
+                    _type = item_data.get("type")
+                    content_key = f"{_type}_{_id}"
+                    if _id is not None and _type and content_key not in fetched_map:
+                        next_item_details = item_data
+                        break
+            if next_item_details:
+                item_id = next_item_details["id"]
+                item_type = next_item_details["type"]
+                print(f"--- Picked next item to fetch: {item_type}_{item_id} ---")
             else:
-                print("Warning: get_noteapp_content tool does not have set_auth method.")
+                print("--- No suitable next item to fetch from search_results. ---")
+                return {"error_message": "No more relevant items to fetch content for."}
 
-            # Prepare the input for the tool.
-            # Your GetNoteAppContentTool._run expects a JSON string.
-            tool_input_dict = {"item_id": item_id, "item_type": item_type}
-            tool_input_json_str = json.dumps(tool_input_dict)
+        if item_id is None or item_type is None:
+            print("--- item_id_to_fetch or item_type_to_fetch still not found. Error. ---")
+            return {"error_message": "Missing item ID or type to fetch content after trying to pick next."}
 
-            print(f"Invoking get_noteapp_content tool with input: {tool_input_json_str}")
-            tool_output_str = get_content_tool.run(tool_input_json_str) # Pass JSON string
-            print(f"Raw output from get_noteapp_content: {tool_output_str[:200]}...")
+        # After picking item_id/item_type if needed, always define content_key here
+        content_key = f"{item_type}_{item_id}"
 
-            # Add a ToolMessage to the messages list
-            tool_message = ToolMessage(content=tool_output_str, tool_call_id=f"get_content_{item_id}")
-
-            # Update the fetched_content_map
-            # The reducer `lambda x, y: {**x, **y}` for fetched_content_map will merge this.
-            updated_fetched_content = {content_key: tool_output_str}
-
+        if content_key in state.get("fetched_content_map", {}):
+            print(f"--- Content for {content_key} already fetched. Skipping. ---")
             return {
-                "messages": [tool_message],
-                "fetched_content_map": updated_fetched_content,
-                "item_id_to_fetch": None, # Clear after fetching
-                "item_type_to_fetch": None, # Clear after fetching
-                "error_message": None
-            }
-
-        except Exception as e:
-            print(f"Error in _get_content_node: {e}")
-            traceback.print_exc()
-            error_message_content = f"Error while fetching content for {item_type} ID {item_id}: {str(e)}"
-            tool_error_message = ToolMessage(
-                content=error_message_content,
-                tool_call_id=f"get_content_{item_id}_error",
-                is_error=True
-            )
-            return {
-                "messages": [tool_error_message],
-                "error_message": error_message_content,
-                "item_id_to_fetch": None, # Clear even on error to prevent re-fetch loop on this item
+                "item_id_to_fetch": None,
                 "item_type_to_fetch": None
             }
 
+        # After picking item_id/item_type if needed, get the tool
+        get_content_tool = self.base_tools.get("get_noteapp_content")
+        if not get_content_tool:
+            print("--- get_noteapp_content tool not found. ---")
+            return {"error_message": "Get content tool is not available."}
+
+        # Set authentication for the tool
+        if hasattr(get_content_tool, "set_auth"):
+            get_content_tool.set_auth(jwt_token=jwt_token, user_id=user_id)
+        else:
+            print("Warning: get_noteapp_content tool does not have set_auth method.")
+
+        # Prepare the input for the tool.
+        # Your GetNoteAppContentTool._run expects a JSON string.
+        tool_input_dict = {"item_id": item_id, "item_type": item_type}
+        tool_input_json_str = json.dumps(tool_input_dict)
+        print(f"Invoking get_noteapp_content tool with input: {tool_input_json_str}")
+        tool_output_str = get_content_tool.run(tool_input_json_str) # Pass JSON string
+        print(f"Raw output from get_noteapp_content: {tool_output_str[:200]}...")
+
+        # Add a ToolMessage to the messages list
+        tool_message = ToolMessage(content=tool_output_str, tool_call_id=f"get_content_{item_id}")
+        updated_fetched_content = {content_key: tool_output_str}
+
+        return {
+            "messages": [tool_message],
+            "fetched_content_map": updated_fetched_content,
+            "item_id_to_fetch": None, # Clear after fetching
+            "item_type_to_fetch": None, # Clear after fetching
+            "error_message": None
+        }
+
     async def _synthesize_answer_node(self, state: GraphState) -> Dict[str, Any]:
         print("--- Executing Node: synthesize_answer ---")
-        user_input = state["user_input"]  # The original user query for this turn
+        user_input = state["user_input"]
         current_conversation_messages = state["messages"]
         fetched_content_map = state.get("fetched_content_map", {})
-        search_results_summary = state.get("search_results", [])
+        search_results = state.get("search_results", [])
 
-        # Define extract_subject at the beginning of the method
         def extract_subject(query):
-            m = re.search(r"do i have (any )?notes (on|about|regarding) (.*?)[?]?$", query, re.IGNORECASE)
-            if m:
-                return m.group(3).strip()
-            # fallback: just return the query
+            m = re.search(r"do i have (any )?notes (on|about|regarding) (.*?)[?]$", query, re.IGNORECASE)
+            if m: return m.group(3).strip()
+            m2 = re.search(r"(?:provide|show|get|give me) (?:the )?(?:full )?content of (?:the )?(.*?) note", query, re.IGNORECASE)
+            if m2: return m2.group(1).strip()
             return query.strip()
 
-        # 1. Prepare context from fetched content
+        def extract_target_title_from_get_request(query_text):
+            match = re.search(r"(?:content of|text of|details of|full text of|provide the content for) (?:the )?\"?(.*?)\"? note", query_text, re.IGNORECASE)
+            if match: return match.group(1).strip().lower()
+            return None
+
+        # Build context_from_fetched_content (ensure it's just the raw content if possible)
         context_from_fetched_content = ""
-        if fetched_content_map:
-            context_from_fetched_content += "\n\nHere is the content I found for you:\n"
+        specifically_requested_content_text = None
+        identified_target_title = None
+
+        user_input_lower = user_input.lower()
+        is_get_content_request = (
+            "content of" in user_input_lower or
+            "full text of" in user_input_lower or
+            "details of" in user_input_lower or
+            "provide the content for" in user_input_lower
+        )
+
+        if is_get_content_request:
+            target_title_query = extract_target_title_from_get_request(user_input)
+            if target_title_query and fetched_content_map:
+                for item_key, full_content_text_from_tool in fetched_content_map.items():
+                    title_match_in_tool_output = re.match(r"(?:Note|Transcript):\s*(.*?)\n", full_content_text_from_tool, re.IGNORECASE)
+                    if title_match_in_tool_output:
+                        actual_title_in_content = title_match_in_tool_output.group(1).strip().lower()
+                        if target_title_query == actual_title_in_content:
+                            content_part_match = re.search(r"Content:\n(.*)", full_content_text_from_tool, re.DOTALL | re.IGNORECASE)
+                            if content_part_match:
+                                specifically_requested_content_text = content_part_match.group(1).strip()
+                                identified_target_title = actual_title_in_content.title()
+                                break
+        if not specifically_requested_content_text and fetched_content_map:
+            context_from_fetched_content += "\n\nHere is some content I found previously:\n"
             for item_key, content_text in fetched_content_map.items():
                 context_from_fetched_content += f"\n--- Content from {item_key.replace('_', ' ')} ---\n"
                 context_from_fetched_content += f"{content_text.strip()}\n"
             context_from_fetched_content += "--- End of fetched content ---\n"
 
-        # 2. Prepare context from search results (if no specific content was fetched)
+        # Prepare context from search results (if no specific content was fetched)
         context_from_search_results = ""
-        if not fetched_content_map and search_results_summary:
+        if not fetched_content_map and search_results:
             context_from_search_results += "\nI also found the following items that might be relevant:\n"
-            for item in search_results_summary[:3]:
+            for item in search_results[:3]:
                 context_from_search_results += f"- {item['type'].capitalize()} (ID: {item['id']}): {item['title']} [Relevance: {item['relevance']:.2f}]\n"
 
-        # 3. Add the raw tool output as plain text if available (from ToolMessage)
+        # Add the raw tool output as plain text if available (from ToolMessage)
         tool_output_text = ""
         for msg in current_conversation_messages:
             if isinstance(msg, ToolMessage):
                 tool_output_text += f"\nTool Output:\n{msg.content}\n"
 
-        # --- Custom fallback for no relevant notes ---
-        # Only use a hard fallback if the LLM fails to generate a response
-        MIN_RELEVANCE_THRESHOLD = 0.0
-        has_relevant_results = False
-        if search_results_summary:
-            for item in search_results_summary:
-                if item.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD:
-                    has_relevant_results = True
-                    break
-
-        # --- Improved logic for content requests ---
         user_input_lower = user_input.lower()
-        is_get_content_request = "content of" in user_input_lower or "full text of" in user_input_lower
-        has_fetched_specific_content = bool(fetched_content_map)
-        # Determine if any relevant search results exist
-        MIN_RELEVANCE_THRESHOLD = 0.0
-        has_relevant_results = any(
-            item.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD for item in search_results_summary
-        ) if search_results_summary else False
+        is_get_content_request = (
+            "content of" in user_input_lower or
+            "full text of" in user_input_lower or
+            "details of" in user_input_lower or
+            "provide the content for" in user_input_lower
+        )
+        has_fetched_any_content = bool(fetched_content_map)
+        MIN_RELEVANCE_THRESHOLD = 0.01
+        initial_search_had_relevant_results = any(
+            item.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD for item in search_results
+        ) if search_results else False
 
-        # 4. Construct the prompt for the LLM
-        if is_get_content_request and has_fetched_specific_content:
-            # If user asked for content and we have it, present it
-            system_prompt = (
-                "You are NoteApp's helpful assistant. The user asked for the full content of a note. "
-                "You have previously fetched this content. Present the relevant fetched content clearly. "
-                "Start by confirming which note's content you are providing, using its title if known from the fetched content."
+        system_prompt_content = ""
+
+        if is_get_content_request and specifically_requested_content_text is not None:
+            system_prompt_content = (
+                f"You are NoteApp's helpful assistant. The user asked for the full content of the note titled '{identified_target_title}'. "
+                "You have this content. Please present the following content verbatim. Do not add any commentary before or after it, and preserve all original formatting including line breaks and list styles."
+                "\n\nHere is the content:\n"
+                f"{specifically_requested_content_text}"
+            )
+        elif is_get_content_request and has_fetched_any_content:
+            system_prompt_content = (
+                "You are NoteApp's helpful assistant. The user asked for the content of a specific note. "
+                "You couldn't find an exact match for the requested title among the content you've already fetched. "
+                "Politely inform the user you couldn't find the specific note they asked for by that exact title. "
+                "You can then list the titles of notes for which you *do* have content, and ask if they'd like to see one of those instead, or if they'd like to try a new search."
                 f"{context_from_fetched_content}"
             )
-        elif not has_relevant_results and not has_fetched_specific_content:
+        elif is_get_content_request and not has_fetched_any_content:
             subject = extract_subject(user_input)
-            system_prompt = (
+            system_prompt_content = (
+                f"You are NoteApp's helpful assistant. The user asked for content related to '{subject}'. "
+                "It seems I was unable to retrieve specific content for this request in the previous steps. "
+                "Please inform the user that you couldn't retrieve the specific content and ask if they'd like to try searching again or rephrasing."
+            )
+        elif not initial_search_had_relevant_results and not has_fetched_any_content:
+            subject = extract_subject(user_input)
+            system_prompt_content = (
                 "You are NoteApp's helpful assistant. The user asked: '"
                 f"{user_input}"
                 "'.\nNo relevant notes or transcripts were found for this request.\n"
@@ -429,10 +495,10 @@ class NoteAppChatAgent:
                 "Your response should be plain text, without any markdown formatting.\n"
             )
         else:
-            system_prompt = (
+            system_prompt_content = (
                 "You are NoteApp's helpful assistant. Your task is to answer the user's question based on the preceding conversation history, "
                 "which includes their original query and any information retrieved from tools (like search results or note content).\n"
-                "Please synthesize a comprehensive and direct answer.\n"
+                "Please synthesize a comprehensive and direct answer. Do not use markdown like asterisks for lists if the original content does not use them; try to preserve original formatting if presenting content directly.\n"
                 "If you use information from a specific note or transcript, mention its title or ID.\n"
                 "If, after reviewing all provided context (search results and fetched content), no information truly addresses the user's query, "
                 "then politely state that you couldn't find the specific information they were looking for, even if some items were found by search.\n"
@@ -442,47 +508,30 @@ class NoteAppChatAgent:
                 f"{context_from_search_results}"
                 f"{tool_output_text}"
             )
-        prompt_messages = [SystemMessage(content=system_prompt)]
+        prompt_messages = [SystemMessage(content=system_prompt_content)]
         prompt_messages.extend(current_conversation_messages)
-
-        print(f"DEBUG: Messages being sent to LLM for synthesis: {prompt_messages}")
-
+        print(f"DEBUG: System Prompt for LLM synthesis: {system_prompt_content}")
         try:
             response = await self.llm.ainvoke(prompt_messages)
-            answer = response.content
+            answer = response.content.strip()
             print(f"Synthesized Answer from LLM: {answer}")
-
-            # Fallback: If the answer is empty, try a more explicit prompt or return a helpful message
-            llm_message = answer
-            try:
-                parsed = json.loads(answer)
-                if isinstance(parsed, dict) and "message" in parsed:
-                    llm_message = parsed["message"]
-            except Exception:
-                pass
-
-            if not llm_message or not llm_message.strip():
-                # extract_subject is now defined in the outer scope
+            if not answer:
                 subject = extract_subject(user_input)
-                fallback = (
-                    f"I'm sorry, I could not find any relevant notes about {subject}. "
-                    "If you want to add a note or clarify your request, please let me know."
-                )
-                return {
-                    "messages": [AIMessage(content=fallback)],
-                    "final_answer": fallback,
-                    "error_message": None
-                }
-
+                if has_fetched_any_content or initial_search_had_relevant_results:
+                    answer = f"I found some information regarding '{subject}', but I'm having trouble formulating a specific answer. Could you rephrase or ask something more specific about it?"
+                else:
+                    answer = f"I'm sorry, I could not find any relevant notes about '{subject}'. If you want to add a note or clarify your request, please let me know."
+                print(f"LLM returned empty, using fallback: {answer}")
             return {
-                "messages": [AIMessage(content=llm_message)],
-                "final_answer": llm_message,
+                "messages": [AIMessage(content=answer)],
+                "final_answer": answer,
                 "error_message": None
             }
         except Exception as e:
             print(f"Error in _synthesize_answer_node LLM call: {e}")
             traceback.print_exc()
-            fallback = "I'm sorry, I could not find any relevant notes for your request. If you want to add a note or clarify your request, please let me know."
+            subject = extract_subject(user_input)
+            fallback = f"I'm sorry, I had trouble processing your request about '{subject}'. Please try again."
             return {
                 "messages": [AIMessage(content=fallback)],
                 "final_answer": fallback,
@@ -538,7 +587,6 @@ class NoteAppChatAgent:
         analysis = state.get("initial_analysis")
         if not analysis:
             print("No initial analysis found, routing to handle_error.")
-            state["error_message"] = "Internal error: Input analysis was not performed."
             return "handle_error"
 
         intent_str = analysis.get("intent")
@@ -547,32 +595,24 @@ class NoteAppChatAgent:
 
         print(f"Routing based on: Intent='{intent_str}', RequiresTool={requires_tool}, SearchQuerySet={bool(search_query)}")
 
-        if intent_str == IntentType.CASUAL.value or \
-           (intent_str == IntentType.EMOTIONAL.value and not requires_tool):
-            print("Routing to casual_chat.")
-            return "casual_chat"
-        
-        if intent_str in [IntentType.QUERY_NOTES.value, IntentType.SEARCH_REQUEST.value] and search_query:
-            print("Routing to search_notes.")
+        # Path 1: If _analyze_input_node explicitly prepared a search_query, always prioritize search.
+        if search_query:
+            print(f"Search query ('{search_query}') is set. Routing to search_notes.")
             return "search_notes"
 
-        # --- Heuristic for get_content requests with no search_query ---
-        if requires_tool and not search_query:
-            user_input_lower = state["user_input"].lower()
-            import re
-            match = re.search(r"(?:content|full text|details) of (?:the )?(.*?) note", user_input_lower)
-            if match:
-                note_title = match.group(1).strip()
-                if note_title:
-                    state["search_query"] = note_title
-                    print(f"Extracted note title for search: {note_title}")
-                    return "search_notes"
-
-        if requires_tool and not search_query:
-            print("Tools required but no search query. Routing to synthesize_answer for now.")
+        # Path 2: If no search query was prepared, check for casual chat.
+        if intent_str == IntentType.CASUAL.value or \
+           (intent_str == IntentType.EMOTIONAL.value and not requires_tool):
+            print("No search query, and intent is casual. Routing to casual_chat.")
+            return "casual_chat"
+        
+        # Path 3: Tools might be required by analysis, but _analyze_input_node didn't form a search query.
+        if requires_tool:
+            print(f"Tools required ('{analysis.get('required_tools')}') but no search query. Routing to synthesize_answer.")
             return "synthesize_answer"
 
-        print("No specific tool route and not casual. Routing to synthesize_answer.")
+        # Path 4: Default/Fallback
+        print("Default: No search query, not casual, no explicit tool need from analysis. Routing to synthesize_answer.")
         return "synthesize_answer"
 
     def _route_after_search(self, state: GraphState) -> str:
@@ -611,7 +651,8 @@ class NoteAppChatAgent:
             print(f"Reached max items to fetch ({MAX_ITEMS_TO_FETCH}). Routing to synthesize_answer.")
             return "synthesize_answer"
 
-        MIN_RELEVANCE_THRESHOLD = 0.0
+        # In _route_after_get_content, use a stricter threshold and do not set state directly
+        MIN_RELEVANCE_THRESHOLD = 0.1  # Stricter threshold to avoid irrelevant fetches
         next_item_to_fetch = None
         if search_results:
             sorted_relevant_results = sorted(
@@ -629,8 +670,7 @@ class NoteAppChatAgent:
 
         if next_item_to_fetch:
             print(f"More relevant, unfetched content available ({next_item_to_fetch['type']}_{next_item_to_fetch['id']}). Routing back to get_content.")
-            state["item_id_to_fetch"] = next_item_to_fetch["id"]
-            state["item_type_to_fetch"] = next_item_to_fetch["type"]
+            # Do not set state here; _get_content_node will pick the next item
             return "get_content"
         else:
             print("No more relevant unfetched items or fetched enough. Routing to synthesize_answer.")
