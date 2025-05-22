@@ -23,6 +23,11 @@ class ToolAnalyzer:
             "delete": {
                 "keywords": ["delete", "remove", "clear"],
                 "tools": ["delete_note"]
+            },
+            "get_content": {
+                "keywords": ["provide", "show", "display", "get", "read", "give"],
+                "context_words": ["content", "full text", "details"],
+                "tools": ["get_noteapp_content"]
             }
         }
 
@@ -44,7 +49,12 @@ class ToolAnalyzer:
         # Check keywords against tool indicators
         for category, indicators in self.tool_indicators.items():
             if any(keyword in keywords for keyword in indicators["keywords"]):
-                required_tools.extend(indicators["tools"])
+                # Special logic for get_content: require a context word too
+                if category == "get_content":
+                    if any(ctx_word in keywords for ctx_word in indicators.get("context_words", [])):
+                        required_tools.extend(indicators["tools"])
+                else:
+                    required_tools.extend(indicators["tools"])
 
         # Remove duplicates while preserving order
         unique_tools = list(dict.fromkeys(required_tools))

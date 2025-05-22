@@ -181,17 +181,17 @@ class NoteAppChatAgent:
         search_query = state.get("search_query")
         user_id = state["user_id"]
         jwt_token = state["jwt_token"]
-        iteration_count = state.get("iteration_count", 0) # Get current, don't increment here
+        # iteration_count = state.get("iteration_count", 0) # Not incremented here
 
         if not search_query:
             print("--- No search query found in state. Routing to error. ---")
-            return {"error_message": "No search query was provided for searching notes."}
+            return {"error_message": "No search query was provided for searching notes.", "casual_exchange_count": 0}
 
         try:
             search_tool = self.base_tools.get("search_noteapp")
             if not search_tool:
                 print("--- search_noteapp tool not found. ---")
-                return {"error_message": "Search tool is not available."}
+                return {"error_message": "Search tool is not available.", "casual_exchange_count": 0}
 
             # Set authentication for the tool
             if hasattr(search_tool, "set_auth"):
@@ -224,14 +224,42 @@ class NoteAppChatAgent:
 
             print(f"Parsed search results: {parsed_results}")
 
-            # Add a ToolMessage to the messages list
-            tool_message = ToolMessage(content=tool_output_str, tool_call_id="search_noteapp_0") # Placeholder tool_call_id
+            # --- Determine first item to fetch ---
+            item_id_for_next_step: Optional[int] = None
+            item_type_for_next_step: Optional[str] = None
+            fetched_map_in_state = state.get("fetched_content_map", {}) 
 
-            return {
-                "messages": [tool_message], # Append tool output to history
+            MIN_RELEVANCE_THRESHOLD = 0.0 
+            relevant_results_for_first_fetch = sorted(
+                [res for res in parsed_results if res.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD],
+                key=lambda x: x.get("relevance", -1.0),
+                reverse=True
+            )
+
+            if relevant_results_for_first_fetch:
+                for item in relevant_results_for_first_fetch:
+                    item_id = item.get("id")
+                    item_type = item.get("type")
+                    if item_id is not None and item_type:
+                        content_key = f"{item_type}_{item_id}"
+                        if content_key not in fetched_map_in_state:
+                            item_id_for_next_step = item_id
+                            item_type_for_next_step = item_type
+                            print(f"--- _search_notes_node determined first item to fetch: {content_key} ---")
+                            break
+            
+            tool_message = ToolMessage(content=tool_output_str, tool_call_id="search_noteapp_0")
+
+            return_payload = {
+                "messages": [tool_message],
                 "search_results": parsed_results,
-                "error_message": None # Clear any previous error
+                "item_id_to_fetch": item_id_for_next_step,
+                "item_type_to_fetch": item_type_for_next_step,
+                "error_message": None,
+                "casual_exchange_count": 0 # Reset casual exchange count
             }
+            
+            return return_payload
 
         except Exception as e:
             print(f"Error in _search_notes_node: {e}")
@@ -241,7 +269,10 @@ class NoteAppChatAgent:
             return {
                 "messages": [tool_error_message],
                 "error_message": error_message_content,
-                "search_results": [] # Ensure search_results is empty on error
+                "search_results": [],
+                "item_id_to_fetch": None,
+                "item_type_to_fetch": None,
+                "casual_exchange_count": 0 # Reset casual exchange count
             }
 
     def _get_content_node(self, state: GraphState) -> Dict[str, Any]:
@@ -367,9 +398,26 @@ class NoteAppChatAgent:
                     has_relevant_results = True
                     break
 
+        # --- Improved logic for content requests ---
+        user_input_lower = user_input.lower()
+        is_get_content_request = "content of" in user_input_lower or "full text of" in user_input_lower
+        has_fetched_specific_content = bool(fetched_content_map)
+        # Determine if any relevant search results exist
+        MIN_RELEVANCE_THRESHOLD = 0.0
+        has_relevant_results = any(
+            item.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD for item in search_results_summary
+        ) if search_results_summary else False
+
         # 4. Construct the prompt for the LLM
-        if not has_relevant_results:
-            # No relevant notes found, instruct LLM to inform the user
+        if is_get_content_request and has_fetched_specific_content:
+            # If user asked for content and we have it, present it
+            system_prompt = (
+                "You are NoteApp's helpful assistant. The user asked for the full content of a note. "
+                "You have previously fetched this content. Present the relevant fetched content clearly. "
+                "Start by confirming which note's content you are providing, using its title if known from the fetched content."
+                f"{context_from_fetched_content}"
+            )
+        elif not has_relevant_results and not has_fetched_specific_content:
             subject = extract_subject(user_input)
             system_prompt = (
                 "You are NoteApp's helpful assistant. The user asked: '"
@@ -378,7 +426,7 @@ class NoteAppChatAgent:
                 f"Politely inform the user that you could not find any relevant notes about '{subject}', and suggest they add a note or clarify their request.\n"
                 f"Always mention the subject ('{subject}') in your response.\n"
                 "Do not attempt to answer the question directly.\n"
-                "Your response should be plain text, without any markdown formatting.\n" # Added instruction
+                "Your response should be plain text, without any markdown formatting.\n"
             )
         else:
             system_prompt = (
@@ -386,7 +434,8 @@ class NoteAppChatAgent:
                 "which includes their original query and any information retrieved from tools (like search results or note content).\n"
                 "Please synthesize a comprehensive and direct answer.\n"
                 "If you use information from a specific note or transcript, mention its title or ID.\n"
-                "If no relevant information was found by the tools, politely inform the user that you could not find any relevant notes, and suggest they add a note or clarify their request.\n"
+                "If, after reviewing all provided context (search results and fetched content), no information truly addresses the user's query, "
+                "then politely state that you couldn't find the specific information they were looking for, even if some items were found by search.\n"
                 "Always mention the main subject of the user's query in your response.\n"
                 "Do not refer to the tools themselves in your final answer unless it's to explain why you couldn't find something.\n"
                 f"{context_from_fetched_content}"
@@ -507,6 +556,18 @@ class NoteAppChatAgent:
             print("Routing to search_notes.")
             return "search_notes"
 
+        # --- Heuristic for get_content requests with no search_query ---
+        if requires_tool and not search_query:
+            user_input_lower = state["user_input"].lower()
+            import re
+            match = re.search(r"(?:content|full text|details) of (?:the )?(.*?) note", user_input_lower)
+            if match:
+                note_title = match.group(1).strip()
+                if note_title:
+                    state["search_query"] = note_title
+                    print(f"Extracted note title for search: {note_title}")
+                    return "search_notes"
+
         if requires_tool and not search_query:
             print("Tools required but no search query. Routing to synthesize_answer for now.")
             return "synthesize_answer"
@@ -516,46 +577,23 @@ class NoteAppChatAgent:
 
     def _route_after_search(self, state: GraphState) -> str:
         print("--- Routing: after_search ---")
-        iteration_count = state.get("iteration_count", 0)
+        # iteration_count = state.get("iteration_count", 0) # Not used here
 
         if state.get("error_message"):
             print("Error found after search_notes, routing to handle_error.")
             return "handle_error"
 
-        search_results = state.get("search_results")
-        fetched_content_map = state.get("fetched_content_map", {})
+        # item_id_to_fetch and item_type_to_fetch are now set by _search_notes_node's return
+        current_item_id_to_fetch = state.get("item_id_to_fetch")
+        current_item_type_to_fetch = state.get("item_type_to_fetch")
 
-        # Define a minimum relevance threshold
-        MIN_RELEVANCE_THRESHOLD = 0.0  # Adjust as needed
-
-        if not search_results:
-            print("No search results found, routing to synthesize_answer.")
+        if current_item_id_to_fetch is not None and current_item_type_to_fetch is not None:
+            print(f"--- Routing to get_content for item ID: {current_item_id_to_fetch}, Type: {current_item_type_to_fetch} ---")
+            return "get_content"
+        else:
+            # This case means _search_notes_node found no new relevant items to fetch initially
+            print("--- No specific new item to fetch determined by search_notes. Routing to synthesize_answer. ---")
             return "synthesize_answer"
-
-        # Filter by relevance and sort
-        relevant_results = sorted(
-            [res for res in search_results if res.get("relevance", -1.0) >= MIN_RELEVANCE_THRESHOLD],
-            key=lambda x: x.get("relevance", -1.0),
-            reverse=True
-        )
-
-        if not relevant_results:
-            print(f"No results meet relevance threshold ({MIN_RELEVANCE_THRESHOLD}), routing to synthesize_answer.")
-            return "synthesize_answer"
-
-        # Find the next relevant item whose content hasn't been fetched yet
-        for item in relevant_results:
-            item_id = item.get("id")
-            item_type = item.get("type")
-            content_key = f"{item_type}_{item_id}"
-            if item_id is not None and item_type and content_key not in fetched_content_map:
-                print(f"Found relevant, unfetched item: {content_key}. Routing to get_content.")
-                state["item_id_to_fetch"] = item_id
-                state["item_type_to_fetch"] = item_type
-                return "get_content"
-
-        print("All relevant items fetched or no new relevant items to fetch. Routing to synthesize_answer.")
-        return "synthesize_answer"
 
     def _route_after_get_content(self, state: GraphState) -> str:
         print("--- Routing: after_get_content ---")
