@@ -1,41 +1,52 @@
-from typing import List, Dict, Any, Optional
+"""NoteApp Chat Agent implementation using LangGraph."""
+from typing import List, Dict, Any
 from functools import partial
+import traceback
+
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-import traceback
-import re
-import json
-
+from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+# Agent components
 from .agent.graph_state import GraphState
 from .agent.nodes_initial import analyze_input_node, casual_chat_node
 from .agent.nodes_tool_interaction import search_notes_node, get_content_node
 from .agent.nodes_synthesis import synthesize_answer_node, handle_error_node
 from .agent.routing_logic import route_after_analysis, route_after_search, route_after_get_content
 
-from .conversation import (
-    ResponseGenerator,
-    ConversationContext,
-    MessageAnalyzer,
-    IntentType
-)
+# Conversation handlers
+from .conversation import ResponseGenerator, MessageAnalyzer
 
 class NoteAppChatAgent:
-    """Agent for handling NoteApp chat interactions using LangGraph."""
+    """Agent for handling NoteApp chat interactions using LangGraph.
+    
+    This agent uses a graph-based workflow to process user inputs and generate responses.
+    The workflow consists of several specialized nodes for different tasks:
+    - analyze_input: Analyzes user input to determine intent and required actions
+    - casual_chat: Handles casual conversation without note-related queries
+    - search_notes: Searches through notes based on user queries
+    - get_content: Retrieves specific note content when needed
+    - synthesize_answer: Generates final responses using retrieved context
+    - handle_error: Manages error cases gracefully
+    """
 
     def __init__(self, llm: BaseChatModel, tools: List[BaseTool], checkpointer: BaseCheckpointSaver):
-        """Initialize the chat agent with an LLM, tools, and LangGraph workflow."""
+        """Initialize the chat agent with required components and build the workflow graph.
+        
+        Args:
+            llm: The language model to use for text generation
+            tools: List of tools for interacting with the NoteApp backend
+            checkpointer: Checkpointing mechanism for the workflow state
+        """
+        # Core components
         self.llm = llm
         self.base_tools = {tool.name: tool for tool in tools}
-
-        # Initialize conversation handlers
         self.message_analyzer = MessageAnalyzer()
         self.response_generator = ResponseGenerator(llm=llm)
 
-        # --- Build the LangGraph Workflow ---
+        # Build the workflow graph
         workflow_builder = StateGraph(GraphState)
 
         # Define Nodes using the standalone functions with dependencies
@@ -62,11 +73,10 @@ class NoteAppChatAgent:
         workflow_builder.add_node("handle_error", handle_error_node)
 
         # Define Edges
-        workflow_builder.set_entry_point("analyze_input")
-
+        workflow_builder.set_entry_point("analyze_input")        # Define conditional edges using routing functions from routing_logic module
         workflow_builder.add_conditional_edges(
             "analyze_input",
-            self._route_after_analysis,
+            route_after_analysis,
             {
                 "search_notes": "search_notes",
                 "casual_chat": "casual_chat",
@@ -76,7 +86,7 @@ class NoteAppChatAgent:
         )
         workflow_builder.add_conditional_edges(
             "search_notes",
-            self._route_after_search,
+            route_after_search,
             {
                 "get_content": "get_content",
                 "synthesize_answer": "synthesize_answer",
@@ -85,7 +95,7 @@ class NoteAppChatAgent:
         )
         workflow_builder.add_conditional_edges(
             "get_content",
-            self._route_after_get_content,
+            route_after_get_content,
             {
                 "get_content": "get_content",
                 "synthesize_answer": "synthesize_answer",
@@ -93,23 +103,13 @@ class NoteAppChatAgent:
             }
         )
 
+        # Define terminal edges
         workflow_builder.add_edge("casual_chat", END)
         workflow_builder.add_edge("synthesize_answer", END)
-        workflow_builder.add_edge("handle_error", END)        # Compile the graph with the passed-in, active checkpointer
+        workflow_builder.add_edge("handle_error", END)
+
+        # Compile the graph with the passed-in, active checkpointer
         self.app = workflow_builder.compile(checkpointer=checkpointer)
-
-    # --- Routing Functions ---
-    def _route_after_analysis(self, state: GraphState) -> str:
-        """Route to next node after input analysis."""
-        return route_after_analysis(state)
-
-    def _route_after_search(self, state: GraphState) -> str:
-        """Route to next node after search operation."""
-        return route_after_search(state)
-
-    def _route_after_get_content(self, state: GraphState) -> str:
-        """Route to next node after content retrieval."""
-        return route_after_get_content(state)
 
     async def invoke(self, user_input: str, chat_history: List[Dict], user_id: str, jwt_token: str) -> Dict[str, Any]:
         print(f"\\n--- New Invocation --- User: {user_input[:50]}... ---")
