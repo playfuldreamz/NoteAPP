@@ -7,35 +7,50 @@ from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 
 from config import (
-    CHAT_SERVICE_HOST,
-    CHAT_SERVICE_PORT,
-    LOG_LEVEL,
-    validate_config,
-    get_llm_client
+    CHAT_SERVICE_HOST, CHAT_SERVICE_PORT, LOG_LEVEL,
+    validate_config, get_llm_client
 )
 from modules import NoteAppChatAgent
 from tools import SearchNoteAppTool, GetNoteAppContentTool
+
+# Import the ASYNC version of SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
 
 # Configure logging
 logging.basicConfig(level=LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
+# Global variable for the agent instance
+note_app_agent_instance: Optional[NoteAppChatAgent] = None
+checkpointer_instance: Optional[BaseCheckpointSaver] = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Configuration validation
+    global note_app_agent_instance, checkpointer_instance
+    logger.info("Application startup...")
     if error := validate_config():
+        logger.error(f"Configuration error: {error}")
         raise ValueError(f"Configuration error: {error}")
     logger.info("Configuration validated successfully")
-    
-    # Initialize LLM client
+
     try:
-        global llm_client
-        llm_client = get_llm_client()
+        llm = get_llm_client()
         logger.info("LLM client initialized successfully")
-        yield
+        tools = [SearchNoteAppTool(), GetNoteAppContentTool()]
+        async with AsyncSqliteSaver.from_conn_string(":memory:") as chkptr:
+            checkpointer_instance = chkptr
+            note_app_agent_instance = NoteAppChatAgent(llm=llm, tools=tools, checkpointer=checkpointer_instance)
+            logger.info("NoteAppChatAgent initialized with checkpointer.")
+            yield
     except Exception as e:
-        logger.error(f"Failed to initialize LLM client: {e}")
+        logger.error(f"Failed during application startup: {e}", exc_info=True)
         raise
+    finally:
+        logger.info("Application shutdown...")
+        if hasattr(checkpointer_instance, "close") and callable(getattr(checkpointer_instance, "close")):
+            pass
+        logger.info("Application shutdown complete.")
 
 # Create FastAPI app with lifespan handler
 app = FastAPI(title="NoteApp Chat Service", lifespan=lifespan)
@@ -71,63 +86,31 @@ async def health_check():
     return {"status": "healthy"}
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: dict):
-    """Handle chat requests from users.
-    
-    Args:
-        request: The chat request containing user input and context
-    
-    Returns:
-        ChatResponse containing the agent's answer
-    """
+async def chat(request: ChatRequest):
+    global note_app_agent_instance
+    if not note_app_agent_instance:
+        logger.error("Chat agent not initialized.")
+        raise HTTPException(status_code=503, detail="Chat service is not ready.")
     try:
-        import json
-        
-        # Initialize tools
-        tools = [
-            SearchNoteAppTool(),
-            GetNoteAppContentTool()
-        ]
-        
-        # Create chat agent
-        agent = NoteAppChatAgent(llm=llm_client, tools=tools)
-        
-        # Parse the serialized chat history
-        chat_history = []
-        if "serializedChatHistory" in request:
-            try:
-                chat_history = json.loads(request["serializedChatHistory"])
-                logger.info(f"Successfully parsed serializedChatHistory: {len(chat_history)} messages")
-            except Exception as e:
-                logger.error(f"Error parsing serializedChatHistory: {e}")
-                chat_history = []
-        
-        # Process the request with the parsed chat history
-        result = await agent.invoke(
-            user_input=request["userInput"],
-            chat_history=chat_history,  # Use the parsed chat history
-            user_id=request["userId"],
-            jwt_token=request["token"]
+        chat_history_dicts = [msg.model_dump() for msg in request.chatHistory]
+        result = await note_app_agent_instance.invoke(
+            user_input=request.userInput,
+            chat_history=chat_history_dicts,
+            user_id=request.userId,
+            jwt_token=request.token
         )
-        
         return ChatResponse(**result)
-    
     except Exception as e:
-        logger.error(f"Error processing chat request: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        logger.error(f"Error processing chat request: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/test-ollama")
 async def test_ollama():
-    """Test endpoint to verify Ollama connection."""
+    global note_app_agent_instance
     try:
-        if not llm_client:
+        if not note_app_agent_instance or not hasattr(note_app_agent_instance, "llm"):
             return {"status": "error", "message": "LLM client not initialized"}
-            
-        # Try a simple chat completion
-        response = await llm_client.ainvoke("Say hello!")
+        response = await note_app_agent_instance.llm.ainvoke("Say hello!")
         return {
             "status": "success",
             "message": "Ollama connection successful",
