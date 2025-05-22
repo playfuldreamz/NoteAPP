@@ -19,7 +19,8 @@ from .conversation import (
     MessageAnalyzer,
     IntentType
 )
-from .conversation.history.message_history_manager import MessageHistoryManager
+# MessageHistoryManager might be removed or used differently later for pre-graph summarization
+# from .conversation.history.message_history_manager import MessageHistoryManager
 
 # --- Define Graph State ---
 class GraphState(PydanticTypedDict):
@@ -40,6 +41,7 @@ class GraphState(PydanticTypedDict):
         final_answer: The final response to be delivered to the user.
         error_message: Any error message encountered during processing.
         iteration_count: To prevent infinite loops if logic gets stuck.
+        casual_exchange_count: Tracks the number of consecutive casual exchanges.
     """
     messages: Annotated[List[Any], add_messages] # Can be HumanMessage, AIMessage, ToolMessage
     user_input: str
@@ -54,6 +56,7 @@ class GraphState(PydanticTypedDict):
     final_answer: Optional[str] = None
     error_message: Optional[str] = None
     iteration_count: int = 0 # To prevent potential infinite loops during development
+    casual_exchange_count: int = 0
 
 
 class NoteAppChatAgent:
@@ -65,10 +68,10 @@ class NoteAppChatAgent:
         self.base_tools = {tool.name: tool for tool in tools} # Store tools in a dict for easy access
 
         # Initialize conversation handlers (can be used by nodes)
-        self.classifier = ConversationClassifier(llm=llm)
+        # self.classifier = ConversationClassifier(llm=llm) # Removed
         self.response_generator = ResponseGenerator(llm=llm)
-        self.message_analyzer = MessageAnalyzer()
-        self.history_manager = MessageHistoryManager() # For initial history processing
+        self.message_analyzer = MessageAnalyzer() # MessageAnalyzer instantiates its own IntentClassifier
+        # self.history_manager = MessageHistoryManager() # Removed
 
         # --- Build the LangGraph Workflow ---
         workflow_builder = StateGraph(GraphState)
@@ -440,22 +443,22 @@ class NoteAppChatAgent:
     async def _casual_chat_node(self, state: GraphState) -> Dict[str, Any]:
         print("--- Executing Node: casual_chat ---")
         user_input = state["user_input"]
-        # messages state already contains the full history including the latest user message
+        messages = state["messages"]
+        casual_exchange_count = state.get("casual_exchange_count", 0) + 1
 
-        # Construct ConversationContext for ResponseGenerator
+
         conversation_context_for_casual_chat = ConversationContext(
-            chat_history=state['messages'][:-1], # History up to the last user message
+            chat_history=[msg for msg in messages[:-1] if isinstance(msg, (HumanMessage, AIMessage))],
             current_message=user_input
         )
 
         try:
-            # ResponseGenerator.generate_response is async
             casual_reply = await self.response_generator.generate_response(conversation_context_for_casual_chat)
             print(f"Casual Reply Generated: {casual_reply}")
-
             return {
-                "messages": [AIMessage(content=casual_reply)], # This will be appended to the state's messages
-                "final_answer": casual_reply
+                "messages": [AIMessage(content=casual_reply)],
+                "final_answer": casual_reply,
+                "casual_exchange_count": casual_exchange_count
             }
         except Exception as e:
             print(f"Error in _casual_chat_node: {e}")
@@ -597,50 +600,28 @@ class NoteAppChatAgent:
 
 
     async def invoke(self, user_input: str, chat_history: List[Dict], user_id: str, jwt_token: str) -> Dict[str, Any]:
-        """Process user input using the LangGraph workflow."""
-        print(f"\n--- New Invocation --- User: {user_input[:50]}... ---")
-        # Use MessageHistoryManager to prepare initial messages for the graph state
-        # This part can be simplified if LangGraph's `add_messages` handles dicts directly
-        temp_history_manager = MessageHistoryManager() # Use a temporary one or adapt
-        for msg_dict in chat_history: # msg_dict is like {"role": "user", "content": "...">
-            temp_history_manager.add_message(msg_dict)
-        # The user_input is the current message, add it to history manager to get it formatted
-        # Or, handle it separately in the initial state construction.
-        # For LangGraph, it's common to pass the current user input separately
-        # and have the graph append it to messages.
+        print(f"\\n--- New Invocation --- User: {user_input[:50]}... ---")
 
-        # Convert dict messages to LangChain message objects for the graph state
-        langchain_messages = []
+        langchain_messages: List[Any] = [] # Ensure it's List[Any] to match GraphState
         for msg_dict in chat_history:
             if msg_dict.get("role") == "user":
                 langchain_messages.append(HumanMessage(content=msg_dict.get("content", "")))
-            elif msg_dict.get("role") == "assistant":
+            elif msg_dict.get("role") == "assistant": # Changed from "ai" to "assistant" to match common practice
                 langchain_messages.append(AIMessage(content=msg_dict.get("content", "")))
-            # Add handling for SystemMessage or ToolMessage if they appear in chat_history
-
-        # Add current user input as the latest message
-        langchain_messages.append(HumanMessage(content=user_input))
+        langchain_messages.append(HumanMessage(content=user_input)) # Add current user input
 
         initial_graph_state = GraphState(
             messages=langchain_messages,
             user_input=user_input,
             user_id=user_id,
             jwt_token=jwt_token,
-            initial_analysis=None,
-            search_query=None,
-            search_results=None,
-            item_id_to_fetch=None,
-            item_type_to_fetch=None,
-            fetched_content_map={},
-            final_answer=None,
-            error_message=None,
-            iteration_count=0
+            initial_analysis=None, search_query=None, search_results=None,
+            item_id_to_fetch=None, item_type_to_fetch=None,
+            fetched_content_map={}, final_answer=None, error_message=None,
+            iteration_count=0,
+            casual_exchange_count=0 # Initialize in state
         )
-
-        # Configuration for the graph invocation, including the thread_id for memory
-        # Using user_id as thread_id makes sense for per-user conversation memory
-        config = {"configurable": {"thread_id": user_id}}
-
+        config = {"configurable": {"thread_id": user_id}} # Ensure thread_id is correctly configured
         final_state_result = None
         try:
             # Stream events to observe the flow and state changes

@@ -21,7 +21,7 @@ This directory contains the NoteApp Chat Service, a Python-based component respo
 The Chat Service is built around the `NoteAppChatAgent` which uses LangGraph to define a state machine (graph) representing the flow of conversation. Key components include:
 
 - **`chat_server.py`:** The main entry point that starts a FastAPI server to expose the chat functionality via HTTP endpoints.
-- **`chat_agent.py`:** Contains the core `NoteAppChatAgent` class, defining the LangGraph workflow, nodes (processing steps), and edges (routing logic).
+- **`chat_agent.py`:** Contains the core `NoteAppChatAgent` class, which defines and manages the conversation state (via `GraphState`) and orchestrates the chat flow using a LangGraph workflow. This includes defining processing nodes and routing logic.
     - **Nodes:**
         - `analyze_input`: Classifies user intent and extracts key information.
         - `search_notes`: Uses a tool to search for relevant notes/transcripts in NoteApp.
