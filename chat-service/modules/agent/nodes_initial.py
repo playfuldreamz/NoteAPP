@@ -5,6 +5,7 @@ import re
 from langchain_core.messages import AIMessage, HumanMessage
 
 from .graph_state import GraphState
+from .nodes_synthesis import extract_target_title_from_get_request
 from ..conversation.analyzer import MessageAnalyzer
 from ..conversation.response import ResponseGenerator
 from ..conversation.types import ConversationContext
@@ -51,21 +52,15 @@ def analyze_input_node(state: GraphState, message_analyzer: MessageAnalyzer) -> 
         intent_val = analysis_dict["intent"]
         keywords = analysis_dict["keywords"]
         requires_tool = analysis_dict["requires_tool"]
-        required_tools_list = analysis_dict.get("required_tools", [])
-
-        if intent_val in [IntentType.QUERY_NOTES.value, IntentType.SEARCH_REQUEST.value] and keywords:
+        required_tools_list = analysis_dict.get("required_tools", [])        # First check for content retrieval requests
+        note_title_to_search = extract_target_title_from_get_request(user_input)
+        if note_title_to_search:
+            # This is a content retrieval request, override intent
+            analysis_dict["intent"] = IntentType.ACTION.value
+            update_payload["search_query"] = note_title_to_search
+        # Otherwise handle regular searches
+        elif intent_val in [IntentType.QUERY_NOTES.value, IntentType.SEARCH_REQUEST.value] and keywords:
             update_payload["search_query"] = user_input
-        elif intent_val == IntentType.ACTION.value and "get_noteapp_content" in required_tools_list:
-            user_input_lower = user_input.lower()
-            match = re.search(r"(?:content of|full text of|details of) (?:the )?(.*?) note", user_input_lower)
-            if match:
-                note_title_to_search = match.group(1).strip()
-                if note_title_to_search:
-                    update_payload["search_query"] = note_title_to_search
-            elif keywords:
-                update_payload["search_query"] = " ".join(keywords)
-            else:
-                update_payload["search_query"] = user_input
         elif requires_tool and not update_payload["search_query"] and keywords:
             update_payload["search_query"] = " ".join(keywords)
         
