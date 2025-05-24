@@ -12,12 +12,15 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 # Agent components
 from .agent.graph_state import GraphState
 from .agent.nodes_initial import analyze_input_node, casual_chat_node
-from .agent.nodes_tool_interaction import search_notes_node, get_content_node
+from .agent.nodes_tool_interaction import search_notes_node, get_content_node, create_note_node # Added create_note_node
 from .agent.nodes_synthesis import synthesize_answer_node, handle_error_node
 from .agent.routing_logic import route_after_analysis, route_after_search, route_after_get_content
 
 # Conversation handlers
 from .conversation import ResponseGenerator, MessageAnalyzer
+
+# Preprocessing
+from .preprocessing.typo_corrector import TypoCorrector # Corrected import path
 
 class NoteAppChatAgent:
     """Agent for handling NoteApp chat interactions using LangGraph.
@@ -45,6 +48,7 @@ class NoteAppChatAgent:
         self.base_tools = {tool.name: tool for tool in tools}
         self.message_analyzer = MessageAnalyzer()
         self.response_generator = ResponseGenerator(llm=llm)
+        self.typo_corrector = TypoCorrector(llm=self.llm) # Pass self.llm to TypoCorrector
 
         # Build the workflow graph
         workflow_builder = StateGraph(GraphState)
@@ -66,6 +70,10 @@ class NoteAppChatAgent:
             "get_content",
             partial(get_content_node, base_tools=self.base_tools)
         )
+        workflow_builder.add_node( # Added create_note_node to graph
+            "create_note",
+            partial(create_note_node, base_tools=self.base_tools)
+        )
         workflow_builder.add_node(
             "synthesize_answer",
             partial(synthesize_answer_node, llm=self.llm)
@@ -79,6 +87,7 @@ class NoteAppChatAgent:
             route_after_analysis,
             {
                 "search_notes": "search_notes",
+                "create_note": "create_note", # Added create_note route
                 "casual_chat": "casual_chat",
                 "synthesize_answer": "synthesize_answer",
                 "handle_error": "handle_error"
@@ -103,6 +112,7 @@ class NoteAppChatAgent:
             }
         )
 
+
         # Define terminal edges
         workflow_builder.add_edge("casual_chat", END)
         workflow_builder.add_edge("synthesize_answer", END)
@@ -112,19 +122,31 @@ class NoteAppChatAgent:
         self.app = workflow_builder.compile(checkpointer=checkpointer)
 
     async def invoke(self, user_input: str, chat_history: List[Dict], user_id: str, jwt_token: str) -> Dict[str, Any]:
-        print(f"\\n--- New Invocation --- User: {user_input[:50]}... ---")
+        original_input_for_log = user_input[:100] # For logging, increased length
+        
+        # Apply typo correction
+        corrected_user_input = await self.typo_corrector.correct(user_input) # Await the async call
+        
+        print(f"\\n--- New Invocation --- Original User Input: {original_input_for_log}... ---")
+        if user_input != corrected_user_input:
+            print(f"--- Input corrected to: {corrected_user_input[:100]}... ---")
+        else:
+            print(f"--- No correction needed for input: {corrected_user_input[:100]}... ---")
 
-        langchain_messages: List[Any] = [] # Ensure it's List[Any] to match GraphState
+        langchain_messages: List[Any] = [] 
         for msg_dict in chat_history:
             if msg_dict.get("role") == "user":
                 langchain_messages.append(HumanMessage(content=msg_dict.get("content", "")))
-            elif msg_dict.get("role") == "assistant": # Changed from "ai" to "assistant" to match common practice
+            elif msg_dict.get("role") == "assistant": 
                 langchain_messages.append(AIMessage(content=msg_dict.get("content", "")))
-        langchain_messages.append(HumanMessage(content=user_input)) # Add current user input
+        
+        # Use corrected_user_input for the current HumanMessage
+        langchain_messages.append(HumanMessage(content=corrected_user_input)) 
 
         initial_graph_state = GraphState(
             messages=langchain_messages,
-            user_input=user_input,
+            user_input=corrected_user_input, # Use corrected input
+            original_user_input=user_input, # Store original input
             user_id=user_id,
             jwt_token=jwt_token,
             initial_analysis=None, search_query=None, search_results=None,

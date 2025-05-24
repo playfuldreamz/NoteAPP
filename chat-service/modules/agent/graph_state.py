@@ -11,6 +11,7 @@ class GraphState(PydanticTypedDict):
     Attributes:
         messages: The list of messages accumulated so far.
         user_input: The current input from the user.
+        original_user_input: The user's input before typo correction.
         user_id: The ID of the user for authentication and context.
         jwt_token: JWT token for authenticated tool calls.
         initial_analysis: Results from the MessageAnalyzer.
@@ -26,6 +27,7 @@ class GraphState(PydanticTypedDict):
     """
     messages: Annotated[List[Any], add_messages]  # Can be HumanMessage, AIMessage, ToolMessage
     user_input: str
+    original_user_input: Optional[str]  # Added to store the original input before correction
     user_id: str
     jwt_token: str
     initial_analysis: Optional[Dict[str, Any]] = None  # Store MessageAnalysis output
