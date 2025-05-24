@@ -6,6 +6,7 @@ class IntentType(Enum):
     """Core types of user intents."""
     QUERY_NOTES = "query_notes"          # Direct questions about notes
     SEARCH_REQUEST = "search_request"     # Requests to find information
+    CREATE_NOTE = "create_note"           # Requests to create a new note
     OPINION_NOTES = "opinion_notes"       # Opinions/feelings about notes/system
     EMOTIONAL = "emotional"               # Personal/emotional content
     CASUAL = "casual"                     # Small talk
@@ -24,6 +25,10 @@ class IntentClassifier:
             IntentType.SEARCH_REQUEST: {
                 "words": ["search", "find", "lookup", "locate", "get", "show", "display"],
                 "patterns": ["where is", "how do i", "how to", "can you find", "do you know"]
+            },
+            IntentType.CREATE_NOTE: {
+                "words": ["create", "add", "make", "new note", "save", "write down", "document"],
+                "patterns": ["create a note", "add a note", "make a new note", "save this as a note", "can you create a note", "i want to add a note", "let's make a note"]
             },
             IntentType.OPINION_NOTES: {
                 "words": ["like", "hate", "prefer", "think", "feel", "opinion"],

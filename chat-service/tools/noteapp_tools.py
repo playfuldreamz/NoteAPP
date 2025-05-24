@@ -17,6 +17,11 @@ class GetNoteAppContentInput(BaseModel):
     item_id: int = Field(description="The ID of the note or transcript (must be an integer)")
     item_type: str = Field(description="The type of item (must be 'note' or 'transcript')")
 
+class CreateNoteAppInput(BaseModel):
+    """Input schema for the create note tool."""
+    title: str = Field(description="The title of the note.")
+    content: str = Field(description="The content of the note.")
+
 class BaseNoteAppTool(BaseTool, BaseModel):
     """Base class for NoteApp tools with authentication handling."""
     jwt_token: Optional[str] = None
@@ -164,3 +169,53 @@ class GetNoteAppContentTool(BaseNoteAppTool):
             return f"Error retrieving content: {str(e)}"
         except Exception as e:
             return f"Unexpected error: {str(e)}"
+
+class CreateNoteAppTool(BaseNoteAppTool):
+    """Tool for creating a new note."""
+    
+    name: str = "create_noteapp_note"
+    description: str = "Creates a new note with the given title and content. Use this when the user explicitly asks to create or save a note."
+    args_schema: type[BaseModel] = CreateNoteAppInput
+
+    def _run(self, title: str, content: str, **kwargs) -> str:
+        """Execute the note creation."""
+        if not self.jwt_token or not self.user_id:
+            return "Error: Tool not properly authenticated. JWT token or user ID is missing."
+
+        if not title or not title.strip():
+            return "Error: Note title cannot be empty."
+        if not content or not content.strip():
+            return "Error: Note content cannot be empty."
+
+        try:
+            response = requests.post(
+                f"{NOTEAPP_BACKEND_URL}/api/notes",
+                headers=self._get_headers(),
+                json={"title": title.strip(), "content": content.strip()}
+            )
+            response.raise_for_status()  # Raises an exception for 4XX/5XX errors
+            
+            # Assuming the backend returns the created note object with its ID
+            created_note_data = response.json()
+            note_id = created_note_data.get("id", "unknown_id") 
+            # Backend might return { "success": true, "note": { "id": ..., ... } } or just { "id": ... }
+            # Adjust based on actual backend response structure for note creation.
+            # For now, let's assume it's in created_note_data.id or created_note_data.note.id
+            if isinstance(created_note_data.get("note"), dict):
+                note_id = created_note_data.get("note", {}).get("id", note_id)
+
+
+            return f"Successfully created note titled '{title.strip()}' with ID: {note_id}."
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 400:
+                try:
+                    error_data = e.response.json()
+                    return f"Error creating note (400 Bad Request): {error_data.get('message', e.response.text)}"
+                except json.JSONDecodeError:
+                    return f"Error creating note (400 Bad Request): {e.response.text}"
+            return f"Error creating note: HTTP {e.response.status_code} - {e.response.text}"
+        except requests.RequestException as e:
+            return f"Error creating note: {str(e)}"
+        except Exception as e:
+            return f"An unexpected error occurred while creating the note: {str(e)}"

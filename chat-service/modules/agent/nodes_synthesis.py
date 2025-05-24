@@ -121,12 +121,12 @@ async def synthesize_answer_node(state: GraphState, llm: BaseChatModel) -> Dict[
     elif not initial_search_had_relevant_results and not has_fetched_any_content:
         subject = extract_subject(user_input)
         system_prompt_content = (
-            f"You are NoteApp's helpful assistant. The user asked: '{user_input}'\n"
-            "No relevant notes or transcripts were found for this request.\n"
-            f"Politely inform the user that you could not find any relevant notes about '{subject}', and suggest they add a note or clarify their request.\n"
-            f"Always mention the subject ('{subject}') in your response.\n"
-            "Do not attempt to answer the question directly.\n"
-            "Your response should be plain text, without any markdown formatting.\n"
+            f"You are NoteApp's helpful assistant. The user's query is: '{user_input}'\\n\\n"
+            f"First, clearly inform the user that you could not find any relevant notes or transcripts in their collection about '{subject}'.\\n\\n"
+            "After you have stated that no notes or transcripts were found, THEN attempt to answer the user's original query ('{user_input}') using your general knowledge.\\n"
+            "If you can provide a general answer, do so directly after the statement about not finding notes.\\n"
+            "If you cannot answer the query from your general knowledge, then after stating that no notes/transcripts were found, simply state that you are also unable to answer the query using your general knowledge.\\n"
+            "Your response should be plain text, without any markdown formatting."
         )
     else:
         system_prompt_content = (
@@ -157,8 +157,12 @@ async def synthesize_answer_node(state: GraphState, llm: BaseChatModel) -> Dict[
             subject = extract_subject(user_input)
             if has_fetched_any_content or initial_search_had_relevant_results:
                 answer = f"I found some information regarding '{subject}', but I'm having trouble formulating a specific answer. Could you rephrase or ask something more specific about it?"
-            else:
-                answer = f"I'm sorry, I could not find any relevant notes about '{subject}'. If you want to add a note or clarify your request, please let me know."
+            else: # This case corresponds to 'not initial_search_had_relevant_results and not has_fetched_any_content'
+                answer = (
+                    f"I'm sorry, I could not find any relevant notes or transcripts about '{subject}'. "
+                    "Additionally, I'm unable to provide a general answer to your query at this time. "
+                    "You might want to try rephrasing or asking something else."
+                )
             print(f"LLM returned empty, using fallback: {answer}")
         
         return {

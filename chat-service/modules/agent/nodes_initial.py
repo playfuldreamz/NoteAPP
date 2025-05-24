@@ -52,17 +52,24 @@ def analyze_input_node(state: GraphState, message_analyzer: MessageAnalyzer) -> 
         intent_val = analysis_dict["intent"]
         keywords = analysis_dict["keywords"]
         requires_tool = analysis_dict["requires_tool"]
-        required_tools_list = analysis_dict.get("required_tools", [])        # First check for content retrieval requests
-        note_title_to_search = extract_target_title_from_get_request(user_input)
-        if note_title_to_search:
-            # This is a content retrieval request, override intent
-            analysis_dict["intent"] = IntentType.ACTION.value
-            update_payload["search_query"] = note_title_to_search
-        # Otherwise handle regular searches
-        elif intent_val in [IntentType.QUERY_NOTES.value, IntentType.SEARCH_REQUEST.value] and keywords:
-            update_payload["search_query"] = user_input
-        elif requires_tool and not update_payload["search_query"] and keywords:
-            update_payload["search_query"] = " ".join(keywords)
+        required_tools_list = analysis_dict.get("required_tools", [])
+
+        # Do not set search_query if the intent is to create a note
+        if intent_val == IntentType.CREATE_NOTE.value:
+            update_payload["search_query"] = None # Ensure it's not set
+            print(f"Intent is CREATE_NOTE. Ensuring search_query is None.")
+        else:
+            # First check for content retrieval requests
+            note_title_to_search = extract_target_title_from_get_request(user_input)
+            if note_title_to_search:
+                # This is a content retrieval request, override intent if not already create
+                # analysis_dict["intent"] = IntentType.ACTION.value # This might be too broad, consider if this override is always safe
+                update_payload["search_query"] = note_title_to_search
+            # Otherwise handle regular searches
+            elif intent_val in [IntentType.QUERY_NOTES.value, IntentType.SEARCH_REQUEST.value] and keywords:
+                update_payload["search_query"] = user_input
+            elif requires_tool and not update_payload.get("search_query") and keywords:
+                update_payload["search_query"] = " ".join(keywords)
         
         if update_payload.get("search_query"):
              print(f"Search query set: {update_payload['search_query']}")

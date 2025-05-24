@@ -3,7 +3,8 @@ from typing import Dict, Any, Optional, List
 import traceback
 import json
 import re
-from langchain_core.messages import ToolMessage
+from datetime import datetime
+from langchain_core.messages import ToolMessage, AIMessage
 from langchain_core.tools import BaseTool
 from .graph_state import GraphState
 
@@ -102,6 +103,76 @@ def search_notes_node(state: GraphState, base_tools: Dict[str, BaseTool]) -> Dic
             "item_id_to_fetch": None,
             "item_type_to_fetch": None,
             "casual_exchange_count": 0
+        }
+
+def create_note_node(state: GraphState, base_tools: Dict[str, BaseTool]) -> Dict[str, Any]:
+    """Node for creating a new note using the create_noteapp_tool."""
+    print("--- Executing Node: create_note ---")
+    user_id = state["user_id"]
+    jwt_token = state["jwt_token"]
+    messages = state.get("messages", [])
+    user_input = state.get("user_input", "") # Current user input that triggered create
+
+    potential_content = ""
+    if messages and len(messages) > 1:
+        if isinstance(messages[-2], AIMessage):
+            potential_content = messages[-2].content
+
+    potential_title = user_input 
+    
+    title_match = re.search(r"(?:title[d]?|name[d]?)\s*[:\"\']?(.*?)(?:\\n|with content|for recipe|$)", user_input, re.IGNORECASE)
+    if title_match and title_match.group(1).strip():
+        potential_title = title_match.group(1).strip()
+    elif not potential_content: 
+        potential_content = user_input
+        potential_title = f"Note from user input on {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    elif not potential_title.strip() or potential_title.lower() in ["yes", "ok", "sure", "go ahead", "create it", "want to add a note", "can you create a note for that?"]:
+        potential_title = f"Note: {potential_content[:30]}..." if potential_content else f"New Note {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
+    if not potential_content.strip():
+        if user_input and not user_input.lower() in ["yes", "ok", "sure", "go ahead", "create it", "want to add a note", "can you create a note for that?"]:
+            potential_content = user_input
+        else:
+            return {"error_message": "Could not determine the content for the new note.", "final_answer": "I can create a note, but I need to know what content to put in it. What should the note say?"}
+
+    potential_title = (potential_title[:75] + '...') if len(potential_title) > 78 else potential_title
+
+    print(f"Attempting to create note with Title: '{potential_title}', Content: '{potential_content[:100]}...'")
+
+    create_tool = base_tools.get("create_noteapp_note")
+    if not create_tool:
+        print("--- create_noteapp_note tool not found. ---")
+        return {"error_message": "Create note tool is not available.", "final_answer": "I'm unable to create notes at the moment."}
+
+    if hasattr(create_tool, "set_auth"):
+        create_tool.set_auth(jwt_token=jwt_token, user_id=user_id)
+    else:
+        print("Warning: create_noteapp_note tool does not have set_auth method.")
+
+    try:
+        tool_output_str = create_tool.run({"title": potential_title, "content": potential_content})
+        print(f"Raw output from create_noteapp_note: {tool_output_str}")
+        
+        tool_message = ToolMessage(content=tool_output_str, tool_call_id="create_noteapp_note_0")
+        return {
+            "messages": [tool_message],
+            "final_answer": tool_output_str, 
+            "error_message": None
+        }
+
+    except Exception as e:
+        print(f"Error in create_note_node: {e}")
+        traceback.print_exc()
+        error_message_content = f"Error while creating note: {str(e)}"
+        tool_error_message = ToolMessage(
+            content=error_message_content,
+            tool_call_id="create_noteapp_note_error_0",
+            is_error=True
+        )
+        return {
+            "messages": [tool_error_message],
+            "error_message": error_message_content,
+            "final_answer": f"I tried to create the note, but something went wrong: {str(e)}"
         }
 
 def get_content_node(state: GraphState, base_tools: Dict[str, BaseTool]) -> Dict[str, Any]:

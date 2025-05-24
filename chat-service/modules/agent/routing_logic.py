@@ -22,6 +22,11 @@ def route_after_analysis(state: GraphState) -> str:
 
     print(f"Routing based on: Intent='{intent_str}', RequiresTool={requires_tool}, SearchQuerySet={bool(search_query)}")
 
+    # Path 0: Explicit Create Note Intent
+    if intent_str == IntentType.CREATE_NOTE.value:
+        print("Intent is CREATE_NOTE. Routing to create_note.")
+        return "create_note"
+
     # Path 1: If _analyze_input_node explicitly prepared a search_query, always prioritize search.
     if search_query:
         print(f"Search query ('{search_query}') is set. Routing to search_notes.")
