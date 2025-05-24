@@ -8,15 +8,37 @@ from langchain_core.language_models import BaseChatModel
 
 from .graph_state import GraphState
 
-def extract_subject(query: str) -> str:
-    """Extract the main subject from a user query."""
-    m = re.search(r"do i have (any )?notes (on|about|regarding) (.*?)[?]$", query, re.IGNORECASE)
-    if m:
-        return m.group(3).strip()
-    m2 = re.search(r"(?:provide|show|get|give me) (?:the )?(?:full )?content of (?:the )?(.*?) note", query, re.IGNORECASE)
-    if m2:
-        return m2.group(1).strip()
-    return query.strip()
+async def extract_subject(query: str, llm: BaseChatModel) -> str:
+    """Extract the main subject from a user query using an LLM."""
+    prompt_template = (
+        "You are an expert at identifying the core subject of a user's query. "
+        "Please extract the main subject from the following user query. "
+        "The subject should be a concise noun phrase representing what the query is about. "
+        "Respond with ONLY the extracted subject. "
+        "For example:\n"
+        "Query: 'do i have notes on project alpha?' -> Subject: 'project alpha'\n"
+        "Query: 'can you give me a recipe for pepperoni pizza' -> Subject: 'a recipe for pepperoni pizza'\n"
+        "Query: 'what\'s the weather like?' -> Subject: 'the weather'\n"
+        "Query: 'tell me about the new marketing strategy' -> Subject: 'the new marketing strategy'\n\n"
+        "User Query: \"{user_query}\"\n"
+        "Extracted Subject:"
+    )
+    
+    subject_extraction_prompt = prompt_template.format(user_query=query)
+    
+    try:
+        response = await llm.ainvoke([HumanMessage(content=subject_extraction_prompt)])
+        extracted_subject = response.content.strip()
+        
+        # Basic validation: if LLM returns something very short, empty, or the original query, fallback.
+        if not extracted_subject or len(extracted_subject) < 3 or extracted_subject.lower() == query.lower():
+            print(f"LLM subject extraction yielded unusable result ('{extracted_subject}'), falling back to original query for subject.")
+            return query.strip() # Fallback to original query
+            
+        return extracted_subject
+    except Exception as e:
+        print(f"Error during LLM subject extraction: {e}. Falling back to original query.")
+        return query.strip() # Fallback to original query
 
 def extract_target_title_from_get_request(query_text: str) -> str:
     """Extract the target note title from a get content request."""
@@ -112,20 +134,20 @@ async def synthesize_answer_node(state: GraphState, llm: BaseChatModel) -> Dict[
             f"{context_from_fetched_content}"
         )
     elif is_get_content_request and not has_fetched_any_content:
-        subject = extract_subject(user_input)
+        subject = await extract_subject(user_input, llm)
         system_prompt_content = (
             f"You are NoteApp's helpful assistant. The user asked for content related to '{subject}'. "
             "It seems I was unable to retrieve specific content for this request in the previous steps. "
             "Please inform the user that you couldn't retrieve the specific content and ask if they'd like to try searching again or rephrasing."
         )
     elif not initial_search_had_relevant_results and not has_fetched_any_content:
-        subject = extract_subject(user_input)
+        subject = await extract_subject(user_input, llm)
         system_prompt_content = (
-            f"You are NoteApp's helpful assistant. The user's query is: '{user_input}'\\n\\n"
-            f"First, clearly inform the user that you could not find any relevant notes or transcripts in their collection about '{subject}'.\\n\\n"
-            "After you have stated that no notes or transcripts were found, THEN attempt to answer the user's original query ('{user_input}') using your general knowledge.\\n"
-            "If you can provide a general answer, do so directly after the statement about not finding notes.\\n"
-            "If you cannot answer the query from your general knowledge, then after stating that no notes/transcripts were found, simply state that you are also unable to answer the query using your general knowledge.\\n"
+            f"You are NoteApp's helpful assistant. The user's query is: '{user_input}'\n\n"
+            f"First, clearly inform the user that you could not find any relevant notes or transcripts in their collection about '{subject}'.\n\n"
+            "After you have stated that no notes or transcripts were found, THEN attempt to answer the user's original query ('{user_input}') using your general knowledge.\n"
+            "If you can provide a general answer, do so directly after the statement about not finding notes.\n"
+            "If you cannot answer the query from your general knowledge, then after stating that no notes/transcripts were found, simply state that you are also unable to answer the query using your general knowledge.\n"
             "Your response should be plain text, without any markdown formatting."
         )
     else:
@@ -154,7 +176,7 @@ async def synthesize_answer_node(state: GraphState, llm: BaseChatModel) -> Dict[
         print(f"Synthesized Answer from LLM: {answer}")
         
         if not answer:
-            subject = extract_subject(user_input)
+            subject = await extract_subject(user_input, llm)
             if has_fetched_any_content or initial_search_had_relevant_results:
                 answer = f"I found some information regarding '{subject}', but I'm having trouble formulating a specific answer. Could you rephrase or ask something more specific about it?"
             else: # This case corresponds to 'not initial_search_had_relevant_results and not has_fetched_any_content'
@@ -174,7 +196,7 @@ async def synthesize_answer_node(state: GraphState, llm: BaseChatModel) -> Dict[
     except Exception as e:
         print(f"Error in synthesize_answer_node LLM call: {e}")
         traceback.print_exc()
-        subject = extract_subject(user_input)
+        subject = await extract_subject(user_input, llm)
         fallback = f"I'm sorry, I had trouble processing your request about '{subject}'. Please try again."
         return {
             "messages": [AIMessage(content=fallback)],
