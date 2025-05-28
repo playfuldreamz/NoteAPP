@@ -173,7 +173,7 @@ class GetNoteAppContentTool(BaseNoteAppTool):
 class CreateNoteAppTool(BaseNoteAppTool):
     """Tool for creating a new note."""
     
-    name: str = "create_noteapp_note"
+    name: str = "create_note"
     description: str = "Creates a new note with the given title and content. Use this when the user explicitly asks to create or save a note."
     args_schema: type[BaseModel] = CreateNoteAppInput
 

@@ -11,7 +11,7 @@ from config import (
     validate_config, get_llm_client
 )
 from modules import NoteAppChatAgent
-from tools import SearchNoteAppTool, GetNoteAppContentTool
+from tools import SearchNoteAppTool, GetNoteAppContentTool, CreateNoteAppTool
 
 # Import the ASYNC version of SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
     try:
         llm = get_llm_client()
         logger.info("LLM client initialized successfully")
-        tools = [SearchNoteAppTool(), GetNoteAppContentTool()]
+        tools = [SearchNoteAppTool(), GetNoteAppContentTool(), CreateNoteAppTool()]
         async with AsyncSqliteSaver.from_conn_string(":memory:") as chkptr:
             checkpointer_instance = chkptr
             note_app_agent_instance = NoteAppChatAgent(llm=llm, tools=tools, checkpointer=checkpointer_instance)

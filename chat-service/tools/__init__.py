@@ -1,3 +1,3 @@
-from .noteapp_tools import SearchNoteAppTool, GetNoteAppContentTool
+from .noteapp_tools import SearchNoteAppTool, GetNoteAppContentTool, CreateNoteAppTool
 
-__all__ = ['SearchNoteAppTool', 'GetNoteAppContentTool']
+__all__ = ['SearchNoteAppTool', 'GetNoteAppContentTool', 'CreateNoteAppTool']

@@ -106,7 +106,7 @@ def search_notes_node(state: GraphState, base_tools: Dict[str, BaseTool]) -> Dic
         }
 
 def create_note_node(state: GraphState, base_tools: Dict[str, BaseTool]) -> Dict[str, Any]:
-    """Node for creating a new note using the create_noteapp_tool."""
+    """Node for creating a new note using the create_note tool."""
     print("--- Executing Node: create_note ---")
     user_id = state["user_id"]
     jwt_token = state["jwt_token"]
@@ -139,21 +139,21 @@ def create_note_node(state: GraphState, base_tools: Dict[str, BaseTool]) -> Dict
 
     print(f"Attempting to create note with Title: '{potential_title}', Content: '{potential_content[:100]}...'")
 
-    create_tool = base_tools.get("create_noteapp_note")
+    create_tool = base_tools.get("create_note")  # FIXED: use correct tool name
     if not create_tool:
-        print("--- create_noteapp_note tool not found. ---")
+        print("--- create_note tool not found. ---")
         return {"error_message": "Create note tool is not available.", "final_answer": "I'm unable to create notes at the moment."}
 
     if hasattr(create_tool, "set_auth"):
         create_tool.set_auth(jwt_token=jwt_token, user_id=user_id)
     else:
-        print("Warning: create_noteapp_note tool does not have set_auth method.")
+        print("Warning: create_note tool does not have set_auth method.")
 
     try:
         tool_output_str = create_tool.run({"title": potential_title, "content": potential_content})
-        print(f"Raw output from create_noteapp_note: {tool_output_str}")
+        print(f"Raw output from create_note: {tool_output_str}")
         
-        tool_message = ToolMessage(content=tool_output_str, tool_call_id="create_noteapp_note_0")
+        tool_message = ToolMessage(content=tool_output_str, tool_call_id="create_note_0")
         return {
             "messages": [tool_message],
             "final_answer": tool_output_str, 
@@ -166,7 +166,7 @@ def create_note_node(state: GraphState, base_tools: Dict[str, BaseTool]) -> Dict
         error_message_content = f"Error while creating note: {str(e)}"
         tool_error_message = ToolMessage(
             content=error_message_content,
-            tool_call_id="create_noteapp_note_error_0",
+            tool_call_id="create_note_error_0",
             is_error=True
         )
         return {
